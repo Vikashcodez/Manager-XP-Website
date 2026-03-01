@@ -75,12 +75,12 @@ const WhyUsPage = () => {
       icon: <Gamepad2 className="w-6 h-6 text-purple-400" />,
       title: "Built for Gaming Businesses",
       subtitle: "Not Just Software",
-      description: "We build high-performance gaming café management platforms designed for how you actually operate.",
+      description: "We build high-performance gaming cafe management platforms designed for how you actually operate.",
       list: ["Game time tracking", "Automated billing", "Tournament management", "PC control & monitoring"]
     },
     {
       icon: <Monitor className="w-6 h-6 text-cyan-400" />,
-      title: "Complete Internet Café Management",
+      title: "Complete Internet Cafe Management",
       subtitle: "All-in-One Dashboard",
       description: "From small browsing centers to large cyber hubs. Everything you need to run efficiently.",
       list: ["User login control", "Time-based billing", "Bandwidth monitoring", "Security & activity tracking"]
@@ -89,7 +89,7 @@ const WhyUsPage = () => {
       icon: <Brain className="w-6 h-6 text-green-400" />,
       title: "AI-Powered Smart Solutions",
       subtitle: "Intelligent Operations",
-      description: "Integrate Artificial Intelligence to give your business an edge. Your café becomes intelligent.",
+      description: "Integrate Artificial Intelligence to give your business an edge. Your cafe becomes intelligent.",
       list: ["Smart usage prediction", "Revenue forecasting", "Security anomaly detection", "Customer behavior analysis"]
     },
     {
@@ -225,7 +225,7 @@ const WhyUsPage = () => {
                         <h3 className="text-lg font-bold text-white tracking-wide">Custom Development & AI Integration</h3>
                     </div>
                     <p className="text-gray-400 leading-relaxed mb-4">
-                        Need something unique? We provide custom gaming café solutions, AI model integration, automation tools, and full-stack development support.
+                        Need something unique? We provide custom gaming cafe solutions, AI model integration, automation tools, and full-stack development support.
                     </p>
                     <div className="flex flex-wrap gap-2">
                          <span className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-400">Automation Tools</span>

@@ -71,7 +71,7 @@ const AboutPage = () => {
   }, []);
 
   const whyUsPoints = [
-    "Built specifically for gaming & internet cafés",
+    "Built specifically for gaming & internet cafes",
     "Real-time monitoring & reporting",
     "Advanced telemetry data tracking",
     "Custom CRM integration",
@@ -120,7 +120,7 @@ const AboutPage = () => {
           </h1>
           
           <p className="text-gray-400 max-w-3xl mx-auto text-lg font-light">
-            A next-generation café software and AI solutions provider dedicated to transforming how digital spaces operate.
+            A next-generation cafe software and AI solutions provider dedicated to transforming how digital spaces operate.
           </p>
         </div>
 
@@ -135,10 +135,10 @@ const AboutPage = () => {
               Who We Are
             </h3>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
-              Founded in <span className="text-white">2026</span>, ManagerXP is a next-generation café software and AI solutions provider. We specialize in building intelligent management platforms that combine automation, real-time monitoring, billing systems, and AI-driven analytics.
+              Founded in <span className="text-white">2026</span>, ManagerXP is a next-generation cafe software and AI solutions provider. We specialize in building intelligent management platforms that combine automation, real-time monitoring, billing systems, and AI-driven analytics.
             </p>
             <p className="text-gray-500 text-sm leading-relaxed">
-              From high-performance gaming arenas to traditional cyber cafés, our solutions are designed to simplify operations, improve efficiency, and maximize profitability.
+              From high-performance gaming arenas to traditional cyber cafes, our solutions are designed to simplify operations, improve efficiency, and maximize profitability.
             </p>
           </div>
 
@@ -174,7 +174,7 @@ const AboutPage = () => {
         <div className="mb-20">
           <div className="text-center mb-10">
             <h2 className="text-2xl font-bold text-white mb-2">What We Do</h2>
-            <p className="text-gray-500 text-sm">We don't just manage cafés — we build intelligent digital ecosystems.</p>
+            <p className="text-gray-500 text-sm">We don't just manage cafes — we build intelligent digital ecosystems.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -183,7 +183,7 @@ const AboutPage = () => {
               <div className="p-3 bg-purple-500/10 rounded-lg w-fit mb-4 group-hover:bg-purple-500/20 transition-colors">
                 <Gamepad2 className="w-6 h-6 text-purple-400" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Gaming Café Software</h3>
+              <h3 className="text-lg font-bold text-white mb-2">Gaming Cafe Software</h3>
               <p className="text-xs text-gray-500 leading-relaxed">
                 High-performance systems with telemetry data, session control, tournament handling, and smart billing.
               </p>
@@ -194,7 +194,7 @@ const AboutPage = () => {
               <div className="p-3 bg-cyan-500/10 rounded-lg w-fit mb-4 group-hover:bg-cyan-500/20 transition-colors">
                 <Monitor className="w-6 h-6 text-cyan-400" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Internet Café Software</h3>
+              <h3 className="text-lg font-bold text-white mb-2">Internet Cafe Software</h3>
               <p className="text-xs text-gray-500 leading-relaxed">
                 Secure user access management, automated billing, centralized control, and real-time reporting.
               </p>
@@ -224,7 +224,7 @@ const AboutPage = () => {
                 <h3 className="text-xl font-bold text-white">Our Vision</h3>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-4">
-                To become a global leader in café management and AI-driven business ecosystems by delivering scalable, secure, and performance-oriented software solutions.
+                To become a global leader in cafe management and AI-driven business ecosystems by delivering scalable, secure, and performance-oriented software solutions.
               </p>
               <p className="text-gray-500 text-xs font-mono">
                 // Redefining how digital spaces operate.
@@ -241,7 +241,7 @@ const AboutPage = () => {
                 <h3 className="text-xl font-bold text-white">Our Mission</h3>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-4">
-                To empower café owners with smart technology that reduces complexity, increases operational control, and drives sustainable growth through innovation.
+                To empower cafe owners with smart technology that reduces complexity, increases operational control, and drives sustainable growth through innovation.
               </p>
               <p className="text-gray-500 text-xs font-mono">
                 // Driving sustainable growth via AI.
@@ -271,7 +271,7 @@ const AboutPage = () => {
             <div className="mt-8 pt-6 border-t border-white/5 text-center">
               <p className="text-gray-500 text-sm font-mono">
                 ManagerXP is not just a software provider. <br/>
-                We are a <span className="text-white">technology partner</span> committed to building the future of smart café ecosystems.
+                We are a <span className="text-white">technology partner</span> committed to building the future of smart cafe ecosystems.
               </p>
             </div>
           </div>

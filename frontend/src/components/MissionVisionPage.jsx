@@ -69,15 +69,15 @@ const MissionVisionPage = () => {
 
   const ecosystemItems = [
     { icon: <Cpu className="w-5 h-5" />, text: "Gaming Systems" },
-    { icon: <Network className="w-5 h-5" />, text: "Café Operations" },
+    { icon: <Network className="w-5 h-5" />, text: "Cafe Operations" },
     { icon: <Zap className="w-5 h-5" />, text: "Billing & Monitoring" },
     { icon: <Layers className="w-5 h-5" />, text: "AI Analytics" },
     { icon: <Shield className="w-5 h-5" />, text: "Security & Automation" }
   ];
 
   const visionPoints = [
-    "Every gaming café runs on intelligent automation",
-    "Every internet café operates with full transparency",
+    "Every gaming cafe runs on intelligent automation",
+    "Every internet cafe operates with full transparency",
     "Businesses are powered by predictive AI insights",
     "All systems are connected inside one scalable ecosystem"
   ];
@@ -125,7 +125,7 @@ const MissionVisionPage = () => {
                 OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">MISSION</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                To empower gaming cafés, internet cafés, and digital businesses with intelligent, secure, and high-performance software solutions — while building our own integrated technology ecosystem.
+                To empower gaming cafes, internet cafes, and digital businesses with intelligent, secure, and high-performance software solutions — while building our own integrated technology ecosystem.
               </p>
               <div className="p-4 border-l-2 border-cyan-500 bg-white/5 backdrop-blur-sm">
                 <p className="text-white font-mono text-sm">
@@ -162,7 +162,7 @@ const MissionVisionPage = () => {
           {/* Bottom Text */}
           <div className="mt-8 max-w-3xl mx-auto text-center">
             <p className="text-gray-500 text-sm">
-              Our mission is to transform traditional café operations into <span className="text-white">smart</span>, <span className="text-white">scalable</span>, and <span className="text-white">data-driven</span> digital environments.
+              Our mission is to transform traditional cafe operations into <span className="text-white">smart</span>, <span className="text-white">scalable</span>, and <span className="text-white">data-driven</span> digital environments.
             </p>
           </div>
         </div>
@@ -190,7 +190,7 @@ const MissionVisionPage = () => {
               OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">VISION</span>
             </h2>
             <p className="text-gray-400 text-lg max-w-3xl mx-auto">
-              To build our own global ecosystem of AI-powered café and digital management solutions that redefine how modern digital spaces operate.
+              To build our own global ecosystem of AI-powered cafe and digital management solutions that redefine how modern digital spaces operate.
             </p>
           </div>
 

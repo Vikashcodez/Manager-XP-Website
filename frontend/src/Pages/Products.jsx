@@ -156,7 +156,7 @@ const ProductsPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 {/* Left: Info */}
                 <div className="lg:col-span-1">
-                  <h2 className="text-2xl font-bold text-white mb-2">The Ultimate Gaming Café Platform</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">The Ultimate Gaming Cafe Platform</h2>
                   <p className="text-gray-400 text-sm leading-relaxed mb-4">
                     Engineered specifically for high-performance gaming environments. It gives you complete control over your gaming infrastructure.
                   </p>
@@ -190,7 +190,7 @@ const ProductsPage = () => {
               {/* Bottom Statement */}
               <div className="mt-4 pt-6 border-t border-white/5 text-center">
                 <p className="text-sm font-mono text-gray-500">
-                  <span className="text-white">GamingXP</span> doesn’t just manage your café — it optimizes performance, maximizes uptime, and increases profitability.
+                  <span className="text-white">GamingXP</span> doesn’t just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
                 </p>
               </div>
             </div>
@@ -241,9 +241,9 @@ const ProductsPage = () => {
 
                 {/* Features */}
                 <div className="lg:w-2/3">
-                  <h2 className="text-2xl font-bold text-white mb-2">Smart Management for Internet Cafés</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">Smart Management for Internet Cafes</h2>
                   <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                    Designed for traditional internet cafés and browsing centers that need efficiency, security, and complete operational control.
+                    Designed for traditional internet cafes and browsing centers that need efficiency, security, and complete operational control.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
