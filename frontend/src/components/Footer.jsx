@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png'; 
-import { Zap, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import { FaXTwitter, FaLinkedin } from 'react-icons/fa6';
 
 const Footer = () => {
   return (
@@ -28,7 +29,7 @@ const Footer = () => {
 
       {/* --- Main Content --- */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           
           {/* Company Info */}
           <div className="space-y-6 md:col-span-1">
@@ -43,15 +44,13 @@ const Footer = () => {
               Empowering businesses with innovative management solutions for the modern workplace.
             </p>
             <div className="flex space-x-3">
-              {/* Social Icons - HUD Style */}
-              {['facebook', 'twitter', 'github', 'dribbble'].map((social, i) => (
-                <a key={i} href="#" className="p-2 bg-gray-100 border border-gray-300 rounded-full text-gray-600 hover:text-cyan-600 hover:border-cyan-500 transition-all duration-300">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    {/* Generic icon path for demo */}
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                  </svg>
-                </a>
-              ))}
+              {/* Social Icons - X (Twitter) and LinkedIn */}
+              <a href="https://twitter.com/managerxp" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-100 border border-gray-300 rounded-full text-gray-600 hover:text-black hover:border-black transition-all duration-300">
+                <FaXTwitter className="w-4 h-4" />
+              </a>
+              <a href="https://linkedin.com/company/managerxp" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-100 border border-gray-300 rounded-full text-gray-600 hover:text-blue-600 hover:border-blue-500 transition-all duration-300">
+                <FaLinkedin className="w-4 h-4" />
+              </a>
             </div>
           </div>
 
@@ -62,32 +61,30 @@ const Footer = () => {
               Quick Links
             </h4>
             <ul className="space-y-3">
-              {['Home', 'Our Products', 'About Us', 'Contact Us'].map((item, i) => (
-                <li key={i}>
-                  <Link to="/" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
-                    <span className="w-0 h-[1px] bg-cyan-600 group-hover:w-3 transition-all duration-300"></span>
-                    {item}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Products */}
-          <div>
-            <h4 className="text-xs font-mono uppercase tracking-[0.2em] text-purple-600 mb-6 flex items-center gap-2">
-              <span className="w-2 h-[1px] bg-purple-600"></span>
-              Products
-            </h4>
-            <ul className="space-y-3">
-              {['Task Management', 'Team Collaboration', 'Analytics', 'Integrations'].map((item, i) => (
-                <li key={i}>
-                  <a href="#" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
-                    <Zap className="w-3 h-3 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    {item}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <Link to="/" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
+                  <span className="w-0 h-[1px] bg-cyan-600 group-hover:w-3 transition-all duration-300"></span>
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
+                  <span className="w-0 h-[1px] bg-cyan-600 group-hover:w-3 transition-all duration-300"></span>
+                  Our Products
+                </Link>
+              </li>
+              <li>
+                <Link to="/about" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
+                  <span className="w-0 h-[1px] bg-cyan-600 group-hover:w-3 transition-all duration-300"></span>
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="group flex items-center gap-2 text-gray-600 hover:text-black transition-colors duration-300 text-sm">
+                  <span className="w-0 h-[1px] bg-cyan-600 group-hover:w-3 transition-all duration-300"></span>
+                  Contact Us
+                </Link>
+              </li>
             </ul>
           </div>
 
