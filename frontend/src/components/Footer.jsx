@@ -1,145 +1,158 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png'; 
+import { Zap, Mail, Phone, MapPin } from 'lucide-react';
 
 const Footer = () => {
   return (
-    <footer className="bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer className="relative bg-[#030303] text-white overflow-hidden border-t border-white/5">
+      
+      {/* --- Background Layers --- */}
+      
+      {/* 1. PCB Grid Pattern */}
+      <div 
+        className="absolute inset-0 z-0 opacity-20
+                   bg-[length:40px_40px]
+                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(255,255,255,0.05)_1px,transparent_1px)]
+                   [mask-image:radial-gradient(ellipse_80%_80%_at_50%_100%,black_40%,transparent_100%)]"
+      />
+
+      {/* 2. Racer Light Streaks */}
+      <div className="absolute top-0 left-0 w-full h-[1px] z-[2] overflow-hidden">
+        <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent absolute animate-racer-fast opacity-60 blur-[1px]"/>
+      </div>
+      <div className="absolute bottom-0 left-0 w-full h-[1px] z-[2] overflow-hidden">
+        <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-purple-500 to-transparent absolute animate-racer-slow opacity-40 blur-[1px]"/>
+      </div>
+
+      {/* --- Main Content --- */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           
           {/* Company Info */}
-          <div className="space-y-4">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-pink-400 bg-clip-text text-transparent">
-              ManagerXP
-            </h3>
-            <p className="text-gray-300 text-sm leading-relaxed">
+          <div className="space-y-6 md:col-span-1">
+            <div className="flex items-center">
+              <img 
+                src={logo}
+                alt="Company Logo" 
+                className="h-10 w-auto object-contain"
+              />
+            </div>
+            <p className="text-gray-500 text-sm leading-relaxed font-mono">
               Empowering businesses with innovative management solutions for the modern workplace.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors duration-300">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.51 0 10-4.48 10-10S17.51 2 12 2zm6.605 4.61a8.502 8.502 0 011.93 5.314c-.281-.054-3.101-.629-5.943-.271-.065-.141-.12-.293-.184-.445a25.416 25.416 0 00-.564-1.236c3.145-1.28 4.577-3.124 4.761-3.362zM12 3.475c2.17 0 4.154.813 5.662 2.148-.152.216-1.443 1.941-4.48 3.08-1.399-2.57-2.95-4.675-3.189-5A8.687 8.687 0 0112 3.475zm-3.633.803a53.896 53.896 0 013.167 4.935c-3.992 1.063-7.517 1.04-7.896 1.04a8.581 8.581 0 014.729-5.975zM3.453 12.01v-.26c.37.01 4.512.065 8.775-1.215.25.477.477.965.694 1.453-.109.033-.228.065-.336.098-4.404 1.42-6.747 5.303-6.942 5.629a8.522 8.522 0 01-2.19-5.705zM12 20.547a8.482 8.482 0 01-5.239-1.8c.152-.315 1.888-3.656 6.703-5.337.022-.01.033-.01.054-.022a35.318 35.318 0 011.823 6.475 8.4 8.4 0 01-3.341.684zm4.761-1.465c-.086-.52-.542-3.015-1.659-6.084 2.679-.423 5.022.271 5.314.369a8.468 8.468 0 01-3.655 5.715z" clipRule="evenodd" />
-                </svg>
-              </a>
+            <div className="flex space-x-3">
+              {/* Social Icons - HUD Style */}
+              {['facebook', 'twitter', 'github', 'dribbble'].map((social, i) => (
+                <a key={i} href="#" className="p-2 bg-white/5 border border-white/10 rounded-full text-gray-500 hover:text-cyan-400 hover:border-cyan-500/50 transition-all duration-300">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    {/* Generic icon path for demo */}
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                  </svg>
+                </a>
+              ))}
             </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-lg font-semibold mb-4 text-indigo-300">Quick Links</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Our Products
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Contact Us
-                </Link>
-              </li>
+            <h4 className="text-xs font-mono uppercase tracking-[0.2em] text-cyan-400 mb-6 flex items-center gap-2">
+              <span className="w-2 h-[1px] bg-cyan-400"></span>
+              Quick Links
+            </h4>
+            <ul className="space-y-3">
+              {['Home', 'Our Products', 'About Us', 'Contact Us'].map((item, i) => (
+                <li key={i}>
+                  <Link to="/" className="group flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-300 text-sm">
+                    <span className="w-0 h-[1px] bg-cyan-400 group-hover:w-3 transition-all duration-300"></span>
+                    {item}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Products */}
           <div>
-            <h4 className="text-lg font-semibold mb-4 text-indigo-300">Products</h4>
-            <ul className="space-y-2">
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Task Management
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Team Collaboration
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Analytics
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">
-                  Integrations
-                </a>
-              </li>
+            <h4 className="text-xs font-mono uppercase tracking-[0.2em] text-purple-400 mb-6 flex items-center gap-2">
+              <span className="w-2 h-[1px] bg-purple-400"></span>
+              Products
+            </h4>
+            <ul className="space-y-3">
+              {['Task Management', 'Team Collaboration', 'Analytics', 'Integrations'].map((item, i) => (
+                <li key={i}>
+                  <a href="#" className="group flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-300 text-sm">
+                    <Zap className="w-3 h-3 text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {item}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Contact Info */}
           <div>
-            <h4 className="text-lg font-semibold mb-4 text-indigo-300">Get In Touch</h4>
-            <ul className="space-y-2">
-              <li className="flex items-start space-x-2">
-                <svg className="w-5 h-5 text-indigo-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span className="text-gray-300 text-sm">info@managerxp.com</span>
+            <h4 className="text-xs font-mono uppercase tracking-[0.2em] text-green-400 mb-6 flex items-center gap-2">
+              <span className="w-2 h-[1px] bg-green-400"></span>
+              Get In Touch
+            </h4>
+            <ul className="space-y-4 text-sm">
+              <li className="flex items-start gap-3 text-gray-500 hover:text-gray-300 transition-colors">
+                <Mail className="w-4 h-4 mt-0.5 text-gray-600" />
+                <span>info@managerxp.com</span>
               </li>
-              <li className="flex items-start space-x-2">
-                <svg className="w-5 h-5 text-indigo-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                <span className="text-gray-300 text-sm">+1 (555) 123-4567</span>
+              <li className="flex items-start gap-3 text-gray-500 hover:text-gray-300 transition-colors">
+                <Phone className="w-4 h-4 mt-0.5 text-gray-600" />
+                <span>+1 (555) 123-4567</span>
               </li>
-              <li className="flex items-start space-x-2">
-                <svg className="w-5 h-5 text-indigo-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="text-gray-300 text-sm">123 Business St, Suite 100<br />New York, NY 10001</span>
+              <li className="flex items-start gap-3 text-gray-500 hover:text-gray-300 transition-colors">
+                <MapPin className="w-4 h-4 mt-0.5 text-gray-600" />
+                <span>123 Business St, Suite 100<br />New York, NY 10001</span>
               </li>
             </ul>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-gray-700">
+        <div className="mt-16 pt-8 border-t border-white/10">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-gray-400 text-sm">
-              &copy; {new Date().getFullYear()} ManagerXP. All rights reserved.
+            <p className="text-gray-600 text-xs font-mono tracking-wider">
+              &copy; {new Date().getFullYear()} ManagerXP. SYSTEM_ONLINE.
             </p>
             <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
-                Privacy Policy
+              <a href="#" className="text-gray-600 hover:text-cyan-400 text-xs font-mono transition-colors duration-300 uppercase tracking-wide">
+                Privacy_Policy
               </a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
-                Terms of Service
+              <a href="#" className="text-gray-600 hover:text-cyan-400 text-xs font-mono transition-colors duration-300 uppercase tracking-wide">
+                Terms_of_Service
               </a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
-                Cookie Policy
+              <a href="#" className="text-gray-600 hover:text-cyan-400 text-xs font-mono transition-colors duration-300 uppercase tracking-wide">
+                Cookie_Protocol
               </a>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Custom CSS Animations */}
+      <style>{`
+        @keyframes racer-fast {
+          0% { transform: translateX(-100vw); }
+          100% { transform: translateX(100vw); }
+        }
+        .animate-racer-fast {
+          animation: racer-fast 3s linear infinite;
+        }
+
+        @keyframes racer-slow {
+          0% { transform: translateX(100vw); }
+          100% { transform: translateX(-100vw); }
+        }
+        .animate-racer-slow {
+          animation: racer-slow 7s linear infinite;
+        }
+      `}</style>
     </footer>
   );
 };
