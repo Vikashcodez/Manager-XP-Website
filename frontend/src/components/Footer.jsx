@@ -104,11 +104,11 @@ const Footer = () => {
               </li>
               <li className="flex items-start gap-3 text-gray-600 hover:text-gray-800 transition-colors">
                 <Phone className="w-4 h-4 mt-0.5 text-gray-500" />
-                <span>+1 (555) 123-4567</span>
+                <span>+91 9679549136</span>
               </li>
               <li className="flex items-start gap-3 text-gray-600 hover:text-gray-800 transition-colors">
                 <MapPin className="w-4 h-4 mt-0.5 text-gray-500" />
-                <span>123 Business St, Suite 100<br />New York, NY 10001</span>
+                <span>8-2-644/1/205 F205,<br /> Hiline Complex, Road No.12,<br /> Banjara Hills, Hyderabad- 500034.</span>
               </li>
             </ul>
           </div>

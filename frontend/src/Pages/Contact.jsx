@@ -154,8 +154,9 @@ const ContactPage = () => {
                 <div>
                   <h3 className="text-black font-bold mb-1">Location</h3>
                   <p className="text-gray-700 text-sm leading-relaxed">
-                    123 Business St, Suite 100<br />
-                    New York, NY 10001
+                    8-2-644/1/205 F205, Hiline Complex, <br />
+                    Road No.12, Banjara Hills,<br />
+                     Hyderabad- 500034
                   </p>
                 </div>
               </div>
@@ -186,7 +187,7 @@ const ContactPage = () => {
                 <div>
                   <h3 className="text-black font-bold mb-1">Phone</h3>
                   <p className="text-gray-700 text-sm">
-                    +1 (555) 123-4567
+                    +91 9679549136
                   </p>
                   <p className="text-gray-600 text-xs mt-1 font-mono">Mon-Fri: 9AM - 6PM</p>
                 </div>
