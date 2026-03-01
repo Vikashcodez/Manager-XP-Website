@@ -72,42 +72,42 @@ const WhyUsPage = () => {
 
   const features = [
     {
-      icon: <Gamepad2 className="w-6 h-6 text-purple-400" />,
+      icon: <Gamepad2 className="w-6 h-6 text-purple-600" />,
       title: "Built for Gaming Businesses",
       subtitle: "Not Just Software",
       description: "We build high-performance gaming cafe management platforms designed for how you actually operate.",
       list: ["Game time tracking", "Automated billing", "Tournament management", "PC control & monitoring"]
     },
     {
-      icon: <Monitor className="w-6 h-6 text-cyan-400" />,
+      icon: <Monitor className="w-6 h-6 text-cyan-600" />,
       title: "Complete Internet Cafe Management",
       subtitle: "All-in-One Dashboard",
       description: "From small browsing centers to large cyber hubs. Everything you need to run efficiently.",
       list: ["User login control", "Time-based billing", "Bandwidth monitoring", "Security & activity tracking"]
     },
     {
-      icon: <Brain className="w-6 h-6 text-green-400" />,
+      icon: <Brain className="w-6 h-6 text-green-600" />,
       title: "AI-Powered Smart Solutions",
       subtitle: "Intelligent Operations",
       description: "Integrate Artificial Intelligence to give your business an edge. Your cafe becomes intelligent.",
       list: ["Smart usage prediction", "Revenue forecasting", "Security anomaly detection", "Customer behavior analysis"]
     },
     {
-      icon: <Gauge className="w-6 h-6 text-yellow-400" />,
+      icon: <Gauge className="w-6 h-6 text-yellow-600" />,
       title: "High Performance Architecture",
       subtitle: "Scalable & Modern",
       description: "Built with modern technologies. Whether you run 10 systems or 1000 — we grow with you.",
       list: ["React-based dashboards", "Cloud-ready backend", "Real-time monitoring", "Scalable database"]
     },
     {
-      icon: <Shield className="w-6 h-6 text-red-400" />,
+      icon: <Shield className="w-6 h-6 text-red-600" />,
       title: "Security First Approach",
       subtitle: "Protected Data",
       description: "Your systems and customer data are protected with enterprise-grade protocols.",
       list: ["Encrypted communication", "Role-based admin access", "Secure authentication", "Backup & recovery"]
     },
     {
-      icon: <BarChart3 className="w-6 h-6 text-blue-400" />,
+      icon: <BarChart3 className="w-6 h-6 text-blue-600" />,
       title: "Data-Driven Decisions",
       subtitle: "No Guesswork",
       description: "Make smarter business decisions with real-time insights and comprehensive reporting.",
@@ -116,25 +116,25 @@ const WhyUsPage = () => {
   ];
 
   return (
-    <div className="relative min-h-screen bg-[#030303] overflow-hidden antialiased font-sans">
+    <div className="relative min-h-screen bg-white overflow-hidden antialiased font-sans">
       
       {/* --- Background Layers (Identical Style) --- */}
       <div 
-        className="absolute inset-0 z-0 opacity-20
+        className="absolute inset-0 z-0 opacity-5
                    bg-[length:40px_40px]
-                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),
-                                      linear-gradient(to_top,rgba(255,255,255,0.05)_1px,transparent_1px)]
+                   [background-image:linear-gradient(to_right,rgba(0,0,0,0.1)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(0,0,0,0.1)_1px,transparent_1px)]
                    [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)]"
       />
-      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-40" />
-      <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-0" />
+      <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-gray-100/50 via-transparent to-transparent" />
 
-      {/* Racer Light Streaks */}
+      {/* Racer Light Streaks - Hidden for white bg */}
       <div className="absolute top-1/4 left-0 w-full h-[2px] z-[2] overflow-hidden">
-        <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent absolute animate-racer-fast opacity-80 blur-[1px]"/>
+        <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-cyan-400/0 to-transparent absolute animate-racer-fast opacity-0 blur-[1px]"/>
       </div>
       <div className="absolute bottom-1/3 left-0 w-full h-[1px] z-[2] overflow-hidden">
-        <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-purple-500 to-transparent absolute animate-racer-slow opacity-60 blur-[1px]"/>
+        <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-purple-400/0 to-transparent absolute animate-racer-slow opacity-0 blur-[1px]"/>
       </div>
 
       {/* --- Main Content --- */}
@@ -143,18 +143,18 @@ const WhyUsPage = () => {
         {/* Header Section */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-4 text-xs text-gray-500 font-mono tracking-[0.2em] uppercase">
-              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
-              <span className="text-cyan-400">Technology Ecosystem</span>
-              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
+            <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
+              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
+              <span className="text-cyan-600">Technology Ecosystem</span>
+              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-white mb-4">
-            WHY <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">CHOOSE US?</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-black mb-4">
+            WHY <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">CHOOSE US?</span>
           </h1>
           
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg font-light">
+          <p className="text-gray-600 max-w-2xl mx-auto text-lg font-light">
             We don’t just sell software. We build technology ecosystems.
           </p>
         </div>
@@ -164,54 +164,54 @@ const WhyUsPage = () => {
           {features.map((feature, index) => (
             <div 
               key={index}
-              className="group relative bg-white/5 border border-white/10 rounded-md p-6 backdrop-blur-sm transition-all duration-300 hover:border-cyan-500/50 hover:bg-white/[0.07] flex flex-col h-full"
+              className="group relative bg-gray-50 border border-gray-300 rounded-md p-6 backdrop-blur-sm transition-all duration-300 hover:border-cyan-600 hover:bg-gray-100 flex flex-col h-full"
             >
               {/* Status Badge */}
               <div className="flex items-center justify-between mb-4">
-                 <div className="p-2 rounded bg-black/50 border border-white/10">
+                 <div className="p-2 rounded bg-white border border-gray-300">
                     {feature.icon}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-500 uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.5)]"></span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-600 uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-600 shadow-[0_0_5px_rgba(6,182,212,0.5)]"></span>
                     Active
                   </div>
               </div>
 
               <div className="mb-4">
-                <span className="text-xs font-mono text-cyan-400/80 tracking-wider">{feature.subtitle}</span>
-                <h3 className="text-xl font-bold text-white mt-1">{feature.title}</h3>
+                <span className="text-xs font-mono text-cyan-600 tracking-wider">{feature.subtitle}</span>
+                <h3 className="text-xl font-bold text-black mt-1">{feature.title}</h3>
               </div>
 
-              <p className="text-gray-400 text-sm mb-4 leading-relaxed flex-grow">
+              <p className="text-gray-600 text-sm mb-4 leading-relaxed flex-grow">
                 {feature.description}
               </p>
 
               {/* Feature List */}
-              <ul className="space-y-2 pt-4 border-t border-white/5">
+              <ul className="space-y-2 pt-4 border-t border-gray-200">
                 {feature.list.map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-                    <Zap className="w-3 h-3 text-purple-400/50" />
+                  <li key={i} className="flex items-center gap-2 text-xs text-gray-600 font-mono">
+                    <Zap className="w-3 h-3 text-purple-600" />
                     {item}
                   </li>
                 ))}
               </ul>
               
               {/* Decorative Corner */}
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-r border-b border-cyan-500/0 group-hover:border-cyan-500/30 transition-colors rounded-br-md" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-r border-b border-cyan-600/0 group-hover:border-cyan-600/30 transition-colors rounded-br-md" />
             </div>
           ))}
         </div>
 
         {/* Custom Development Section (Wide Card) */}
-        <div className="bg-black/70 border border-white/20 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-2xl relative overflow-hidden">
+        <div className="bg-gray-50 border border-gray-300 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-lg relative overflow-hidden">
             {/* Window Controls */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-100">
               <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 border border-red-400/50" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 border border-yellow-400/50" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 border border-green-400/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 border border-red-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500 border border-yellow-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500 border border-green-400" />
               </div>
-              <span className="text-gray-500 text-xs">custom_solutions.exe</span>
+              <span className="text-gray-600 text-xs">custom_solutions.exe</span>
               <div className="flex items-center gap-2 text-gray-600">
                 <Cpu className="w-3 h-3" />
                 <span>Optimized</span>
@@ -221,20 +221,20 @@ const WhyUsPage = () => {
             <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center">
                 <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                        <Code className="w-6 h-6 text-cyan-400" />
-                        <h3 className="text-lg font-bold text-white tracking-wide">Custom Development & AI Integration</h3>
+                        <Code className="w-6 h-6 text-cyan-600" />
+                        <h3 className="text-lg font-bold text-black tracking-wide">Custom Development & AI Integration</h3>
                     </div>
-                    <p className="text-gray-400 leading-relaxed mb-4">
+                    <p className="text-gray-700 leading-relaxed mb-4">
                         Need something unique? We provide custom gaming cafe solutions, AI model integration, automation tools, and full-stack development support.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                         <span className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-400">Automation Tools</span>
-                         <span className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-400">AI Models</span>
-                         <span className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-400">Business Digitization</span>
+                         <span className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-[10px] text-gray-700">Automation Tools</span>
+                         <span className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-[10px] text-gray-700">AI Models</span>
+                         <span className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-[10px] text-gray-700">Business Digitization</span>
                     </div>
                 </div>
-                <button className="group flex items-center gap-3 px-6 py-3 bg-white text-black font-bold rounded-full 
-                           transition-all duration-300 hover:bg-gray-100 active:scale-95 shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)]
+                <button className="group flex items-center gap-3 px-6 py-3 bg-black text-white font-bold rounded-full 
+                           transition-all duration-300 hover:bg-gray-800 active:scale-95 shadow-lg
                            relative overflow-hidden whitespace-nowrap">
                     <Zap className="w-4 h-4" />
                     Request Custom Build

@@ -98,17 +98,17 @@ const ContactPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#030303] overflow-hidden antialiased font-sans">
+    <div className="relative min-h-screen bg-white overflow-hidden antialiased font-sans">
       
       {/* --- Background Layers --- */}
       <div 
         className="absolute inset-0 z-0 opacity-20
                    bg-[length:40px_40px]
-                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),
-                                      linear-gradient(to_top,rgba(255,255,255,0.05)_1px,transparent_1px)]
+                   [background-image:linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(0,0,0,0.05)_1px,transparent_1px)]
                    [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)]"
       />
-      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-40" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-0" />
       <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent" />
 
       {/* Racer Light Streaks */}
@@ -125,17 +125,17 @@ const ContactPage = () => {
         {/* Header Section */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-4 text-xs text-gray-500 font-mono tracking-[0.2em] uppercase">
-              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
-              <span className="text-cyan-400">Communication Channel</span>
-              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
+            <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
+              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
+              <span className="text-cyan-600">Communication Channel</span>
+              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-white mb-4">
-            CONTACT <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">US</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-black mb-4">
+            CONTACT <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">US</span>
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg font-light">
+          <p className="text-gray-700 max-w-2xl mx-auto text-lg font-light">
             Have a project in mind or need support? Initialize a connection.
           </p>
         </div>
@@ -146,14 +146,14 @@ const ContactPage = () => {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Address Card */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6 backdrop-blur-sm hover:border-cyan-500/30 transition-all group">
+            <div className="bg-gray-50 border border-gray-300 rounded-lg p-6 backdrop-blur-sm hover:border-cyan-600/30 transition-all group">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-cyan-500/10 rounded-lg text-cyan-400 group-hover:bg-cyan-500/20 transition-colors">
+                <div className="p-3 bg-cyan-100 rounded-lg text-cyan-600 group-hover:bg-cyan-200 transition-colors">
                   <MapPin className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold mb-1">Location</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">
+                  <h3 className="text-black font-bold mb-1">Location</h3>
+                  <p className="text-gray-700 text-sm leading-relaxed">
                     123 Business St, Suite 100<br />
                     New York, NY 10001
                   </p>
@@ -162,64 +162,64 @@ const ContactPage = () => {
             </div>
 
             {/* Email Card */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6 backdrop-blur-sm hover:border-purple-500/30 transition-all group">
+            <div className="bg-gray-50 border border-gray-300 rounded-lg p-6 backdrop-blur-sm hover:border-purple-600/30 transition-all group">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:bg-purple-500/20 transition-colors">
+                <div className="p-3 bg-purple-100 rounded-lg text-purple-600 group-hover:bg-purple-200 transition-colors">
                   <Mail className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold mb-1">Email</h3>
-                  <p className="text-gray-400 text-sm">
+                  <h3 className="text-black font-bold mb-1">Email</h3>
+                  <p className="text-gray-700 text-sm">
                     support@managerxp.com
                   </p>
-                  <p className="text-gray-500 text-xs mt-1 font-mono">Response time: ~24h</p>
+                  <p className="text-gray-600 text-xs mt-1 font-mono">Response time: ~24h</p>
                 </div>
               </div>
             </div>
 
             {/* Phone Card */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6 backdrop-blur-sm hover:border-green-500/30 transition-all group">
+            <div className="bg-gray-50 border border-gray-300 rounded-lg p-6 backdrop-blur-sm hover:border-green-600/30 transition-all group">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-green-500/10 rounded-lg text-green-400 group-hover:bg-green-500/20 transition-colors">
+                <div className="p-3 bg-green-100 rounded-lg text-green-600 group-hover:bg-green-200 transition-colors">
                   <Phone className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold mb-1">Phone</h3>
-                  <p className="text-gray-400 text-sm">
+                  <h3 className="text-black font-bold mb-1">Phone</h3>
+                  <p className="text-gray-700 text-sm">
                     +1 (555) 123-4567
                   </p>
-                  <p className="text-gray-500 text-xs mt-1 font-mono">Mon-Fri: 9AM - 6PM</p>
+                  <p className="text-gray-600 text-xs mt-1 font-mono">Mon-Fri: 9AM - 6PM</p>
                 </div>
               </div>
             </div>
 
             {/* Decorative Terminal Element */}
-            <div className="hidden lg:block bg-black/70 border border-white/10 rounded-lg p-1 font-mono text-xs shadow-xl">
-              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/10">
+            <div className="hidden lg:block bg-gray-50 border border-gray-300 rounded-lg p-1 font-mono text-xs shadow-xl">
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-300">
                  <div className="w-2 h-2 rounded-full bg-red-500/80" />
                  <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
                  <div className="w-2 h-2 rounded-full bg-green-500/80" />
               </div>
-              <div className="p-3 text-gray-600">
-                <span className="text-cyan-400">$</span> ping support.managerxp.com <br/>
-                <span className="text-green-400">status:</span> online <br/>
-                <span className="text-green-400">latency:</span> 12ms
+              <div className="p-3 text-gray-700">
+                <span className="text-cyan-600">$</span> ping support.managerxp.com <br/>
+                <span className="text-green-600">status:</span> online <br/>
+                <span className="text-green-600">latency:</span> 12ms
               </div>
             </div>
           </div>
 
           {/* Right: Contact Form */}
-          <div className="lg:col-span-3 bg-black/70 border border-white/20 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-2xl relative overflow-hidden">
+          <div className="lg:col-span-3 bg-gray-50 border border-gray-300 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-2xl relative overflow-hidden">
             
             {/* Window Controls */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50">
               <div className="flex gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 border border-red-400/50" />
                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 border border-yellow-400/50" />
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 border border-green-400/50" />
               </div>
-              <span className="text-gray-500 text-xs">new_message.config</span>
-              <div className="text-gray-600 text-xs">SECURE</div>
+              <span className="text-gray-600 text-xs">new_message.config</span>
+              <div className="text-gray-700 text-xs">SECURE</div>
             </div>
 
             <form ref={formRef} onSubmit={sendEmail} className="p-6 md:p-8 space-y-6 relative z-10">
@@ -235,22 +235,22 @@ const ContactPage = () => {
               {/* Grid for Name & Email */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">User Name</label>
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">User Name</label>
                   <input 
                     type="text" 
                     name="user_name" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="Enter name..."
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">User Email</label>
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">User Email</label>
                   <input 
                     type="email" 
                     name="user_email" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="Enter email..."
                   />
                 </div>
@@ -258,24 +258,24 @@ const ContactPage = () => {
 
               {/* Subject */}
               <div>
-                <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">Subject</label>
+                <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">Subject</label>
                 <input 
                   type="text" 
                   name="subject" 
                   required
-                  className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                  className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                   placeholder="Topic of transmission..."
                 />
               </div>
 
               {/* Message */}
               <div>
-                <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">Message</label>
+                <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">Message</label>
                 <textarea 
                   name="message" 
                   rows="5" 
                   required
-                  className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm resize-none"
+                  className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm resize-none"
                   placeholder="Type your message here..."
                 />
               </div>
@@ -285,13 +285,13 @@ const ContactPage = () => {
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="group flex items-center justify-center gap-2 w-full px-6 py-3 bg-white text-black font-bold rounded-full 
-                           transition-all duration-300 hover:bg-cyan-100 active:scale-95 
-                           shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)]
+                  className="group flex items-center justify-center gap-2 w-full px-6 py-3 bg-black text-white font-bold rounded-full 
+                           transition-all duration-300 hover:bg-gray-800 active:scale-95 
+                           shadow-[0_0_30px_-5px_rgba(0,0,0,0.2)]
                            disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
                 >
                   {/* Shine Effect */}
-                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12" />
+                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-gray-600/40 to-transparent skew-x-12" />
                   
                   {isSubmitting ? (
                     <>

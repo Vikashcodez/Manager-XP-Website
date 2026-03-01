@@ -89,17 +89,17 @@ const ProductsPage = () => {
   ];
 
   return (
-    <div className="relative min-h-screen bg-[#030303] overflow-hidden antialiased font-sans">
+    <div className="relative min-h-screen bg-white overflow-hidden antialiased font-sans">
       
       {/* --- Background Layers --- */}
       <div 
         className="absolute inset-0 z-0 opacity-20
                    bg-[length:40px_40px]
-                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),
-                                      linear-gradient(to_top,rgba(255,255,255,0.05)_1px,transparent_1px)]
+                   [background-image:linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(0,0,0,0.05)_1px,transparent_1px)]
                    [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)]"
       />
-      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-40" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-0" />
       <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent" />
 
       {/* Racer Light Streaks */}
@@ -116,20 +116,20 @@ const ProductsPage = () => {
         {/* Header Section */}
         <div className="text-center mb-20">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-4 text-xs text-gray-500 font-mono tracking-[0.2em] uppercase">
-              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
-              <span className="text-cyan-400">System Modules</span>
-              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
+            <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
+              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
+              <span className="text-cyan-600">System Modules</span>
+              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-white mb-6">
-            OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">PRODUCTS</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-black mb-6">
+            OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">PRODUCTS</span>
           </h1>
           
-          <p className="text-gray-400 max-w-3xl mx-auto text-lg font-light">
+          <p className="text-gray-700 max-w-3xl mx-auto text-lg font-light">
             We build powerful, intelligent software solutions designed to manage, monitor, and grow modern digital spaces. 
-            Built on a <span className="text-white">unified technology ecosystem</span>.
+            Built on a <span className="text-black">unified technology ecosystem</span>.
           </p>
         </div>
 
@@ -138,13 +138,13 @@ const ProductsPage = () => {
           {/* Decorative BG Glow */}
           <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-3xl blur-3xl opacity-30" />
           
-          <div className="relative border border-white/10 rounded-lg bg-black/50 backdrop-blur-md overflow-hidden">
+          <div className="relative border border-gray-300 rounded-lg bg-gray-50 backdrop-blur-md overflow-hidden">
             {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-50">
               <div className="flex items-center gap-3">
-                <Gamepad2 className="w-5 h-5 text-cyan-400" />
-                <span className="text-white font-bold tracking-wide">GamingXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-gray-500 bg-black/30 px-2 py-0.5 rounded-full border border-white/10">MODULE_01</span>
+                <Gamepad2 className="w-5 h-5 text-cyan-600" />
+                <span className="text-black font-bold tracking-wide">GamingXP</span>
+                <span className="hidden sm:inline text-[10px] font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-300">MODULE_01</span>
               </div>
               <div className="flex items-center gap-2 text-[10px] font-mono text-green-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
@@ -156,11 +156,11 @@ const ProductsPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 {/* Left: Info */}
                 <div className="lg:col-span-1">
-                  <h2 className="text-2xl font-bold text-white mb-2">The Ultimate Gaming Cafe Platform</h2>
-                  <p className="text-gray-400 text-sm leading-relaxed mb-4">
+                  <h2 className="text-2xl font-bold text-black mb-2">The Ultimate Gaming Cafe Platform</h2>
+                  <p className="text-gray-700 text-sm leading-relaxed mb-4">
                     Engineered specifically for high-performance gaming environments. It gives you complete control over your gaming infrastructure.
                   </p>
-                  <button className="group flex items-center gap-2 text-xs font-mono text-cyan-400 hover:text-white transition-colors">
+                  <button className="group flex items-center gap-2 text-xs font-mono text-cyan-600 hover:text-black transition-colors">
                     Explore Docs <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
@@ -170,16 +170,16 @@ const ProductsPage = () => {
                   {gamingFeatures.map((feature, index) => (
                     <div 
                       key={index}
-                      className="group bg-white/5 border border-white/10 p-4 rounded hover:border-cyan-500/50 hover:bg-white/[0.07] transition-all duration-300"
+                      className="group bg-gray-100 border border-gray-300 p-4 rounded hover:border-cyan-600/50 hover:bg-gray-200 transition-all duration-300"
                     >
                       <div className="flex items-center justify-between mb-2">
-                         <div className="flex items-center gap-2 text-cyan-400">
+                         <div className="flex items-center gap-2 text-cyan-600">
                            {feature.icon}
-                           <h3 className="text-sm font-bold text-white">{feature.title}</h3>
+                           <h3 className="text-sm font-bold text-black">{feature.title}</h3>
                          </div>
-                         <span className="text-[10px] font-mono text-gray-600 group-hover:text-cyan-400 transition-colors">{feature.status}</span>
+                         <span className="text-[10px] font-mono text-gray-700 group-hover:text-cyan-600 transition-colors">{feature.status}</span>
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed">
+                      <p className="text-xs text-gray-600 leading-relaxed">
                         {feature.desc}
                       </p>
                     </div>
@@ -188,9 +188,9 @@ const ProductsPage = () => {
               </div>
 
               {/* Bottom Statement */}
-              <div className="mt-4 pt-6 border-t border-white/5 text-center">
-                <p className="text-sm font-mono text-gray-500">
-                  <span className="text-white">GamingXP</span> doesn’t just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
+              <div className="mt-4 pt-6 border-t border-gray-200 text-center">
+                <p className="text-sm font-mono text-gray-600">
+                  <span className="text-black">GamingXP</span> doesn't just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
                 </p>
               </div>
             </div>
@@ -202,16 +202,16 @@ const ProductsPage = () => {
           {/* Decorative BG Glow */}
           <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-3xl blur-3xl opacity-30" />
           
-          <div className="relative border border-white/10 rounded-lg bg-black/50 backdrop-blur-md overflow-hidden">
+          <div className="relative border border-gray-300 rounded-lg bg-gray-50 backdrop-blur-md overflow-hidden">
             {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-50">
               <div className="flex items-center gap-3">
-                <Monitor className="w-5 h-5 text-purple-400" />
-                <span className="text-white font-bold tracking-wide">CafeXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-gray-500 bg-black/30 px-2 py-0.5 rounded-full border border-white/10">MODULE_02</span>
+                <Monitor className="w-5 h-5 text-purple-600" />
+                <span className="text-black font-bold tracking-wide">CafeXP</span>
+                <span className="hidden sm:inline text-[10px] font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-300">MODULE_02</span>
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-purple-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></span>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-purple-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></span>
                 STABLE_RELEASE
               </div>
             </div>
@@ -220,41 +220,41 @@ const ProductsPage = () => {
               <div className="flex flex-col lg:flex-row gap-8">
                 
                 {/* Terminal Visual - FIXED LAYOUT */}
-                <div className="lg:w-1/3 bg-black/70 border border-white/10 rounded-lg p-1 font-mono text-xs shadow-xl h-fit">
-                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/10">
+                <div className="lg:w-1/3 bg-gray-50 border border-gray-300 rounded-lg p-1 font-mono text-xs shadow-xl h-fit">
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-300">
                     <div className="w-2 h-2 rounded-full bg-red-500/80" />
                     <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
                     <div className="w-2 h-2 rounded-full bg-green-500/80" />
                   </div>
                   
                   {/* Clean Multi-line Code Block */}
-                  <div className="p-4 text-gray-400 leading-relaxed">
+                  <div className="p-4 text-gray-700 leading-relaxed">
                     <code>
-                      <span className="text-purple-400">system</span> init <span className="text-white">CafeXP</span>{'\n'}
-                      <span className="text-green-400">[ OK ]</span> Loading modules...{'\n'}
-                      <span className="text-green-400">[ OK ]</span> User Control: <span className="text-cyan-400">Enabled</span>{'\n'}
-                      <span className="text-green-400">[ OK ]</span> Billing Engine: <span className="text-cyan-400">Active</span>{'\n'}
-                      <span className="text-green-400">[ OK ]</span> Monitoring: <span className="text-cyan-400">Live</span>
+                      <span className="text-purple-600">system</span> init <span className="text-black">CafeXP</span>{'\n'}
+                      <span className="text-green-600">[ OK ]</span> Loading modules...{'\n'}
+                      <span className="text-green-600">[ OK ]</span> User Control: <span className="text-cyan-600">Enabled</span>{'\n'}
+                      <span className="text-green-600">[ OK ]</span> Billing Engine: <span className="text-cyan-600">Active</span>{'\n'}
+                      <span className="text-green-600">[ OK ]</span> Monitoring: <span className="text-cyan-600">Live</span>
                     </code>
                   </div>
                 </div>
 
                 {/* Features */}
                 <div className="lg:w-2/3">
-                  <h2 className="text-2xl font-bold text-white mb-2">Smart Management for Internet Cafes</h2>
-                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                  <h2 className="text-2xl font-bold text-black mb-2">Smart Management for Internet Cafes</h2>
+                  <p className="text-gray-700 text-sm leading-relaxed mb-6">
                     Designed for traditional internet cafes and browsing centers that need efficiency, security, and complete operational control.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {cafeFeatures.map((feature, index) => (
                       <div key={index} className="flex items-start gap-3 group">
-                        <div className="p-2 rounded bg-white/5 border border-white/10 text-purple-400 group-hover:border-purple-500/50 transition-colors">
+                        <div className="p-2 rounded bg-gray-100 border border-gray-300 text-purple-600 group-hover:border-purple-600/50 transition-colors">
                           {feature.icon}
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-white mb-1">{feature.title}</h3>
-                          <p className="text-xs text-gray-500 leading-relaxed">{feature.desc}</p>
+                          <h3 className="text-sm font-bold text-black mb-1">{feature.title}</h3>
+                          <p className="text-xs text-gray-600 leading-relaxed">{feature.desc}</p>
                         </div>
                       </div>
                     ))}
@@ -263,9 +263,9 @@ const ProductsPage = () => {
               </div>
               
               {/* Bottom Statement */}
-              <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                <p className="text-sm font-mono text-gray-500">
-                  <span className="text-white">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
+              <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+                <p className="text-sm font-mono text-gray-600">
+                  <span className="text-black">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
                 </p>
               </div>
             </div>

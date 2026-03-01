@@ -100,17 +100,17 @@ const BookDemoPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#030303] overflow-hidden antialiased font-sans">
+    <div className="relative min-h-screen bg-white overflow-hidden antialiased font-sans">
       
       {/* --- Background Layers --- */}
       <div 
         className="absolute inset-0 z-0 opacity-20
                    bg-[length:40px_40px]
-                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),
-                                      linear-gradient(to_top,rgba(255,255,255,0.05)_1px,transparent_1px)]
+                   [background-image:linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(0,0,0,0.05)_1px,transparent_1px)]
                    [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)]"
       />
-      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-40" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-0" />
       <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent" />
 
       {/* Racer Light Streaks */}
@@ -127,17 +127,17 @@ const BookDemoPage = () => {
         {/* Header Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-4 text-xs text-gray-500 font-mono tracking-[0.2em] uppercase">
-              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
-              <span className="text-cyan-400">Initialize Session</span>
-              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
+            <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
+              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
+              <span className="text-cyan-600">Initialize Session</span>
+              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-white mb-4">
-            BOOK A <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">DEMO</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-black mb-4">
+            BOOK A <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">DEMO</span>
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg font-light">
+          <p className="text-gray-700 max-w-2xl mx-auto text-lg font-light">
             Schedule a live demonstration of our ecosystem.
           </p>
         </div>
@@ -147,17 +147,17 @@ const BookDemoPage = () => {
           {/* Decorative background glow */}
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-lg blur-xl opacity-30" />
           
-          <div className="relative bg-black/70 border border-white/20 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-2xl overflow-hidden">
+          <div className="relative bg-gray-50 border border-gray-300 rounded-lg p-1 backdrop-blur-md font-mono text-xs shadow-2xl overflow-hidden">
             
             {/* Window Controls */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50">
               <div className="flex gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 border border-red-400/50" />
                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 border border-yellow-400/50" />
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 border border-green-400/50" />
               </div>
-              <span className="text-gray-500 text-xs">demo_protocol.exe</span>
-              <div className="text-gray-600 text-xs">ACTIVE</div>
+              <span className="text-gray-600 text-xs">demo_protocol.exe</span>
+              <div className="text-gray-700 text-xs">ACTIVE</div>
             </div>
 
             <form ref={formRef} onSubmit={sendEmail} className="p-6 md:p-10 space-y-8 relative z-10">
@@ -173,26 +173,26 @@ const BookDemoPage = () => {
               {/* Row 1: Name & Organization */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                     <User className="w-3 h-3" /> Your Name
                   </label>
                   <input 
                     type="text" 
                     name="user_name" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="John Doe"
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                     <Building2 className="w-3 h-3" /> Organization
                   </label>
                   <input 
                     type="text" 
                     name="organization_name" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="Cafe Name / Company"
                   />
                 </div>
@@ -201,26 +201,26 @@ const BookDemoPage = () => {
               {/* Row 2: Email & Phone */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                     <Mail className="w-3 h-3" /> Email Address
                   </label>
                   <input 
                     type="email" 
                     name="user_email" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="you@company.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                     <Phone className="w-3 h-3" /> Phone Number
                   </label>
                   <input 
                     type="tel" 
                     name="phone_number" 
                     required
-                    className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                    className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                     placeholder="+1 (555) 123-4567"
                   />
                 </div>
@@ -228,13 +228,13 @@ const BookDemoPage = () => {
 
               {/* Row 3: Software Selection */}
               <div>
-                <label className="block text-gray-400 mb-3 text-xs uppercase tracking-wider">
+                <label className="block text-gray-700 mb-3 text-xs uppercase tracking-wider">
                   Select Software
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Option 1: GamingXP */}
                   <label className={`relative flex items-center gap-4 p-4 rounded border cursor-pointer transition-all
-                                    ${selectedSoftware === 'GamingXP' ? 'border-purple-500 bg-purple-500/10' : 'border-white/10 bg-white/5 hover:border-white/30'}`}>
+                                    ${selectedSoftware === 'GamingXP' ? 'border-purple-600 bg-purple-100' : 'border-gray-300 bg-gray-50 hover:border-gray-400'}`}>
                     <input 
                       type="radio" 
                       name="software_type" 
@@ -243,19 +243,19 @@ const BookDemoPage = () => {
                       onChange={(e) => setSelectedSoftware(e.target.value)}
                       required
                     />
-                    <div className="p-2 bg-black/30 rounded border border-white/10">
-                      <Gamepad2 className="w-5 h-5 text-purple-400" />
+                    <div className="p-2 bg-gray-100 rounded border border-gray-300">
+                      <Gamepad2 className="w-5 h-5 text-purple-600" />
                     </div>
                     <div>
-                      <span className="text-white font-bold text-sm block">GamingXP</span>
-                      <span className="text-gray-500 text-xs">Gaming Café Solution</span>
+                      <span className="text-black font-bold text-sm block">GamingXP</span>
+                      <span className="text-gray-600 text-xs">Gaming Café Solution</span>
                     </div>
-                    {selectedSoftware === 'GamingXP' && <div className="absolute right-4 top-4 w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />}
+                    {selectedSoftware === 'GamingXP' && <div className="absolute right-4 top-4 w-2 h-2 rounded-full bg-purple-600 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />}
                   </label>
 
                   {/* Option 2: CafeXP */}
                   <label className={`relative flex items-center gap-4 p-4 rounded border cursor-pointer transition-all
-                                    ${selectedSoftware === 'CafeXP' ? 'border-cyan-500 bg-cyan-500/10' : 'border-white/10 bg-white/5 hover:border-white/30'}`}>
+                                    ${selectedSoftware === 'CafeXP' ? 'border-cyan-600 bg-cyan-100' : 'border-gray-300 bg-gray-50 hover:border-gray-400'}`}>
                     <input 
                       type="radio" 
                       name="software_type" 
@@ -263,38 +263,38 @@ const BookDemoPage = () => {
                       className="sr-only"
                       onChange={(e) => setSelectedSoftware(e.target.value)}
                     />
-                    <div className="p-2 bg-black/30 rounded border border-white/10">
-                      <Monitor className="w-5 h-5 text-cyan-400" />
+                    <div className="p-2 bg-gray-100 rounded border border-gray-300">
+                      <Monitor className="w-5 h-5 text-cyan-600" />
                     </div>
                     <div>
-                      <span className="text-white font-bold text-sm block">CafeXP</span>
-                      <span className="text-gray-500 text-xs">Internet Café Solution</span>
+                      <span className="text-black font-bold text-sm block">CafeXP</span>
+                      <span className="text-gray-600 text-xs">Internet Café Solution</span>
                     </div>
-                    {selectedSoftware === 'CafeXP' && <div className="absolute right-4 top-4 w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]" />}
+                    {selectedSoftware === 'CafeXP' && <div className="absolute right-4 top-4 w-2 h-2 rounded-full bg-cyan-600 shadow-[0_0_10px_rgba(6,182,212,0.5)]" />}
                   </label>
                 </div>
               </div>
 
               {/* Row 4: Subject */}
               <div>
-                <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">Subject</label>
+                <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">Subject</label>
                 <input 
                   type="text" 
                   name="subject" 
                   required
-                  className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm"
+                  className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm"
                   placeholder="How can we help you?"
                 />
               </div>
 
               {/* Row 5: Message */}
               <div>
-                <label className="block text-gray-400 mb-2 text-xs uppercase tracking-wider">Message</label>
+                <label className="block text-gray-700 mb-2 text-xs uppercase tracking-wider">Message</label>
                 <textarea 
                   name="message" 
                   rows="4" 
                   required
-                  className="w-full bg-black/50 border border-white/10 text-white px-4 py-3 rounded focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600 text-sm resize-none"
+                  className="w-full bg-gray-50 border border-gray-300 text-black px-4 py-3 rounded focus:outline-none focus:border-cyan-600 transition-colors placeholder-gray-500 text-sm resize-none"
                   placeholder="Tell us about your project or requirements..."
                 />
               </div>
@@ -304,13 +304,13 @@ const BookDemoPage = () => {
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="group flex items-center justify-center gap-2 w-full px-8 py-4 bg-white text-black font-bold rounded-full 
-                           transition-all duration-300 hover:bg-cyan-100 active:scale-95 
-                           shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)]
+                  className="group flex items-center justify-center gap-2 w-full px-8 py-4 bg-black text-white font-bold rounded-full 
+                           transition-all duration-300 hover:bg-gray-800 active:scale-95 
+                           shadow-[0_0_30px_-5px_rgba(0,0,0,0.2)]
                            disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
                 >
                   {/* Shine Effect */}
-                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12" />
+                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-gray-600/40 to-transparent skew-x-12" />
                   
                   {isSubmitting ? (
                     <>

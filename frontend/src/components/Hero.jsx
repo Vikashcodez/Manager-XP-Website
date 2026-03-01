@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Zap, Terminal, ArrowRight, Gamepad2, Wifi } from 'lucide-react';
+import { Zap, Terminal, ArrowRight, Gamepad2, DollarSign, Monitor, BarChart3 } from 'lucide-react';
 
 const HeroSection = () => {
   const canvasRef = useRef(null);
@@ -74,7 +74,7 @@ const HeroSection = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-[#030303] overflow-hidden flex items-center justify-center antialiased font-sans">
+    <div className="relative min-h-screen bg-white overflow-hidden flex items-center justify-center antialiased font-sans">
       
       {/* --- Background Layers --- */}
       
@@ -97,94 +97,88 @@ const HeroSection = () => {
       />
       
       {/* 4. Moving "Light" Streaks (The Racer) */}
-      <div className="absolute top-1/3 left-0 w-full h-[2px] z-[2] overflow-hidden">
+      <div className="absolute top-1/4 left-0 w-full h-[2px] z-[2] overflow-hidden">
         <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent absolute animate-racer-fast opacity-80 blur-[1px]"/>
       </div>
-      <div className="absolute top-2/3 left-0 w-full h-[1px] z-[2] overflow-hidden">
+      <div className="absolute top-1/2 left-0 w-full h-[1px] z-[2] overflow-hidden">
         <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-purple-500 to-transparent absolute animate-racer-slow opacity-60 blur-[1px]"/>
+      </div>
+      <div className="absolute top-3/4 left-0 w-full h-[1px] z-[2] overflow-hidden">
+        <div className="w-1/5 h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent absolute animate-racer-fast opacity-50 blur-[1px]"/>
       </div>
 
       {/* --- Main Content --- */}
-      <div className="relative z-10 max-w-6xl mx-auto px-6 text-center pt-24 pb-4">
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-24 pb-4">
         
         {/* Top HUD Element */}
-        <div className="flex justify-center mb-4">
-          <div className="flex items-center gap-4 text-xs text-gray-500 font-mono tracking-[0.2em] uppercase">
-            <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
-            <span className="text-cyan-400">Cafe Management Solutions</span>
-            <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
+        <div className="flex justify-center mb-3">
+          <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
+            <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
+            <span className="text-cyan-600">Cafe Management Solutions</span>
+            <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
           </div>
         </div>
 
         {/* Main Typography */}
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-white leading-none mb-2">
-          CAFE SOFTWARE
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tighter text-black leading-tight mb-3">
+          CONTROL EVERY PC. TRACK EVERY MINUTE.<br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">GROW YOUR CAFE.</span>
         </h1>
         
-        <div className="flex items-center justify-center gap-4 mb-5">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-light tracking-tight text-gray-400">
-            FOR <span className="text-white font-semibold">GAMING & NON-GAMING</span>
-          </h2>
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <p className="text-base sm:text-lg text-gray-700 max-w-2xl mx-auto font-light leading-relaxed">
+            ManagerXP delivers gaming session management, intelligent billing, and real-time monitoring for modern internet and gaming cafes using AI .
+          </p>
         </div>
 
-        {/* Feature Tags */}
-        <div className="flex flex-wrap justify-center gap-4 mb-6">
-          <div className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 bg-white/5 backdrop-blur-sm">
-            <Wifi className="w-4 h-4 text-blue-400" /> Internet Cafe Software
+        {/* Feature Highlights Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-3xl mx-auto">
+          <div className="flex flex-col items-center gap-2 p-3">
+            <Gamepad2 className="w-5 h-5 text-cyan-600" />
+            <span className="text-xs text-gray-700 font-mono uppercase tracking-wide text-center">Gaming Session Control</span>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 bg-white/5 backdrop-blur-sm">
-            <Gamepad2 className="w-4 h-4 text-green-400" /> Gaming Cafe Software
+          <div className="flex flex-col items-center gap-2 p-3">
+            <DollarSign className="w-5 h-5 text-green-600" />
+            <span className="text-xs text-gray-700 font-mono uppercase tracking-wide text-center">Automated Billing</span>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 bg-white/5 backdrop-blur-sm">
-            <Zap className="w-4 h-4 text-yellow-400 animate-pulse" /> High Performance
+          <div className="flex flex-col items-center gap-2 p-3">
+            <Monitor className="w-5 h-5 text-purple-600" />
+            <span className="text-xs text-gray-700 font-mono uppercase tracking-wide text-center">Centralized Monitoring</span>
           </div>
-        </div>
-
-        {/* Code Editor Style Description */}
-        <div className="max-w-2xl mx-auto mb-6 text-left md:text-center bg-black/70 border border-white/20 rounded-lg p-3 backdrop-blur-md font-mono text-xs shadow-2xl relative overflow-hidden">
-          {/* Window Controls */}
-          <div className="absolute top-3 left-3 flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/80 border border-red-400/50" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 border border-yellow-400/50" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500/80 border border-green-400/50" />
+          <div className="flex flex-col items-center gap-2 p-3">
+            <BarChart3 className="w-5 h-5 text-yellow-600" />
+            <span className="text-xs text-gray-700 font-mono uppercase tracking-wide text-center">Real-Time Analytics</span>
           </div>
-          
-          <pre className="text-gray-400 mt-2 overflow-x-auto">
-            <code>
-              <span className="text-purple-400">const</span> <span className="text-cyan-400">cafe</span> = <span className="text-yellow-300">new</span> CafeManager({'{'} type: <span className="text-green-400">'gaming'</span> {'}'});{'\n'}
-              cafe.<span className="text-white">startSession</span>(); <span className="text-gray-600">// Billing, Monitor & Control</span>
-            </code>
-          </pre>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button className="group flex items-center gap-3 px-8 py-4 bg-white text-black font-bold rounded-full 
-                           transition-all duration-300 hover:bg-gray-100 active:scale-95 shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)]
+          <button className="group flex items-center gap-2 px-7 py-3 bg-black text-white font-bold rounded-full 
+                           transition-all duration-300 hover:bg-gray-800 active:scale-95 shadow-lg
                            relative overflow-hidden">
             {/* Shine Effect */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12" />
-            <Zap className="w-5 h-5" />
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
+            <Zap className="w-4 h-4" />
             View Products
           </button>
           
-          <button className="group flex items-center gap-2 px-6 py-4 text-gray-400 font-mono text-sm transition-colors hover:text-cyan-400">
+          <button className="group flex items-center gap-2 px-6 py-3 text-gray-700 font-mono text-sm transition-colors hover:text-cyan-600 border border-gray-300 rounded-full hover:border-cyan-600">
             <Terminal className="w-4 h-4" />
-            Get a Demo
+            Get a Free Demo
             <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
           </button>
         </div>
 
         {/* Speed Stats Bar */}
-        <div className="mt-8 flex justify-center items-center gap-8 text-gray-500 text-xs font-mono uppercase tracking-widest">
+        <div className="mt-8 flex justify-center items-center gap-6 sm:gap-8 text-gray-600 text-xs font-mono uppercase tracking-widest">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
             System Active
           </div>
-          <div className="h-4 w-[1px] bg-gray-800"></div>
+          <div className="h-4 w-[1px] bg-gray-300"></div>
           <div>24/7 Support</div>
-          <div className="h-4 w-[1px] bg-gray-800"></div>
-          <div>Trusted Software</div>
+          <div className="h-4 w-[1px] bg-gray-300"></div>
+          <div>Secure & Reliable Software</div>
         </div>
       </div>
 
