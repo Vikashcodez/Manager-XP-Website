@@ -31,6 +31,21 @@ export const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // subscription plans table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS subscription_plans (
+        sub_id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        max_branches INTEGER NOT NULL,
+        max_pcs INTEGER NOT NULL,
+        is_telmetry_enabled BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     
     console.log('✅ Users table created/verified');
     
