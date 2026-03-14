@@ -15,7 +15,7 @@ import AdminDashboard from './Pages/AdminDashboard'
 
 const AppLayout = () => {
   const location = useLocation()
-  const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup'
+  const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin'
 
   return (
     <div className="flex flex-col min-h-screen bg-white">

@@ -151,3 +151,26 @@ export const login = async (req, res) => {
     });
   }
 };
+
+// Get all users for admin dashboard
+export const getAllUsers = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, phone_number, name, address, role, created_at
+       FROM users
+       ORDER BY created_at DESC`
+    );
+
+    res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
