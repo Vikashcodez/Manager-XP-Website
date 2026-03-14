@@ -41,6 +41,7 @@ export const initializeDatabase = async () => {
         max_pcs INTEGER NOT NULL,
         is_telmetry_enabled BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
+        description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
