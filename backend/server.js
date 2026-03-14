@@ -3,6 +3,7 @@ import cors from 'cors';
 import './src/config/env.js';
 import { initializeDatabase } from './src/config/database.js';
 import authRoutes from './src/routes/auth.Routes.js';
+import subscriptionPlanRouter from './src/routes/subscriptionPlan.Routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,6 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/subscription-plans',subscriptionPlanRouter);
 
 // Health check route
 app.get('/health', (req, res) => {
