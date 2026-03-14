@@ -3,60 +3,67 @@ import { Zap, Calendar, ArrowRight } from 'lucide-react';
 
 const DemoRibbon = () => {
   return (
-    <div className="relative w-full py-12 overflow-hidden">
+    <div className="relative w-full py-16 overflow-hidden bg-black">
       
       {/* Background Slanted Ribbon Shape */}
       <div className="absolute inset-0 z-0">
         {/* The main dark background with skew */}
         <div 
-          className="absolute inset-0 bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 
-                     border-y border-gray-300
+          className="absolute inset-0 bg-gradient-to-r from-neutral-950 via-black to-neutral-950 
+                     border-y border-white/10
                      transform -skew-y-1 scale-110" 
         />
         
+        {/* Ambient Red Glow */}
+        <div className="absolute inset-0 opacity-60 bg-[radial-gradient(ellipse_50%_50%_at_50%_50%,rgba(220,38,38,0.15),transparent)]" />
+
         {/* Glowing Racing Lines */}
-        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-600/50 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-purple-600/50 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-600/70 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
       </div>
 
       {/* Content Container */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
+      <div className="relative z-10 max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
         
         {/* Text Section */}
-        <div className="flex items-center gap-4 text-center md:text-left">
-          <div className="p-3 rounded-lg bg-gray-100 border border-gray-300 backdrop-blur-sm">
-            <Zap className="w-6 h-6 text-cyan-600 animate-pulse" />
+        <div className="flex items-center gap-5 text-center md:text-left">
+          <div className="p-3.5 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
+            <Zap className="w-6 h-6 text-red-500 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold text-black tracking-tight">
-              BOOK YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">DEMO</span> NOW
+            <h3 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+              BOOK YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">DEMO</span> NOW
             </h3>
-            <p className="text-xs text-gray-600 font-mono uppercase tracking-wider mt-0.5">
+            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider mt-1">
               Experience the ecosystem firsthand
             </p>
           </div>
         </div>
 
         {/* Vertical Divider (Visible on Desktop) */}
-        <div className="hidden md:block h-10 w-[1px] bg-gray-300" />
+        <div className="hidden md:block h-12 w-[1px] bg-gradient-to-b from-transparent via-neutral-700 to-transparent" />
 
         {/* Button Section */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <button 
-            className="group flex items-center gap-2 px-6 py-3 bg-black text-white text-sm font-bold rounded-full 
-                       transition-all duration-300 hover:bg-gray-800 active:scale-95 
-                       shadow-[0_0_25px_-5px_rgba(0,0,0,0.3)]
-                       relative overflow-hidden"
+            className="group relative flex items-center gap-3 px-8 py-3.5 
+                       text-sm font-semibold rounded-full text-white 
+                       transition-all duration-300 
+                       bg-red-600/10 border border-red-500/30
+                       hover:bg-red-600/20 hover:border-red-500/60
+                       active:scale-95 
+                       shadow-[0_0_25px_-10px_rgba(220,38,38,0.4)]
+                       backdrop-blur-md"
           >
             {/* Shine Animation */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-gray-600/50 to-transparent skew-x-12" />
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 rounded-full" />
             
-            <Calendar className="w-4 h-4 relative z-10" />
+            <Calendar className="w-4 h-4 relative z-10 text-red-400 group-hover:text-white transition-colors" />
             <span className="relative z-10">BOOK DEMO</span>
           </button>
 
-          {/* Secondary Ghost Button (Optional) */}
-          <button className="group hidden sm:flex items-center gap-2 px-4 py-3 text-gray-700 text-xs font-mono transition-colors hover:text-black">
+          {/* Secondary Ghost Button */}
+          <button className="group hidden sm:flex items-center gap-2 px-4 py-3 text-neutral-500 text-xs font-mono transition-colors hover:text-white border border-transparent hover:border-white/10 rounded-full">
             LEARN MORE
             <ArrowRight className="w-3 h-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
           </button>

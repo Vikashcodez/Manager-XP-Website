@@ -1,17 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
+import { Link, useLocation } from 'react-router-dom';
+import logo from '../assets/whitelogo.png';
+import { useAuth } from '../context/AuthContext';
+
+const navItems = [
+  { label: 'Home', to: '/' },
+  { label: 'Products', to: '/products' },
+  { label: 'About', to: '/about' },
+  { label: 'Contact', to: '/contact' },
+];
 
 const Navbar = () => {
   // State to handle mobile menu toggle
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   // State to handle scroll position
   const [isScrolled, setIsScrolled] = useState(false);
+  const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
 
   // Detect scroll position
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 50) {
+      if (window.scrollY > 24) {
         setIsScrolled(true);
       } else {
         setIsScrolled(false);
@@ -22,48 +33,101 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    setIsMenuOpen(false);
+    setIsProfileOpen(false);
+  }, [location.pathname]);
+
+  const isActive = (path) => location.pathname === path;
+  const avatarLabel = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
+
   return (
-    <nav className={`fixed w-full z-50 top-0 left-0 antialiased font-sans transition-all duration-300 ${
-      isScrolled 
-        ? 'bg-white/95 backdrop-blur-lg shadow-lg' 
-        : 'bg-white backdrop-blur-none'
+    <nav className={`fixed z-50 top-0 left-0 right-0 antialiased font-sans border-b transition-all duration-300 ${
+      isScrolled
+        ? 'bg-black border-neutral-800 shadow-[0_8px_24px_rgba(0,0,0,0.38)]'
+        : 'bg-black border-white/5'
     }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
           
           {/* Left Side: Logo */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center hover:opacity-80 transition-opacity duration-300">
-              <img src={logo} alt="ManagerXP Logo" className="h-8 w-auto" />
+              <img src={logo} alt="ManagerXP Logo" className="h-7 w-auto" />
             </Link>
           </div>
 
           {/* Center: Desktop Navigation Links */}
-          <div className="hidden md:flex md:items-center md:space-x-1">
-            <Link to="/" className="text-gray-700 hover:text-black hover:bg-gray-100 px-4 py-2 rounded-lg text-base font-mono font-semibold uppercase tracking-wide transition-all duration-300 relative group">
-              Home
-              <span className="absolute bottom-1 left-4 right-4 h-0.5 bg-cyan-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"></span>
-            </Link>
-            <Link to="/products" className="text-gray-700 hover:text-black hover:bg-gray-100 px-4 py-2 rounded-lg text-base font-mono font-semibold uppercase tracking-wide transition-all duration-300 relative group">
-              Our Products
-              <span className="absolute bottom-1 left-4 right-4 h-0.5 bg-cyan-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"></span>
-            </Link>
-            <Link to="/about" className="text-gray-700 hover:text-black hover:bg-gray-100 px-4 py-2 rounded-lg text-base font-mono font-semibold uppercase tracking-wide transition-all duration-300 relative group">
-              About Us
-              <span className="absolute bottom-1 left-4 right-4 h-0.5 bg-cyan-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"></span>
-            </Link>
-            <Link to="/contact" className="text-gray-700 hover:text-black hover:bg-gray-100 px-4 py-2 rounded-lg text-base font-mono font-semibold uppercase tracking-wide transition-all duration-300 relative group">
-              Contact Us
-              <span className="absolute bottom-1 left-4 right-4 h-0.5 bg-cyan-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"></span>
-            </Link>
+          <div className="hidden md:flex md:items-center md:space-x-6">
+            {navItems.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`relative text-[13px] font-medium tracking-[0.01em] transition-colors duration-200 ${
+                  isActive(item.to)
+                    ? 'text-white'
+                    : 'text-neutral-300 hover:text-white'
+                }`}
+              >
+                {item.label}
+                {isActive(item.to) && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-red-500" />
+                )}
+              </Link>
+            ))}
           </div>
 
           {/* Right Side: CTA Button */}
-          <div className="hidden md:flex">
-            <a href="/demo" className="group inline-flex items-center justify-center px-6 py-2 text-sm font-bold text-white bg-black rounded-full shadow-lg hover:bg-gray-800 active:scale-95 transition-all duration-300 relative overflow-hidden">
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-500 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
-              Book Demo
-            </a>
+          <div className="hidden md:flex md:items-center md:gap-2.5">
+            {!isAuthenticated && (
+              <>
+                <Link
+                  to="/login"
+                  className="inline-flex items-center justify-center px-4 py-2 text-[13px] font-medium text-neutral-300 hover:text-red-400 transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center justify-center px-4 py-2 text-[13px] font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 active:scale-[0.98] transition-all duration-200"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
+
+            {isAuthenticated && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className="h-9 w-9 rounded-full bg-white text-black text-sm font-semibold flex items-center justify-center border border-white/90 hover:bg-neutral-100 transition"
+                  aria-expanded={isProfileOpen}
+                >
+                  {avatarLabel}
+                </button>
+
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-2xl p-1.5">
+                    {user?.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                      >
+                        Admin Dashboard
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -71,7 +135,7 @@ const Navbar = () => {
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-black hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-600 transition duration-300"
+              className="inline-flex items-center justify-center p-2 rounded-md text-neutral-300 hover:text-red-400 hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500/60 transition duration-200"
               aria-controls="mobile-menu"
               aria-expanded="false"
             >
@@ -93,24 +157,57 @@ const Navbar = () => {
 
       {/* Mobile Menu Overlay */}
       <div className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`} id="mobile-menu">
-        <div className="px-4 pt-4 pb-6 space-y-2 bg-white shadow-xl border-t border-gray-200">
-          <Link to="/" className="block px-4 py-3 rounded-xl text-base font-mono font-semibold uppercase tracking-wide text-gray-700 hover:text-black hover:bg-gray-100 hover:shadow-md transition-all duration-200" onClick={() => setIsMenuOpen(false)}>
-            Home
-          </Link>
-          <Link to="/products" className="block px-4 py-3 rounded-xl text-base font-mono font-semibold uppercase tracking-wide text-gray-700 hover:text-black hover:bg-gray-100 hover:shadow-md transition-all duration-200" onClick={() => setIsMenuOpen(false)}>
-            Our Products
-          </Link>
-          <Link to="/about" className="block px-4 py-3 rounded-xl text-base font-mono font-semibold uppercase tracking-wide text-gray-700 hover:text-black hover:bg-gray-100 hover:shadow-md transition-all duration-200" onClick={() => setIsMenuOpen(false)}>
-            About Us
-          </Link>
-          <Link to="/contact" className="block px-4 py-3 rounded-xl text-base font-mono font-semibold uppercase tracking-wide text-gray-700 hover:text-black hover:bg-gray-100 hover:shadow-md transition-all duration-200" onClick={() => setIsMenuOpen(false)}>
-            Contact Us
-          </Link>
-          <div className="pt-3">
-            <a href="#" className="block w-full text-center px-6 py-3 text-base font-bold text-white bg-black rounded-full shadow-lg hover:bg-gray-800 transition-all duration-300">
-              Book Demo
-            </a>
-          </div>
+        <div className="px-4 pt-2 pb-4 space-y-1 bg-black border-t border-white/10">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive(item.to)
+                  ? 'text-white bg-red-500/15 border border-red-500/30'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-900'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              {item.label}
+            </Link>
+          ))}
+          {!isAuthenticated && (
+            <div className="pt-2 grid grid-cols-2 gap-2">
+              <Link
+                to="/login"
+                className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-neutral-700 hover:bg-neutral-900 transition-all duration-200"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 transition-all duration-200"
+              >
+                Sign up
+              </Link>
+            </div>
+          )}
+
+          {isAuthenticated && (
+            <div className="pt-2 space-y-2">
+              {user?.role === 'admin' && (
+                <Link
+                  to="/admin"
+                  className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-neutral-700 hover:bg-neutral-900 transition-all duration-200"
+                >
+                  Admin Dashboard
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={logout}
+                className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 transition-all duration-200"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

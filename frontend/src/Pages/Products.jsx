@@ -7,7 +7,7 @@ import {
 const ProductsPage = () => {
   const canvasRef = useRef(null);
 
-  // "Racing Code" particle logic
+  // Racing Code Particle Logic - Red/White Theme
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -22,14 +22,14 @@ const ProductsPage = () => {
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        speed: Math.random() * 15 + 5,
-        length: Math.random() * 100 + 50,
-        color: `rgba(${Math.random() > 0.5 ? '147, 51, 234' : '59, 130, 246'}, ${Math.random() * 0.5 + 0.1})`,
-        type: Math.random() > 0.7 ? 'code' : 'line'
+        speed: Math.random() * 8 + 2,
+        length: Math.random() * 80 + 20,
+        color: `rgba(${Math.random() > 0.8 ? '239, 68, 68' : '255, 255, 255'}, ${Math.random() * 0.3 + 0.1})`,
+        type: Math.random() > 0.8 ? 'code' : 'line'
       });
     }
 
@@ -40,12 +40,12 @@ const ProductsPage = () => {
         ctx.beginPath();
         
         if (p.type === 'code') {
-          ctx.font = '14px monospace';
-          ctx.fillStyle = p.color;
+          ctx.font = '12px monospace';
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
           ctx.fillText('{ }', p.x, p.y);
         } else {
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 1;
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x + p.length, p.y);
           ctx.stroke();
@@ -89,25 +89,33 @@ const ProductsPage = () => {
   ];
 
   return (
-    <div className="relative min-h-screen bg-white overflow-hidden antialiased font-sans">
+    <div className="relative min-h-screen bg-black overflow-hidden antialiased font-sans text-white">
       
       {/* --- Background Layers --- */}
+      
+      {/* 1. Tech Grid */}
       <div 
-        className="absolute inset-0 z-0 opacity-20
+        className="absolute inset-0 z-0 opacity-[0.03]
                    bg-[length:40px_40px]
-                   [background-image:linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),
-                                      linear-gradient(to_top,rgba(0,0,0,0.05)_1px,transparent_1px)]
-                   [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)]"
+                   [background-image:linear-gradient(to_right,rgba(255,255,255,0.1)_1px,transparent_1px),
+                                      linear-gradient(to_top,rgba(255,255,255,0.1)_1px,transparent_1px)]"
       />
-      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-0" />
-      <div className="absolute bottom-0 left-0 right-0 h-[40%] z-0 bg-gradient-to-t from-purple-900/10 via-transparent to-transparent" />
 
-      {/* Racer Light Streaks */}
-      <div className="absolute top-1/3 left-0 w-full h-[2px] z-[2] overflow-hidden">
-        <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent absolute animate-racer-fast opacity-80 blur-[1px]"/>
+      {/* 2. Canvas Particles */}
+      <canvas ref={canvasRef} className="absolute inset-0 z-[1] opacity-60" />
+
+      {/* 3. Ambient Red Glow */}
+      <div 
+        className="absolute inset-0 z-[1] opacity-70
+                   [background:radial-gradient(ellipse_60%_50%_at_50%_30%,rgba(185,28,28,0.15),transparent_70%)]"
+      />
+
+      {/* 4. Racer Light Streaks */}
+      <div className="absolute top-1/3 left-0 w-full h-[1px] z-[2] overflow-hidden">
+        <div className="w-1/3 h-full bg-gradient-to-r from-transparent via-red-600/60 to-transparent absolute animate-racer-fast blur-[1px]"/>
       </div>
       <div className="absolute top-2/3 left-0 w-full h-[1px] z-[2] overflow-hidden">
-        <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-purple-500 to-transparent absolute animate-racer-slow opacity-60 blur-[1px]"/>
+        <div className="w-1/4 h-full bg-gradient-to-r from-transparent via-red-500/40 to-transparent absolute animate-racer-slow blur-[1px]"/>
       </div>
 
       {/* --- Main Content --- */}
@@ -116,38 +124,38 @@ const ProductsPage = () => {
         {/* Header Section */}
         <div className="text-center mb-20">
           <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-4 text-xs text-gray-600 font-mono tracking-[0.2em] uppercase">
-              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-gray-300" />
-              <span className="text-cyan-600">System Modules</span>
-              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-gray-300" />
+            <div className="flex items-center gap-4 text-xs text-neutral-500 font-mono tracking-[0.2em] uppercase">
+              <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-neutral-700" />
+              <span className="text-red-500">System Modules</span>
+              <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-black mb-6">
-            OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-purple-600">PRODUCTS</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-white mb-6">
+            OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">PRODUCTS</span>
           </h1>
           
-          <p className="text-gray-700 max-w-3xl mx-auto text-lg font-light">
+          <p className="text-neutral-400 max-w-3xl mx-auto text-lg font-light">
             We build powerful, intelligent software solutions designed to manage, monitor, and grow modern digital spaces. 
-            Built on a <span className="text-black">unified technology ecosystem</span>.
+            Built on a <span className="text-white">unified technology ecosystem</span>.
           </p>
         </div>
 
         {/* Product 1: GamingXP */}
         <div className="mb-24 relative">
           {/* Decorative BG Glow */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-3xl blur-3xl opacity-30" />
+          <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
           
-          <div className="relative border border-gray-300 rounded-lg bg-gray-50 backdrop-blur-md overflow-hidden">
+          <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)]">
             {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
               <div className="flex items-center gap-3">
-                <Gamepad2 className="w-5 h-5 text-cyan-600" />
-                <span className="text-black font-bold tracking-wide">GamingXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-300">MODULE_01</span>
+                <Gamepad2 className="w-5 h-5 text-red-500" />
+                <span className="text-white font-semibold tracking-wide">GamingXP</span>
+                <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_01</span>
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-green-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
                 SYSTEM_ACTIVE
               </div>
             </div>
@@ -156,11 +164,11 @@ const ProductsPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 {/* Left: Info */}
                 <div className="lg:col-span-1">
-                  <h2 className="text-2xl font-bold text-black mb-2">The Ultimate Gaming Cafe Platform</h2>
-                  <p className="text-gray-700 text-sm leading-relaxed mb-4">
+                  <h2 className="text-2xl font-semibold text-white mb-3">The Ultimate Gaming Cafe Platform</h2>
+                  <p className="text-neutral-400 text-sm leading-relaxed mb-6">
                     Engineered specifically for high-performance gaming environments. It gives you complete control over your gaming infrastructure.
                   </p>
-                  <button className="group flex items-center gap-2 text-xs font-mono text-cyan-600 hover:text-black transition-colors">
+                  <button className="group flex items-center gap-2 text-xs font-mono text-red-500 hover:text-white transition-colors">
                     Explore Docs <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
@@ -170,16 +178,16 @@ const ProductsPage = () => {
                   {gamingFeatures.map((feature, index) => (
                     <div 
                       key={index}
-                      className="group bg-gray-100 border border-gray-300 p-4 rounded hover:border-cyan-600/50 hover:bg-gray-200 transition-all duration-300"
+                      className="group bg-white/[0.03] border border-white/5 p-5 rounded-lg hover:border-red-500/30 hover:bg-white/[0.05] transition-all duration-300"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                         <div className="flex items-center gap-2 text-cyan-600">
+                      <div className="flex items-center justify-between mb-3">
+                         <div className="flex items-center gap-2 text-red-500">
                            {feature.icon}
-                           <h3 className="text-sm font-bold text-black">{feature.title}</h3>
+                           <h3 className="text-sm font-medium text-white">{feature.title}</h3>
                          </div>
-                         <span className="text-[10px] font-mono text-gray-700 group-hover:text-cyan-600 transition-colors">{feature.status}</span>
+                         <span className="text-[10px] font-mono text-neutral-600 group-hover:text-red-500 transition-colors">{feature.status}</span>
                       </div>
-                      <p className="text-xs text-gray-600 leading-relaxed">
+                      <p className="text-xs text-neutral-500 leading-relaxed">
                         {feature.desc}
                       </p>
                     </div>
@@ -188,9 +196,9 @@ const ProductsPage = () => {
               </div>
 
               {/* Bottom Statement */}
-              <div className="mt-4 pt-6 border-t border-gray-200 text-center">
-                <p className="text-sm font-mono text-gray-600">
-                  <span className="text-black">GamingXP</span> doesn't just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
+              <div className="mt-4 pt-6 border-t border-white/5 text-center">
+                <p className="text-sm font-mono text-neutral-500">
+                  <span className="text-white">GamingXP</span> doesn't just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
                 </p>
               </div>
             </div>
@@ -200,18 +208,18 @@ const ProductsPage = () => {
         {/* Product 2: CafeXP */}
         <div className="relative">
           {/* Decorative BG Glow */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-3xl blur-3xl opacity-30" />
+          <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
           
-          <div className="relative border border-gray-300 rounded-lg bg-gray-50 backdrop-blur-md overflow-hidden">
+          <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)]">
             {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
               <div className="flex items-center gap-3">
-                <Monitor className="w-5 h-5 text-purple-600" />
-                <span className="text-black font-bold tracking-wide">CafeXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-300">MODULE_02</span>
+                <Monitor className="w-5 h-5 text-red-400" />
+                <span className="text-white font-semibold tracking-wide">CafeXP</span>
+                <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_02</span>
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-purple-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shadow-[0_0_10px_rgba(168,85,247,0.5)]"></span>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
                 STABLE_RELEASE
               </div>
             </div>
@@ -219,42 +227,42 @@ const ProductsPage = () => {
             <div className="p-8 md:p-12">
               <div className="flex flex-col lg:flex-row gap-8">
                 
-                {/* Terminal Visual - FIXED LAYOUT */}
-                <div className="lg:w-1/3 bg-gray-50 border border-gray-300 rounded-lg p-1 font-mono text-xs shadow-xl h-fit">
-                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-300">
-                    <div className="w-2 h-2 rounded-full bg-red-500/80" />
-                    <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
-                    <div className="w-2 h-2 rounded-full bg-green-500/80" />
+                {/* Terminal Visual */}
+                <div className="lg:w-1/3 bg-neutral-900 border border-white/10 rounded-xl p-1 font-mono text-xs shadow-xl h-fit">
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
                   </div>
                   
                   {/* Clean Multi-line Code Block */}
-                  <div className="p-4 text-gray-700 leading-relaxed">
+                  <div className="p-4 text-neutral-400 leading-loose">
                     <code>
-                      <span className="text-purple-600">system</span> init <span className="text-black">CafeXP</span>{'\n'}
-                      <span className="text-green-600">[ OK ]</span> Loading modules...{'\n'}
-                      <span className="text-green-600">[ OK ]</span> User Control: <span className="text-cyan-600">Enabled</span>{'\n'}
-                      <span className="text-green-600">[ OK ]</span> Billing Engine: <span className="text-cyan-600">Active</span>{'\n'}
-                      <span className="text-green-600">[ OK ]</span> Monitoring: <span className="text-cyan-600">Live</span>
+                      <span className="text-red-500">system</span> init <span className="text-white">CafeXP</span>{'\n'}
+                      <span className="text-green-500">[ OK ]</span> Loading modules...{'\n'}
+                      <span className="text-green-500">[ OK ]</span> User Control: <span className="text-red-400">Enabled</span>{'\n'}
+                      <span className="text-green-500">[ OK ]</span> Billing Engine: <span className="text-red-400">Active</span>{'\n'}
+                      <span className="text-green-500">[ OK ]</span> Monitoring: <span className="text-red-400">Live</span>
                     </code>
                   </div>
                 </div>
 
                 {/* Features */}
                 <div className="lg:w-2/3">
-                  <h2 className="text-2xl font-bold text-black mb-2">Smart Management for Internet Cafes</h2>
-                  <p className="text-gray-700 text-sm leading-relaxed mb-6">
+                  <h2 className="text-2xl font-semibold text-white mb-3">Smart Management for Internet Cafes</h2>
+                  <p className="text-neutral-400 text-sm leading-relaxed mb-8">
                     Designed for traditional internet cafes and browsing centers that need efficiency, security, and complete operational control.
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {cafeFeatures.map((feature, index) => (
-                      <div key={index} className="flex items-start gap-3 group">
-                        <div className="p-2 rounded bg-gray-100 border border-gray-300 text-purple-600 group-hover:border-purple-600/50 transition-colors">
+                      <div key={index} className="flex items-start gap-4 group">
+                        <div className="p-2.5 rounded-lg border border-white/10 bg-white/5 text-red-500 group-hover:border-red-500/30 group-hover:bg-red-500/10 transition-all">
                           {feature.icon}
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-black mb-1">{feature.title}</h3>
-                          <p className="text-xs text-gray-600 leading-relaxed">{feature.desc}</p>
+                          <h3 className="text-sm font-medium text-white mb-1">{feature.title}</h3>
+                          <p className="text-xs text-neutral-500 leading-relaxed">{feature.desc}</p>
                         </div>
                       </div>
                     ))}
@@ -263,9 +271,9 @@ const ProductsPage = () => {
               </div>
               
               {/* Bottom Statement */}
-              <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-                <p className="text-sm font-mono text-gray-600">
-                  <span className="text-black">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
+              <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                <p className="text-sm font-mono text-neutral-500">
+                  <span className="text-white">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
                 </p>
               </div>
             </div>
@@ -281,7 +289,7 @@ const ProductsPage = () => {
           100% { transform: translateX(100vw); }
         }
         .animate-racer-fast {
-          animation: racer-fast 3s linear infinite;
+          animation: racer-fast 4s linear infinite;
         }
 
         @keyframes racer-slow {
@@ -289,7 +297,7 @@ const ProductsPage = () => {
           100% { transform: translateX(-100vw); }
         }
         .animate-racer-slow {
-          animation: racer-slow 7s linear infinite;
+          animation: racer-slow 9s linear infinite;
         }
       `}</style>
     </div>
