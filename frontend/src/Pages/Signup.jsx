@@ -59,7 +59,7 @@ const Signup = () => {
   };
 
   return (
-    <section className="min-h-[calc(100svh-4rem)] bg-black text-white px-4 py-10">
+    <section className="min-h-screen bg-black text-white px-4 py-10">
       <div className="w-full max-w-2xl mx-auto border border-neutral-800 rounded-2xl bg-neutral-950 p-6 sm:p-7">
         <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
         <p className="text-sm text-neutral-400 mt-1">Register with details required by backend validation</p>
