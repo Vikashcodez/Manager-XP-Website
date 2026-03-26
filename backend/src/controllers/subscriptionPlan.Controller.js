@@ -15,8 +15,8 @@ export const createSubscriptionPlan = async (req, res) => {
 
     const query = `
       INSERT INTO subscription_plans 
-      (name, max_branches, max_pcs, is_telmetry_enabled, is_active) 
-      VALUES ($1, $2, $3, $4, $5) 
+      (name, max_branches, max_pcs, is_telmetry_enabled, is_active, description) 
+      VALUES ($1, $2, $3, $4, $5, $6) 
       RETURNING *
     `;
 
@@ -25,7 +25,8 @@ export const createSubscriptionPlan = async (req, res) => {
       max_branches, 
       max_pcs, 
       is_telmetry_enabled || false, 
-      is_active !== undefined ? is_active : true
+      is_active !== undefined ? is_active : true,
+      req.body.description || null
     ];
 
     const result = await pool.query(query, values);

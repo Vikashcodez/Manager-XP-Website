@@ -36,9 +36,12 @@ export const initializeDatabase = async () => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS subscription_plans (
         sub_id SERIAL PRIMARY KEY,
+        subs_software VARCHAR(255) NOT NULL,
         name VARCHAR(255) NOT NULL,
         max_branches INTEGER NOT NULL,
+        is_single_pc_price BOOLEAN DEFAULT FALSE,
         max_pcs INTEGER NOT NULL,
+        games_allowed JSONB,
         is_telmetry_enabled BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
         description TEXT,
@@ -46,6 +49,8 @@ export const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    
 
     
     console.log('✅ Users table created/verified');

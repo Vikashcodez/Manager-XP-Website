@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const initialForm = {
+  description: '',
   name: '',
   max_branches: 1,
   max_pcs: 1,
@@ -57,6 +58,7 @@ const SubscriptionPlansPage = () => {
   const onEdit = (plan) => {
     setEditingId(plan.sub_id);
     setForm({
+      description: getDescription(plan),
       name: plan.name || '',
       max_branches: Number(plan.max_branches || 1),
       max_pcs: Number(plan.max_pcs || 1),
@@ -117,6 +119,9 @@ const SubscriptionPlansPage = () => {
     }
   };
 
+  const getDescription = (plan) =>
+    plan?.description ?? plan?.descption ?? plan?.desc ?? '';
+
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
@@ -134,6 +139,15 @@ const SubscriptionPlansPage = () => {
       </div>
 
       <form onSubmit={onSubmit} className="mt-5 grid md:grid-cols-2 gap-3 rounded-xl border border-neutral-800 p-4">
+        <textarea
+          name="description"
+          value={form.description}
+          onChange={onChange}
+          placeholder="Description"
+          rows={3}
+          className="md:col-span-2 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
+        />
+
         <input
           name="name"
           value={form.name}
@@ -212,7 +226,9 @@ const SubscriptionPlansPage = () => {
           <table className="min-w-full text-sm">
             <thead className="bg-neutral-900/80 text-neutral-300">
               <tr>
+                <th className="text-left px-4 py-3 font-medium">Sub ID</th>
                 <th className="text-left px-4 py-3 font-medium">Name</th>
+                <th className="text-left px-4 py-3 font-medium">Description</th>
                 <th className="text-left px-4 py-3 font-medium">Max Branches</th>
                 <th className="text-left px-4 py-3 font-medium">Max PCs</th>
                 <th className="text-left px-4 py-3 font-medium">Telemetry</th>
@@ -223,7 +239,9 @@ const SubscriptionPlansPage = () => {
             <tbody>
               {plans.map((plan) => (
                 <tr key={plan.sub_id} className="border-t border-neutral-800">
+                  <td className="px-4 py-3">{plan.sub_id ?? '-'}</td>
                   <td className="px-4 py-3">{plan.name}</td>
+                  <td className="px-4 py-3">{getDescription(plan) || '-'}</td>
                   <td className="px-4 py-3">{plan.max_branches}</td>
                   <td className="px-4 py-3">{plan.max_pcs}</td>
                   <td className="px-4 py-3">{plan.is_telmetry_enabled ? 'Enabled' : 'Disabled'}</td>
@@ -250,7 +268,7 @@ const SubscriptionPlansPage = () => {
               ))}
               {plans.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-5 text-center text-neutral-400">
+                  <td colSpan={8} className="px-4 py-5 text-center text-neutral-400">
                     No subscription plans found.
                   </td>
                 </tr>
