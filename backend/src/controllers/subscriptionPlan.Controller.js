@@ -3,30 +3,57 @@ import pool from '../config/database.js';
 // Create a new subscription plan
 export const createSubscriptionPlan = async (req, res) => {
   try {
-    const { name, max_branches, max_pcs, is_telmetry_enabled, is_active } = req.body;
+    const {
+      subs_software,
+      name,
+      max_branches,
+      is_single_pc_price = false,
+      max_pcs,
+      games_allowed,
+      is_telmetry_enabled = false,
+      is_active = true,
+      description
+    } = req.body;
 
     // Validate required fields
-    if (!name || !max_branches || !max_pcs) {
+    if (!subs_software || !name || !max_branches || !max_pcs) {
       return res.status(400).json({
         success: false,
-        message: 'Name, max_branches, and max_pcs are required fields'
+        message: 'Missing required fields: subs_software, name, max_branches, max_pcs are required'
       });
     }
 
+    // Validate games_allowed is valid JSON if provided
+    let gamesAllowedJson = games_allowed || [];
+    if (typeof games_allowed === 'string') {
+      try {
+        gamesAllowedJson = JSON.parse(games_allowed);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON format for games_allowed'
+        });
+      }
+    }
+
     const query = `
-      INSERT INTO subscription_plans 
-      (name, max_branches, max_pcs, is_telmetry_enabled, is_active, description) 
-      VALUES ($1, $2, $3, $4, $5, $6) 
+      INSERT INTO subscription_plans (
+        subs_software, name, max_branches, is_single_pc_price, 
+        max_pcs, games_allowed, is_telmetry_enabled, is_active, description
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
 
     const values = [
-      name, 
-      max_branches, 
-      max_pcs, 
-      is_telmetry_enabled || false, 
-      is_active !== undefined ? is_active : true,
-      req.body.description || null
+      subs_software,
+      name,
+      max_branches,
+      is_single_pc_price,
+      max_pcs,
+      JSON.stringify(gamesAllowedJson),
+      is_telmetry_enabled,
+      is_active,
+      description
     ];
 
     const result = await pool.query(query, values);
@@ -49,13 +76,38 @@ export const createSubscriptionPlan = async (req, res) => {
 // Get all subscription plans
 export const getAllSubscriptionPlans = async (req, res) => {
   try {
-    const query = `
-      SELECT * FROM subscription_plans 
-      ORDER BY created_at DESC
+    const { is_active, subs_software } = req.query;
+    
+    let query = `
+      SELECT 
+        sub_id, subs_software, name, max_branches, is_single_pc_price,
+        max_pcs, games_allowed, is_telmetry_enabled, is_active, description,
+        created_at, updated_at
+      FROM subscription_plans
+      WHERE 1=1
     `;
     
-    const result = await pool.query(query);
-
+    const values = [];
+    let paramCounter = 1;
+    
+    // Add filters if provided
+    if (is_active !== undefined) {
+      query += ` AND is_active = $${paramCounter}`;
+      values.push(is_active === 'true');
+      paramCounter++;
+    }
+    
+    if (subs_software) {
+      query += ` AND subs_software = $${paramCounter}`;
+      values.push(subs_software);
+      paramCounter++;
+    }
+    
+    // Add ordering
+    query += ` ORDER BY created_at DESC`;
+    
+    const result = await pool.query(query, values);
+    
     res.status(200).json({
       success: true,
       count: result.rows.length,
@@ -71,21 +123,29 @@ export const getAllSubscriptionPlans = async (req, res) => {
   }
 };
 
-// Get subscription plan by ID
+// Get single subscription plan by ID
 export const getSubscriptionPlanById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const query = 'SELECT * FROM subscription_plans WHERE sub_id = $1';
+    
+    const query = `
+      SELECT 
+        sub_id, subs_software, name, max_branches, is_single_pc_price,
+        max_pcs, games_allowed, is_telmetry_enabled, is_active, description,
+        created_at, updated_at
+      FROM subscription_plans
+      WHERE sub_id = $1
+    `;
+    
     const result = await pool.query(query, [id]);
-
+    
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Subscription plan not found'
       });
     }
-
+    
     res.status(200).json({
       success: true,
       data: result.rows[0]
@@ -104,70 +164,70 @@ export const getSubscriptionPlanById = async (req, res) => {
 export const updateSubscriptionPlan = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, max_branches, max_pcs, is_telmetry_enabled, is_active } = req.body;
-
+    const updates = req.body;
+    
     // Check if plan exists
     const checkQuery = 'SELECT * FROM subscription_plans WHERE sub_id = $1';
     const checkResult = await pool.query(checkQuery, [id]);
-
+    
     if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Subscription plan not found'
       });
     }
-
+    
     // Build dynamic update query
-    const updates = [];
+    const allowedFields = [
+      'subs_software', 'name', 'max_branches', 'is_single_pc_price',
+      'max_pcs', 'games_allowed', 'is_telmetry_enabled', 'is_active', 'description'
+    ];
+    
+    const updateFields = [];
     const values = [];
     let paramCounter = 1;
-
-    if (name !== undefined) {
-      updates.push(`name = $${paramCounter}`);
-      values.push(name);
-      paramCounter++;
+    
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        // Handle JSON field specially
+        if (field === 'games_allowed' && typeof updates[field] === 'string') {
+          try {
+            updates[field] = JSON.parse(updates[field]);
+          } catch (error) {
+            return res.status(400).json({
+              success: false,
+              message: 'Invalid JSON format for games_allowed'
+            });
+          }
+        }
+        
+        updateFields.push(`${field} = $${paramCounter}`);
+        values.push(updates[field]);
+        paramCounter++;
+      }
     }
-    if (max_branches !== undefined) {
-      updates.push(`max_branches = $${paramCounter}`);
-      values.push(max_branches);
-      paramCounter++;
-    }
-    if (max_pcs !== undefined) {
-      updates.push(`max_pcs = $${paramCounter}`);
-      values.push(max_pcs);
-      paramCounter++;
-    }
-    if (is_telmetry_enabled !== undefined) {
-      updates.push(`is_telmetry_enabled = $${paramCounter}`);
-      values.push(is_telmetry_enabled);
-      paramCounter++;
-    }
-    if (is_active !== undefined) {
-      updates.push(`is_active = $${paramCounter}`);
-      values.push(is_active);
-      paramCounter++;
-    }
-
-    // Always update the updated_at timestamp
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    if (updates.length === 1) {
+    
+    if (updateFields.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No fields to update'
       });
     }
-
+    
+    // Add updated_at timestamp
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+    
     const query = `
       UPDATE subscription_plans 
-      SET ${updates.join(', ')} 
-      WHERE sub_id = $${paramCounter} 
+      SET ${updateFields.join(', ')}
+      WHERE sub_id = $${paramCounter}
       RETURNING *
     `;
     
     values.push(id);
+    
     const result = await pool.query(query, values);
-
+    
     res.status(200).json({
       success: true,
       message: 'Subscription plan updated successfully',
@@ -183,30 +243,49 @@ export const updateSubscriptionPlan = async (req, res) => {
   }
 };
 
-// Delete subscription plan
+// Delete subscription plan (soft delete)
 export const deleteSubscriptionPlan = async (req, res) => {
   try {
     const { id } = req.params;
-
+    const { permanent } = req.query; // Optional flag for permanent deletion
+    
     // Check if plan exists
     const checkQuery = 'SELECT * FROM subscription_plans WHERE sub_id = $1';
     const checkResult = await pool.query(checkQuery, [id]);
-
+    
     if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Subscription plan not found'
       });
     }
-
-    const deleteQuery = 'DELETE FROM subscription_plans WHERE sub_id = $1 RETURNING *';
-    const result = await pool.query(deleteQuery, [id]);
-
-    res.status(200).json({
-      success: true,
-      message: 'Subscription plan deleted successfully',
-      data: result.rows[0]
-    });
+    
+    if (permanent === 'true') {
+      // Permanent deletion
+      const deleteQuery = 'DELETE FROM subscription_plans WHERE sub_id = $1 RETURNING *';
+      const result = await pool.query(deleteQuery, [id]);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Subscription plan permanently deleted',
+        data: result.rows[0]
+      });
+    } else {
+      // Soft delete (set is_active to false)
+      const updateQuery = `
+        UPDATE subscription_plans 
+        SET is_active = false, updated_at = CURRENT_TIMESTAMP
+        WHERE sub_id = $1 
+        RETURNING *
+      `;
+      const result = await pool.query(updateQuery, [id]);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Subscription plan deactivated successfully',
+        data: result.rows[0]
+      });
+    }
   } catch (error) {
     console.error('Error deleting subscription plan:', error);
     res.status(500).json({
@@ -216,3 +295,4 @@ export const deleteSubscriptionPlan = async (req, res) => {
     });
   }
 };
+
