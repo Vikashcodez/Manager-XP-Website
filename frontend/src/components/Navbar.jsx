@@ -21,28 +21,29 @@ const Navbar = () => {
 
   // Detect scroll position
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      if (window.scrollY > 24) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
+      if (ticking) return;
+
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        const next = window.scrollY > 24;
+        setIsScrolled((prev) => (prev === next ? prev : next));
+        ticking = false;
+      });
     };
 
-    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useEffect(() => {
-    setIsMenuOpen(false);
-    setIsProfileOpen(false);
-  }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
   const avatarLabel = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
 
   return (
-    <nav className={`fixed z-50 top-0 left-0 right-0 antialiased font-sans border-b transition-all duration-300 ${
+    <nav className={`fixed z-50 top-0 left-0 right-0 antialiased font-sans border-b transition-[border-color,box-shadow] duration-200 ${
       isScrolled
         ? 'bg-black border-neutral-800 shadow-[0_8px_24px_rgba(0,0,0,0.38)]'
         : 'bg-black border-white/5'
@@ -109,6 +110,14 @@ const Navbar = () => {
 
                 {isProfileOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-2xl p-1.5">
+                    {user?.role !== 'admin' && (
+                      <Link
+                        to="/dashboard"
+                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                      >
+                        Dashboard
+                      </Link>
+                    )}
                     {user?.role === 'admin' && (
                       <Link
                         to="/admin"
@@ -191,6 +200,14 @@ const Navbar = () => {
 
           {isAuthenticated && (
             <div className="pt-2 space-y-2">
+              {user?.role !== 'admin' && (
+                <Link
+                  to="/dashboard"
+                  className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-red-600/70 bg-red-900/20 hover:bg-red-900/35 transition-all duration-200"
+                >
+                  Dashboard
+                </Link>
+              )}
               {user?.role === 'admin' && (
                 <Link
                   to="/admin"

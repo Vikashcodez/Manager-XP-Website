@@ -12,15 +12,19 @@ import BookDemoPage from './Pages/BookDemo'
 import Login from './Pages/Login'
 import Signup from './Pages/Signup'
 import AdminDashboard from './Pages/AdminDashboard'
+import UserDashboard from './Pages/UserDashboard'
+import CafeManager from './components/cafeManager'
 
 const AppLayout = () => {
   const location = useLocation()
   const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin'
+  const isDashboardRoute = location.pathname === '/dashboard'
+  const hideFooter = hideNavAndFooter || isDashboardRoute
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className={`flex flex-col min-h-screen ${isDashboardRoute ? 'bg-black' : 'bg-white'}`}>
       {!hideNavAndFooter && <Navbar />}
-      <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'}`}>
+      <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'} ${isDashboardRoute ? 'bg-black' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
@@ -29,6 +33,22 @@ const AppLayout = () => {
           <Route path="/demo" element={<BookDemoPage/>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route
+            path="/dashboard"
+            element={(
+              <ProtectedRoute>
+                <UserDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/add-cafe"
+            element={(
+              <ProtectedRoute>
+                <CafeManager />
+              </ProtectedRoute>
+            )}
+          />
           <Route
             path="/admin"
             element={(
@@ -39,7 +59,7 @@ const AppLayout = () => {
           />
         </Routes>
       </main>
-      {!hideNavAndFooter && <Footer />}
+      {!hideFooter && <Footer />}
     </div>
   )
 }

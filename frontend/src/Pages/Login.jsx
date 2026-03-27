@@ -34,7 +34,7 @@ const Login = () => {
       if (user?.role === 'admin') {
         navigate('/admin', { replace: true });
       } else {
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Unable to login');

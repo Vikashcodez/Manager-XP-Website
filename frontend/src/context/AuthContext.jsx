@@ -105,6 +105,14 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
+  const updateUser = (updates) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = typeof updates === 'function' ? updates(prev) : { ...prev, ...updates };
+      return normalizeUser(next);
+    });
+  };
+
   const value = useMemo(
     () => ({
       user,
@@ -114,6 +122,7 @@ export const AuthProvider = ({ children }) => {
       login,
       register,
       logout,
+      updateUser,
     }),
     [user, token, isLoading]
   );
