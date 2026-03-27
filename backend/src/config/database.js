@@ -50,7 +50,35 @@ export const initializeDatabase = async () => {
       )
     `);
 
-    
+    //cafe table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cafes (
+        cafe_id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user_designation VARCHAR(255) NOT NULL,
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    //branch table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS branches (
+        branch_id SERIAL PRIMARY KEY,
+        cafe_id INTEGER REFERENCES cafes(cafe_id) ON DELETE CASCADE,
+        street VARCHAR(255) NOT NULL,
+        city VARCHAR(255) NOT NULL,
+        state VARCHAR(255) NOT NULL,
+        country VARCHAR(255) NOT NULL,
+        zip_code VARCHAR(20) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     
     console.log('✅ Users table created/verified');
