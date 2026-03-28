@@ -5,6 +5,7 @@ import { initializeDatabase } from './src/config/database.js';
 import authRoutes from './src/routes/auth.Routes.js';
 import subscriptionPlanRouter from './src/routes/subscriptionPlan.Routes.js';
 import cafeRouter from './src/routes/cafe.Routes.js';
+import subscriptionsRouter from './src/routes/subscriptions.Routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/subscription-plans',subscriptionPlanRouter);
 app.use('/api/cafes', cafeRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
 
 // Health check route
 app.get('/health', (req, res) => {
