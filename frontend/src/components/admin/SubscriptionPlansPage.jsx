@@ -11,6 +11,7 @@ const initialForm = {
   max_pcs: 1,
   games_allowed: [],
   is_telmetry_enabled: false,
+  no_of_days: '',
   is_active: true,
 };
 
@@ -54,7 +55,7 @@ const SubscriptionPlansPage = () => {
         ...prev,
         [name]: checked,
       }));
-    } else if (name === 'max_branches' || name === 'max_pcs') {
+    } else if (name === 'max_branches' || name === 'max_pcs' || name === 'no_of_days') {
       setForm((prev) => ({
         ...prev,
         [name]: parseInt(value) || 0,
@@ -112,6 +113,7 @@ const SubscriptionPlansPage = () => {
       max_pcs: Number(plan.max_pcs || 1),
       games_allowed: plan.games_allowed || [],
       is_telmetry_enabled: Boolean(plan.is_telmetry_enabled),
+      no_of_days: Number(plan.no_of_days || ''),
       is_active: Boolean(plan.is_active),
     });
   };
@@ -272,6 +274,20 @@ const SubscriptionPlansPage = () => {
               />
             </div>
 
+            {/* Number of Days */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Number of Days</label>
+              <input
+                name="no_of_days"
+                type="number"
+                min="0"
+                value={form.no_of_days}
+                onChange={onChange}
+                placeholder="e.g., 30, 365"
+                className="w-full bg-neutral-900 border border-red-500/30 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-500 transition-colors"
+              />
+            </div>
+
             {/* Single PC Price Option */}
             <div>
               <label className="flex items-center gap-2 cursor-pointer mt-7">
@@ -422,6 +438,7 @@ const SubscriptionPlansPage = () => {
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Description</th>
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Branches</th>
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">PCs</th>
+                  <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Days</th>
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Games</th>
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Telemetry</th>
                   <th className="text-left px-6 py-4 text-sm font-medium text-gray-300">Status</th>
@@ -448,6 +465,9 @@ const SubscriptionPlansPage = () => {
                     <td className="px-6 py-4 text-sm">{plan.max_branches}</td>
                     <td className="px-6 py-4 text-sm">
                       {plan.is_single_pc_price ? 'Single PC' : plan.max_pcs}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {plan.no_of_days || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       {plan.games_allowed && plan.games_allowed.length > 0 ? (

@@ -43,7 +43,9 @@ export const initializeDatabase = async () => {
         max_pcs INTEGER NOT NULL,
         games_allowed JSONB,
         is_telmetry_enabled BOOLEAN DEFAULT FALSE,
+        no_of_days INTEGER,
         is_active BOOLEAN DEFAULT TRUE,
+        is_freeTrial BOOLEAN DEFAULT FALSE,
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -82,6 +84,38 @@ export const initializeDatabase = async () => {
 
     
     console.log('✅ Users table created/verified');
+
+    // Seed subscription_plans table with default data if empty
+    const planCheck = await client.query('SELECT COUNT(*) FROM subscription_plans');
+    if (planCheck.rows[0].count === '0') {
+      await client.query(`
+        INSERT INTO subscription_plans (
+          subs_software,
+          name,
+          max_branches,
+          is_single_pc_price,
+          max_pcs,
+          is_telmetry_enabled,
+          no_of_days,
+          is_active,
+          is_freeTrial,
+          description
+        )
+        VALUES (
+          'gamingxp',
+          'Free Trial Plan',
+          1,
+          FALSE,
+          5,
+          TRUE,
+          15,
+          TRUE,
+          TRUE,
+          '15-day free trial with limited PCs and basic game access'
+        )
+      `);
+      console.log('✅ Default subscription plan seeded');
+    }
     
     client.release();
   } catch (error) {

@@ -11,6 +11,7 @@ export const createSubscriptionPlan = async (req, res) => {
       max_pcs,
       games_allowed,
       is_telmetry_enabled = false,
+      no_of_days,
       is_active = true,
       description
     } = req.body;
@@ -39,8 +40,8 @@ export const createSubscriptionPlan = async (req, res) => {
     const query = `
       INSERT INTO subscription_plans (
         subs_software, name, max_branches, is_single_pc_price, 
-        max_pcs, games_allowed, is_telmetry_enabled, is_active, description
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        max_pcs, games_allowed, is_telmetry_enabled, no_of_days, is_active, description
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -52,6 +53,7 @@ export const createSubscriptionPlan = async (req, res) => {
       max_pcs,
       JSON.stringify(gamesAllowedJson),
       is_telmetry_enabled,
+      no_of_days,
       is_active,
       description
     ];
@@ -81,7 +83,7 @@ export const getAllSubscriptionPlans = async (req, res) => {
     let query = `
       SELECT 
         sub_id, subs_software, name, max_branches, is_single_pc_price,
-        max_pcs, games_allowed, is_telmetry_enabled, is_active, description,
+        max_pcs, games_allowed, is_telmetry_enabled, no_of_days, is_active, description,
         created_at, updated_at
       FROM subscription_plans
       WHERE 1=1
@@ -131,7 +133,7 @@ export const getSubscriptionPlanById = async (req, res) => {
     const query = `
       SELECT 
         sub_id, subs_software, name, max_branches, is_single_pc_price,
-        max_pcs, games_allowed, is_telmetry_enabled, is_active, description,
+        max_pcs, games_allowed, is_telmetry_enabled, no_of_days, is_active, description,
         created_at, updated_at
       FROM subscription_plans
       WHERE sub_id = $1
@@ -180,7 +182,7 @@ export const updateSubscriptionPlan = async (req, res) => {
     // Build dynamic update query
     const allowedFields = [
       'subs_software', 'name', 'max_branches', 'is_single_pc_price',
-      'max_pcs', 'games_allowed', 'is_telmetry_enabled', 'is_active', 'description'
+      'max_pcs', 'games_allowed', 'is_telmetry_enabled', 'no_of_days', 'is_active', 'description'
     ];
     
     const updateFields = [];
