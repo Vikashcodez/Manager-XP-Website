@@ -82,6 +82,22 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    //subscription table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        subscription_id SERIAL PRIMARY KEY,
+        cafe_id INTEGER REFERENCES cafes(cafe_id) ON DELETE CASCADE,
+        sub_id INTEGER REFERENCES subscription_plans(sub_id) ON DELETE CASCADE,
+        max_pcs INTEGER NOT NULL,
+        start_date TIMESTAMP NOT NULL,
+        end_date TIMESTAMP NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+
     
     console.log('✅ Users table created/verified');
 
