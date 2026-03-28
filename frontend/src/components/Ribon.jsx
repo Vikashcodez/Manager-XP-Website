@@ -1,7 +1,33 @@
-import React from 'react';
-import { Zap, Calendar, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, Rocket, ArrowRight, Monitor } from 'lucide-react';
 
-const DemoRibbon = () => {
+const FreeTrialRibbon = () => {
+  const [trialData, setTrialData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrialData = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/subscription-plans/gamingxp-free-trial');
+        const result = await response.json();
+        if (result.success && result.data.length > 0) {
+          setTrialData(result.data[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch trial data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrialData();
+  }, []);
+
+  // Extract dynamic values with fallbacks
+  const days = trialData?.no_of_days || 15;
+  const maxPcs = trialData?.max_pcs || 5;
+  const softwareName = trialData?.subs_software?.toUpperCase() || 'GAMINGXP';
+
   return (
     <div className="relative w-full py-16 overflow-hidden bg-black">
       
@@ -32,10 +58,10 @@ const DemoRibbon = () => {
           </div>
           <div>
             <h3 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
-              BOOK YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">DEMO</span> NOW
+              START YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">{days}-DAY</span> TRIAL
             </h3>
             <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider mt-1">
-              Experience the ecosystem firsthand
+              Access {softwareName} on up to {maxPcs} PCs — No credit card required
             </p>
           </div>
         </div>
@@ -58,13 +84,13 @@ const DemoRibbon = () => {
             {/* Shine Animation */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 rounded-full" />
             
-            <Calendar className="w-4 h-4 relative z-10 text-red-400 group-hover:text-white transition-colors" />
-            <span className="relative z-10">BOOK DEMO</span>
+            <Rocket className="w-4 h-4 relative z-10 text-red-400 group-hover:text-white transition-colors" />
+            <span className="relative z-10">START FREE TRIAL</span>
           </button>
 
           {/* Secondary Ghost Button */}
           <button className="group hidden sm:flex items-center gap-2 px-4 py-3 text-neutral-500 text-xs font-mono transition-colors hover:text-white border border-transparent hover:border-white/10 rounded-full">
-            LEARN MORE
+            VIEW PLANS
             <ArrowRight className="w-3 h-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
           </button>
         </div>
@@ -73,4 +99,4 @@ const DemoRibbon = () => {
   );
 };
 
-export default DemoRibbon;
+export default FreeTrialRibbon;
