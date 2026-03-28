@@ -34,6 +34,14 @@ export const register = async (req, res) => {
 
     const user = result.rows[0];
 
+    // Get cafeId if user has a cafe
+    const cafeResult = await pool.query(
+      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      [user.id]
+    );
+    
+    user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
+
     // Generate token
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -126,6 +134,14 @@ export const login = async (req, res) => {
 
     // Remove password from response
     delete user.password;
+
+    // Get cafeId if user has a cafe
+    const cafeResult = await pool.query(
+      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      [user.id]
+    );
+    
+    user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
     // Generate token
     const token = jwt.sign(

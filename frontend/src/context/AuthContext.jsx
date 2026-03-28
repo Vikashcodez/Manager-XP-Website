@@ -19,6 +19,7 @@ const normalizeUser = (user) => {
   return {
     ...user,
     address: normalizedAddress,
+    cafe_id: user.cafe_id || null,
   };
 };
 
