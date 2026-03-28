@@ -5,9 +5,9 @@ import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { label: 'Home', to: '/' },
-  { label: 'Products', to: '/products' },
-  { label: 'About', to: '/about' },
-  { label: 'Contact', to: '/contact' },
+  { label: 'Our Products', to: '/products' },
+  { label: 'About Us', to: '/about' },
+  { label: 'Contact Us', to: '/contact' },
 ];
 
 const AuthButtons = ({ isProfileOpen, setIsProfileOpen, avatarLabel, user, isAuthenticated, logout }) => {
@@ -59,6 +59,10 @@ const Navbar = () => {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
@@ -71,32 +75,30 @@ const Navbar = () => {
     <>
       {/* Desktop Top Bar with Centered Logo */}
       <div className="hidden lg:flex fixed top-0 left-0 right-0 h-20 bg-black border-b border-neutral-800 z-50 items-center justify-center">
-        <Link to="/" className="flex items-center hover:opacity-80 transition-opacity duration-300">
+        <Link to="/" onClick={scrollToTop} className="flex items-center hover:opacity-80 transition-opacity duration-300">
           <img src={logo} alt="ManagerXP Logo" className="h-10 w-auto" />
         </Link>
       </div>
 
-      {/* Desktop Sidebar */}
-      <nav className="hidden lg:flex fixed left-0 top-20 h-[calc(100vh-5rem)] w-64 bg-black border-r border-neutral-800 flex-col z-50">
-        {/* Navigation Box */}
-        <div className="flex-1 flex items-start justify-center px-4 pt-4">
-          <div className="w-full bg-neutral-900/50 rounded-xl border border-neutral-800 p-4 space-y-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`block px-4 py-3 text-sm font-medium rounded-lg transition-all duration-300 text-center ${
-                  isActive(item.to)
-                    ? 'bg-red-500 text-black'
-                    : 'text-white hover:bg-red-500 hover:text-black'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+      {/* Desktop Navigation Box - Left Side */}
+      <div className="hidden lg:flex fixed left-4 top-24 z-50">
+        <div className="w-56 bg-neutral-900/50 rounded-xl border border-neutral-800 p-4 space-y-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={scrollToTop}
+              className={`block px-4 py-3 text-sm font-medium rounded-lg transition-all duration-300 text-center ${
+                isActive(item.to)
+                  ? 'bg-red-500 text-black'
+                  : 'text-white hover:bg-red-500 hover:text-black'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
-      </nav>
+      </div>
 
       {/* Desktop Auth Buttons - Top Right */}
       <div className="hidden lg:flex fixed top-4 right-4 z-50 items-center gap-2">
@@ -129,7 +131,7 @@ const Navbar = () => {
         </button>
 
         {/* Logo - Center */}
-        <Link to="/" className="flex items-center hover:opacity-80 transition-opacity duration-300">
+        <Link to="/" onClick={scrollToTop} className="flex items-center hover:opacity-80 transition-opacity duration-300">
           <img src={logo} alt="ManagerXP Logo" className="h-8 w-auto" />
         </Link>
 
@@ -164,7 +166,10 @@ const Navbar = () => {
                   <Link
                     key={item.to}
                     to={item.to}
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      scrollToTop();
+                    }}
                     className={`block px-4 py-3 text-sm font-medium rounded-lg transition-all duration-300 text-center ${
                       isActive(item.to)
                         ? 'bg-red-500 text-black'

@@ -141,143 +141,143 @@ const ProductsPage = () => {
           </p>
         </div>
 
-        {/* Product 1: GamingXP */}
-        <div className="mb-24 relative">
-          {/* Decorative BG Glow */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
+        {/* Products Grid - Horizontal Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
-          <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)]">
-            {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-              <div className="flex items-center gap-3">
-                <Gamepad2 className="w-5 h-5 text-red-500" />
-                <span className="text-white font-semibold tracking-wide">GamingXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_01</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
-                SYSTEM_ACTIVE
-              </div>
-            </div>
-
-            <div className="p-8 md:p-12">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                {/* Left: Info */}
-                <div className="lg:col-span-1">
-                  <h2 className="text-2xl font-semibold text-white mb-3">The Ultimate Gaming Cafe Platform</h2>
-                  <p className="text-neutral-400 text-sm leading-relaxed mb-6">
-                    Engineered specifically for high-performance gaming environments. It gives you complete control over your gaming infrastructure.
-                  </p>
-                  <button className="group flex items-center gap-2 text-xs font-mono text-red-500 hover:text-white transition-colors">
-                    Explore Docs <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </button>
+          {/* Product 1: GamingXP */}
+          <div className="relative">
+            {/* Decorative BG Glow */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
+            
+            <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)] h-full flex flex-col">
+              {/* Top HUD Bar */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+                <div className="flex items-center gap-3">
+                  <Gamepad2 className="w-5 h-5 text-red-500" />
+                  <span className="text-white font-semibold tracking-wide">GamingXP</span>
+                  <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_01</span>
                 </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
+                  SYSTEM_ACTIVE
+                </div>
+              </div>
 
-                {/* Right: Feature Grid */}
-                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {gamingFeatures.map((feature, index) => (
-                    <div 
-                      key={index}
-                      className="group bg-white/[0.03] border border-white/5 p-5 rounded-lg hover:border-red-500/30 hover:bg-white/[0.05] transition-all duration-300"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                         <div className="flex items-center gap-2 text-red-500">
-                           {feature.icon}
-                           <h3 className="text-sm font-medium text-white">{feature.title}</h3>
-                         </div>
-                         <span className="text-[10px] font-mono text-neutral-600 group-hover:text-red-500 transition-colors">{feature.status}</span>
+              <div className="p-6 md:p-8 flex-1 flex flex-col">
+                <div className="flex-1">
+                  <div className="mb-6">
+                    <h2 className="text-xl font-semibold text-white mb-3">The Ultimate Gaming Cafe Platform</h2>
+                    <p className="text-neutral-400 text-sm leading-relaxed">
+                      Engineered specifically for high-performance gaming environments. It gives you complete control over your gaming infrastructure.
+                    </p>
+                  </div>
+
+                  {/* Feature Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {gamingFeatures.map((feature, index) => (
+                      <div 
+                        key={index}
+                        className="group bg-white/[0.03] border border-white/5 p-4 rounded-lg hover:border-red-500/30 hover:bg-white/[0.05] transition-all duration-300"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="flex items-center gap-2 text-red-500">
+                             {feature.icon}
+                             <h3 className="text-xs font-medium text-white">{feature.title}</h3>
+                           </div>
+                           <span className="text-[9px] font-mono text-neutral-600 group-hover:text-red-500 transition-colors">{feature.status}</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-500 leading-relaxed">
+                          {feature.desc}
+                        </p>
                       </div>
-                      <p className="text-xs text-neutral-500 leading-relaxed">
-                        {feature.desc}
-                      </p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Bottom Statement */}
-              <div className="mt-4 pt-6 border-t border-white/5 text-center">
-                <p className="text-sm font-mono text-neutral-500">
-                  <span className="text-white">GamingXP</span> doesn't just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
-                </p>
+                {/* Bottom Statement */}
+                <div className="mt-6 pt-4 border-t border-white/5 text-center">
+                  <p className="text-xs font-mono text-neutral-500">
+                    <span className="text-white">GamingXP</span> doesn't just manage your cafe — it optimizes performance, maximizes uptime, and increases profitability.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Product 2: CafeXP */}
-        <div className="relative">
-          {/* Decorative BG Glow */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
-          
-          <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)]">
-            {/* Top HUD Bar */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-              <div className="flex items-center gap-3">
-                <Monitor className="w-5 h-5 text-red-400" />
-                <span className="text-white font-semibold tracking-wide">CafeXP</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_02</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
-                STABLE_RELEASE
-              </div>
-            </div>
-
-            <div className="p-8 md:p-12">
-              <div className="flex flex-col lg:flex-row gap-8">
-                
-                {/* Terminal Visual */}
-                <div className="lg:w-1/3 bg-neutral-900 border border-white/10 rounded-xl p-1 font-mono text-xs shadow-xl h-fit">
-                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5">
-                    <div className="w-2 h-2 rounded-full bg-red-500" />
-                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                  </div>
-                  
-                  {/* Clean Multi-line Code Block */}
-                  <div className="p-4 text-neutral-400 leading-loose">
-                    <code>
-                      <span className="text-red-500">system</span> init <span className="text-white">CafeXP</span>{'\n'}
-                      <span className="text-green-500">[ OK ]</span> Loading modules...{'\n'}
-                      <span className="text-green-500">[ OK ]</span> User Control: <span className="text-red-400">Enabled</span>{'\n'}
-                      <span className="text-green-500">[ OK ]</span> Billing Engine: <span className="text-red-400">Active</span>{'\n'}
-                      <span className="text-green-500">[ OK ]</span> Monitoring: <span className="text-red-400">Live</span>
-                    </code>
-                  </div>
+          {/* Product 2: CafeXP */}
+          <div className="relative">
+            {/* Decorative BG Glow */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-red-500/10 to-black rounded-3xl blur-3xl opacity-30" />
+            
+            <div className="relative border border-white/10 rounded-xl bg-white/[0.02] backdrop-blur-md overflow-hidden shadow-[0_0_50px_-20px_rgba(220,38,38,0.1)] h-full flex flex-col">
+              {/* Top HUD Bar */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+                <div className="flex items-center gap-3">
+                  <Monitor className="w-5 h-5 text-red-400" />
+                  <span className="text-white font-semibold tracking-wide">CafeXP</span>
+                  <span className="hidden sm:inline text-[10px] font-mono text-neutral-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">MODULE_02</span>
                 </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-red-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"></span>
+                  STABLE_RELEASE
+                </div>
+              </div>
 
-                {/* Features */}
-                <div className="lg:w-2/3">
-                  <h2 className="text-2xl font-semibold text-white mb-3">Smart Management for Internet Cafes</h2>
-                  <p className="text-neutral-400 text-sm leading-relaxed mb-8">
-                    Designed for traditional internet cafes and browsing centers that need efficiency, security, and complete operational control.
-                  </p>
+              <div className="p-6 md:p-8 flex-1 flex flex-col">
+                <div className="flex-1">
+                  <div className="mb-6">
+                    <h2 className="text-xl font-semibold text-white mb-3">Smart Management for Internet Cafes</h2>
+                    <p className="text-neutral-400 text-sm leading-relaxed">
+                      Designed for traditional internet cafes and browsing centers that need efficiency, security, and complete operational control.
+                    </p>
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Terminal Visual */}
+                  <div className="bg-neutral-900 border border-white/10 rounded-xl p-1 font-mono text-xs shadow-xl mb-6">
+                    <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5">
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                    </div>
+                    
+                    {/* Clean Multi-line Code Block */}
+                    <div className="p-4 text-neutral-400 leading-loose">
+                      <code>
+                        <span className="text-red-500">system</span> init <span className="text-white">CafeXP</span>{'\n'}
+                        <span className="text-green-500">[ OK ]</span> Loading modules...{'\n'}
+                        <span className="text-green-500">[ OK ]</span> User Control: <span className="text-red-400">Enabled</span>{'\n'}
+                        <span className="text-green-500">[ OK ]</span> Billing Engine: <span className="text-red-400">Active</span>{'\n'}
+                        <span className="text-green-500">[ OK ]</span> Monitoring: <span className="text-red-400">Live</span>
+                      </code>
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {cafeFeatures.map((feature, index) => (
-                      <div key={index} className="flex items-start gap-4 group">
-                        <div className="p-2.5 rounded-lg border border-white/10 bg-white/5 text-red-500 group-hover:border-red-500/30 group-hover:bg-red-500/10 transition-all">
+                      <div key={index} className="flex items-start gap-3 group">
+                        <div className="p-2 rounded-lg border border-white/10 bg-white/5 text-red-500 group-hover:border-red-500/30 group-hover:bg-red-500/10 transition-all flex-shrink-0">
                           {feature.icon}
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium text-white mb-1">{feature.title}</h3>
-                          <p className="text-xs text-neutral-500 leading-relaxed">{feature.desc}</p>
+                          <h3 className="text-xs font-medium text-white mb-1">{feature.title}</h3>
+                          <p className="text-[11px] text-neutral-500 leading-relaxed">{feature.desc}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-              
-              {/* Bottom Statement */}
-              <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                <p className="text-sm font-mono text-neutral-500">
-                  <span className="text-white">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
-                </p>
+
+                {/* Bottom Statement */}
+                <div className="mt-6 pt-4 border-t border-white/5 text-center">
+                  <p className="text-xs font-mono text-neutral-500">
+                    <span className="text-white">CafeXP</span> simplifies daily operations while giving owners complete visibility and control.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+
         </div>
 
       </div>

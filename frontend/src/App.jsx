@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
+import ScrollToTop from './components/ScrollToTop'
 import { AuthProvider } from './context/AuthContext'
 import Home from './Pages/Home'
 import Products from './Pages/Products'
@@ -47,6 +48,7 @@ const AppLayout = () => {
 const App = () => {
   return (
     <Router>
+      <ScrollToTop />
       <AuthProvider>
         <AppLayout />
       </AuthProvider>

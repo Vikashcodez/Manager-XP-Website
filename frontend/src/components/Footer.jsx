@@ -4,6 +4,10 @@ import logo from '../assets/logo.png';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { FaXTwitter, FaLinkedin } from 'react-icons/fa6';
 
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
 const Footer = () => {
   // Helper function to determine if logo needs filter (optional, assuming logo is dark, we invert it)
   // If your logo is already white, remove the style prop from the img tag.
@@ -79,14 +83,20 @@ const Footer = () => {
               Navigation
             </h4>
             <ul className="space-y-4">
-              {['Home', 'Our Products', 'About Us', 'Contact Us'].map((item, idx) => (
+              {[
+                { name: 'Home', path: '/' },
+                { name: 'Our Products', path: '/products' },
+                { name: 'About Us', path: '/about' },
+                { name: 'Contact Us', path: '/contact' }
+              ].map((item, idx) => (
                 <li key={idx}>
                   <Link 
-                    to={item === 'Home' ? '/' : `/${item.toLowerCase().replace(' ', '')}`} 
+                    to={item.path} 
+                    onClick={scrollToTop}
                     className="group flex items-center gap-2 text-neutral-300 hover:text-white transition-colors duration-300 text-sm"
                   >
                     <span className="w-0 h-[1px] bg-red-500 group-hover:w-3 transition-all duration-300"></span>
-                    {item}
+                    {item.name}
                   </Link>
                 </li>
               ))}

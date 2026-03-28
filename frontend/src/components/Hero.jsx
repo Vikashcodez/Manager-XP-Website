@@ -69,7 +69,7 @@ const HeroSection = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-black overflow-hidden flex items-center justify-center antialiased font-sans">
+    <div className="relative bg-black overflow-hidden flex items-center justify-center antialiased font-sans min-h-screen py-20">
       
       {/* --- Background Layers --- */}
       
@@ -99,7 +99,7 @@ const HeroSection = () => {
       </div>
 
       {/* --- Main Content --- */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 lg:px-8 text-center flex flex-col justify-center min-h-screen">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 lg:px-8 text-center flex flex-col justify-center">
         
         {/* Top HUD Element */}
         <div className="flex justify-center mb-6">
