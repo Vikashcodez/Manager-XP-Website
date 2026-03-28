@@ -18,9 +18,9 @@ const AppLayout = () => {
   const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin'
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-black">
       {!hideNavAndFooter && <Navbar />}
-      <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'}`}>
+      <main className={`flex-1 transition-all duration-300 ${hideNavAndFooter ? '' : 'lg:ml-64 lg:mt-20 mt-16'}`}> {/* Responsive margins: mobile gets mt-16, desktop gets ml-64 and mt-20 */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />

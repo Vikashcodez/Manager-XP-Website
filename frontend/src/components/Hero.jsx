@@ -99,7 +99,7 @@ const HeroSection = () => {
       </div>
 
       {/* --- Main Content --- */}
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-20 pb-8">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 lg:px-8 text-center flex flex-col justify-center min-h-screen">
         
         {/* Top HUD Element */}
         <div className="flex justify-center mb-6">
@@ -111,13 +111,13 @@ const HeroSection = () => {
         </div>
 
         {/* Main Typography */}
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-white leading-[1.1] mb-6">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-white leading-[1.1] mb-6 text-center">
           Control Every PC. Track Every Minute.<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-800">Grow Your Cafe.</span>
         </h1>
         
         <div className="flex items-center justify-center gap-4 mb-10">
-          <p className="text-base sm:text-lg text-neutral-400 max-w-2xl mx-auto font-light leading-relaxed">
+          <p className="text-base sm:text-lg text-neutral-400 max-w-2xl font-light leading-relaxed text-center">
             ManagerXP delivers gaming session management, intelligent billing, and real-time monitoring for modern internet and gaming cafes powered by AI.
           </p>
         </div>
@@ -166,7 +166,7 @@ const HeroSection = () => {
         </div>
 
         {/* Status Bar */}
-        <div className="mt-16 flex justify-center items-center gap-6 sm:gap-8 text-neutral-500 text-xs font-mono uppercase tracking-widest">
+        <div className="mt-16 flex flex-wrap justify-center items-center gap-4 sm:gap-6 lg:gap-8 text-neutral-500 text-xs font-mono uppercase tracking-widest">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -174,9 +174,9 @@ const HeroSection = () => {
             </span>
             System Active
           </div>
-          <div className="h-4 w-[1px] bg-neutral-800"></div>
+          <div className="hidden sm:block h-4 w-[1px] bg-neutral-800"></div>
           <div>24/7 Support</div>
-          <div className="h-4 w-[1px] bg-neutral-800"></div>
+          <div className="hidden sm:block h-4 w-[1px] bg-neutral-800"></div>
           <div>Secure & Reliable</div>
         </div>
       </div>

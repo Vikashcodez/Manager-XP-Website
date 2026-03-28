@@ -119,10 +119,10 @@ const ProductsPage = () => {
       </div>
 
       {/* --- Main Content --- */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12 flex flex-col min-h-screen">
         
         {/* Header Section */}
-        <div className="text-center mb-20">
+        <div className="text-center mb-8 lg:mb-12">
           <div className="flex justify-center mb-4">
             <div className="flex items-center gap-4 text-xs text-neutral-500 font-mono tracking-[0.2em] uppercase">
               <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-neutral-700" />
@@ -131,11 +131,11 @@ const ProductsPage = () => {
             </div>
           </div>
           
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-white mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-white mb-4 lg:mb-6">
             OUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">PRODUCTS</span>
           </h1>
           
-          <p className="text-neutral-400 max-w-3xl mx-auto text-lg font-light">
+          <p className="text-neutral-400 max-w-3xl mx-auto text-base lg:text-lg font-light px-4">
             We build powerful, intelligent software solutions designed to manage, monitor, and grow modern digital spaces. 
             Built on a <span className="text-white">unified technology ecosystem</span>.
           </p>

@@ -111,7 +111,7 @@ const AboutPage = () => {
       </div>
 
       {/* --- Main Content --- */}
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-24">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 lg:px-8 py-8 lg:py-12 flex flex-col min-h-screen">
         
         {/* Header Section */}
         <div className="text-center mb-20">
