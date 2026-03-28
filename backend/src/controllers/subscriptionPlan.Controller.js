@@ -298,3 +298,33 @@ export const deleteSubscriptionPlan = async (req, res) => {
   }
 };
 
+// Get free trial plans for GamingXP
+export const getGamingXPFreeTrialPlan = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        sub_id, subs_software, name, max_branches, is_single_pc_price,
+        max_pcs, games_allowed, is_telmetry_enabled, no_of_days, is_active, 
+        is_freeTrial, description, created_at, updated_at
+      FROM subscription_plans
+      WHERE is_freeTrial = true AND subs_software = 'gamingxp'
+      ORDER BY created_at DESC
+    `;
+    
+    const result = await pool.query(query);
+    
+    res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching GamingXP free trial plan:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
