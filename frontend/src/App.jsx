@@ -14,10 +14,11 @@ import Signup from './Pages/Signup'
 import AdminDashboard from './Pages/AdminDashboard'
 import UserDashboard from './Pages/UserDashboard'
 import CafeManager from './components/cafeManager'
+import GamerXpLogin from './Pages/GamingXplogin'
 
 const AppLayout = () => {
   const location = useLocation()
-  const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin'
+  const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin' || location.pathname === '/gamingxp-login'
   const isDashboardRoute = location.pathname === '/dashboard'
   const hideFooter = hideNavAndFooter || isDashboardRoute
 
@@ -33,6 +34,7 @@ const AppLayout = () => {
           <Route path="/demo" element={<BookDemoPage/>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/gamingxp-login" element={<GamerXpLogin />} />
           <Route
             path="/dashboard"
             element={(
