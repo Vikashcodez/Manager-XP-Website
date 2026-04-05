@@ -190,3 +190,91 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+
+// Verify token and return user info
+export const verifyToken = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
+      });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get user from database
+    const result = await pool.query(
+      'SELECT id, email, phone_number, name, address, role, created_at FROM users WHERE id = $1',
+      [decoded.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Get cafeId if user has a cafe
+    const cafeResult = await pool.query(
+      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      [user.id]
+    );
+    
+    user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
+
+    res.status(200).json({
+      success: true,
+      message: 'Token verified successfully',
+      data: {
+        user,
+        token
+      }
+    });
+
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired'
+      });
+    }
+    console.error('Token verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Quick verification endpoint for checking recent auth
+export const verify = async (req, res) => {
+  try {
+    // This endpoint is called when desktop app wants to verify if user just logged in
+    // It can use session cookies or other methods
+    // For now, we'll return error - actual implementation depends on your session strategy
+    
+    return res.status(401).json({
+      success: false,
+      message: 'Session verification failed. Please use token method.'
+    });
+  } catch (error) {
+    console.error('Verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
