@@ -496,14 +496,19 @@ const UserDashboard = () => {
     loadSubscriptions();
   }, [cafes]);
 
-  const personalCafeCount = useMemo(
-    () => cafes.filter((cafe) => String(cafe.user_id) === String(user?.id)).length,
+  const userCafes = useMemo(
+    () => cafes.filter((cafe) => String(cafe.user_id) === String(user?.id)),
     [cafes, user?.id]
   );
 
+  const personalCafeCount = useMemo(
+    () => userCafes.length,
+    [userCafes]
+  );
+
   const activeCafeCount = useMemo(
-    () => cafes.filter((cafe) => cafe.is_active).length,
-    [cafes]
+    () => userCafes.filter((cafe) => cafe.is_active).length,
+    [userCafes]
   );
 
   const handleProfileUpdate = useCallback((formData) => {
@@ -553,8 +558,8 @@ const UserDashboard = () => {
                 <p className="text-xs font-semibold uppercase tracking-wider text-red-300 mb-5">Quick Stats</p>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
-                    <span className="text-xs text-neutral-400">Total Cafes</span>
-                    <span className="text-lg font-bold text-white">{cafesLoading ? '...' : cafes.length}</span>
+                    <span className="text-xs text-neutral-400">My Cafes</span>
+                    <span className="text-lg font-bold text-white">{cafesLoading ? '...' : personalCafeCount}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-xl bg-red-900/20 hover:bg-red-900/30 transition-colors">
                     <span className="text-xs text-neutral-400">Active Cafes</span>
@@ -592,7 +597,7 @@ const UserDashboard = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="rounded-full border border-red-700/60 bg-gradient-to-r from-red-900/40 to-red-800/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-red-200">
-                        {cafes.length} Listed
+                        {userCafes.length} Listed
                       </span>
                       <button
                         onClick={() => navigate('/add-cafe')}
@@ -621,7 +626,7 @@ const UserDashboard = () => {
 
                   {!cafesLoading && !cafesError && (
                     <>
-                      {cafes.length === 0 ? (
+                      {userCafes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">
                           <div className="w-16 h-16 rounded-full bg-neutral-900 flex items-center justify-center mb-4">
                             <span className="text-2xl">🏪</span>
@@ -631,7 +636,7 @@ const UserDashboard = () => {
                         </div>
                       ) : (
                         <div className="grid gap-5 sm:grid-cols-2">
-                          {cafes.map((cafe) => (
+                          {userCafes.map((cafe) => (
                             <CafeCard key={cafe.cafe_id} cafe={cafe} />
                           ))}
                         </div>
