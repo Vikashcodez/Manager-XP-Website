@@ -122,7 +122,6 @@ export const getAllSubscriptions = async (req, res) => {
         s.subscription_id,
         s.cafe_id,
         c.name as cafe_name,
-        c.email as cafe_email,
         s.sub_id,
         sp.name as plan_name,
         sp.subs_software as software,
@@ -371,6 +370,32 @@ export const deleteExpiredSubscriptions = async (req, res) => {
     
   } catch (error) {
     console.error('Error deleting expired subscriptions:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+//get subscriptions by cafe id
+export const getSubscriptionsByCafeId = async (req, res) => {
+  try {
+    const { cafe_id } = req.params;
+    const query = `
+      SELECT s.*, 
+      s1.*
+       FROM subscriptions s JOIN subscription_plans s1 ON s.sub_id = s1.sub_id
+      WHERE s.cafe_id = $1
+    `;
+    const result = await pool.query(query, [cafe_id]);
+    
+    return res.status(200).json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching subscriptions by cafe id:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
