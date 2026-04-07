@@ -386,7 +386,7 @@ export const getSubscriptionsByCafeId = async (req, res) => {
       SELECT s.*, 
       s1.*
        FROM subscriptions s JOIN subscription_plans s1 ON s.sub_id = s1.sub_id
-      WHERE s.cafe_id = $1
+      WHERE s.cafe_id = $1 AND s.end_date >= CURRENT_TIMESTAMP
     `;
     const result = await pool.query(query, [cafe_id]);
     
