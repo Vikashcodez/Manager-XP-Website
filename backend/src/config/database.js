@@ -97,6 +97,22 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    //pcs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pcs (
+        pc_id SERIAL PRIMARY KEY,
+        cafe_id INTEGER REFERENCES cafes(cafe_id) ON DELETE CASCADE,
+        branch_id INTEGER REFERENCES branches(branch_id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        ip_address VARCHAR(255) NOT NULL,
+        mac_address VARCHAR(255) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+
 
     
     console.log('✅ Users table created/verified');
