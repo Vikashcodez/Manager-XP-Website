@@ -89,7 +89,7 @@ export const getPCById = async (req, res) => {
 // Create new PC
 export const createPC = async (req, res) => {
   try {
-    const { cafe_id, branch_id, name, ip_address, mac_address, is_active } = req.body;
+    const { cafe_id, branch_id, name, ip_address, mac_address, port, is_active } = req.body;
     
     // Validate required fields
     if (!cafe_id || !branch_id || !name || !ip_address || !mac_address) {
@@ -130,8 +130,8 @@ export const createPC = async (req, res) => {
     }
     
     const query = `
-      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
     
@@ -141,6 +141,7 @@ export const createPC = async (req, res) => {
       name,
       ip_address,
       mac_address,
+      port || 9090,
       is_active !== undefined ? is_active : true
     ]);
     

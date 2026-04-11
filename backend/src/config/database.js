@@ -106,12 +106,12 @@ export const initializeDatabase = async () => {
         name VARCHAR(255) NOT NULL,
         ip_address VARCHAR(255) NOT NULL,
         mac_address VARCHAR(255) NOT NULL,
+        port INTEGER DEFAULT 9090,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-
 
 
     
