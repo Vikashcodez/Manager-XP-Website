@@ -7,7 +7,7 @@ export const getAllPCs = async (req, res) => {
     let query = `
       SELECT p.*, 
              c.name as cafe_name,
-             b.name as branch_name
+             b.city as branch_name
       FROM pcs p
       LEFT JOIN cafes c ON p.cafe_id = c.cafe_id
       LEFT JOIN branches b ON p.branch_id = b.branch_id
@@ -56,7 +56,7 @@ export const getPCById = async (req, res) => {
     const query = `
       SELECT p.*, 
              c.name as cafe_name,
-             b.name as branch_name
+             b.city as branch_name
       FROM pcs p
       LEFT JOIN cafes c ON p.cafe_id = c.cafe_id
       LEFT JOIN branches b ON p.branch_id = b.branch_id
@@ -402,7 +402,7 @@ export const getActivePCs = async (req, res) => {
     let query = `
       SELECT p.*, 
              c.name as cafe_name,
-             b.name as branch_name
+             b.city as branch_name
       FROM pcs p
       LEFT JOIN cafes c ON p.cafe_id = c.cafe_id
       LEFT JOIN branches b ON p.branch_id = b.branch_id
@@ -434,6 +434,35 @@ export const getActivePCs = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching active PCs',
+      error: error.message
+    });
+  }
+};
+
+//get pc by cafe id
+export const getPCsByCafe = async (req, res) => {
+  try {
+    const { cafeId } = req.params;
+    const query = `
+      SELECT p.*, b.city as branch_name
+      FROM pcs p
+      LEFT JOIN branches b ON p.branch_id = b.branch_id
+      WHERE p.cafe_id = $1
+      ORDER BY p.name ASC
+    `;
+    const result = await pool.query
+    (query, [cafeId]);
+    res.status(200).json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length
+    });
+  }
+    catch (error) {
+    console.error('Error fetching PCs by cafe:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching PCs by cafe',
       error: error.message
     });
   }

@@ -7,7 +7,8 @@ import {
   deletePC,
   restorePC,
   getPCsByBranch,
-  getActivePCs
+  getActivePCs,
+  getPCsByCafe
 } from '../controllers/pcs.Controller.js';
 
 const pcsRouter = express.Router();
@@ -21,5 +22,5 @@ pcsRouter.post('/', createPC);
 pcsRouter.put('/:id', updatePC);
 pcsRouter.delete('/:id', deletePC);
 pcsRouter.patch('/:id/restore', restorePC);
-
+pcsRouter.get('/cafe/:cafeId', getPCsByCafe);
 export default pcsRouter;
