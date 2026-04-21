@@ -467,3 +467,117 @@ export const getPCsByCafe = async (req, res) => {
     });
   }
 };
+
+// Check if PC exists by IP or MAC address
+export const checkPCExists = async (req, res) => {
+  try {
+    const { ip_address, mac_address } = req.body;
+    
+    if (!ip_address && !mac_address) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide ip_address or mac_address'
+      });
+    }
+    
+    let query = 'SELECT pc_id, name, ip_address, mac_address FROM pcs WHERE 1=1';
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    if (ip_address) {
+      query += ` AND ip_address = $${paramCounter++}`;
+      queryParams.push(ip_address);
+    }
+    if (mac_address) {
+      query += ` AND mac_address = $${paramCounter++}`;
+      queryParams.push(mac_address);
+    }
+    
+    const result = await pool.query(query, queryParams);
+    
+    if (result.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        exists: true,
+        data: result.rows[0]
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      exists: false,
+      message: 'PC not found in database'
+    });
+  } catch (error) {
+    console.error('Error checking PC:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking PC',
+      error: error.message
+    });
+  }
+};
+
+// Register a new discovered PC
+export const registerDiscoveredPC = async (req, res) => {
+  try {
+    const { cafe_id, branch_id, name, ip_address, mac_address, port, hostname } = req.body;
+    
+    // Validate required fields
+    if (!ip_address || !mac_address) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: ip_address, mac_address'
+      });
+    }
+    
+    // Use provided name or hostname as fallback
+    const pc_name = name || hostname || `PC-${mac_address.substring(0, 8)}`;
+    
+    // If cafe_id not provided, use default or return error
+    const final_cafe_id = cafe_id || 1;
+    const final_branch_id = branch_id || 1;
+    
+    // Check if IP or MAC address already exists
+    const existingCheck = await pool.query(
+      'SELECT pc_id FROM pcs WHERE ip_address = $1 OR mac_address = $2',
+      [ip_address, mac_address]
+    );
+    if (existingCheck.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'PC with this IP address or MAC address already exists'
+      });
+    }
+    
+    const query = `
+      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [
+      final_cafe_id,
+      final_branch_id,
+      pc_name,
+      ip_address,
+      mac_address,
+      port || 9090,
+      true
+    ]);
+    
+    res.status(201).json({
+      success: true,
+      message: 'PC registered successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error registering PC:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error registering PC',
+      error: error.message
+    });
+  }
+};
+
