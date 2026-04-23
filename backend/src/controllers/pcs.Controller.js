@@ -469,6 +469,7 @@ export const getPCsByCafe = async (req, res) => {
 };
 
 // Check if PC exists by IP or MAC address
+// Auto-updates IP if MAC address matches but IP is different (handles unknown PC scenario)
 export const checkPCExists = async (req, res) => {
   try {
     const { ip_address, mac_address } = req.body;
@@ -480,29 +481,62 @@ export const checkPCExists = async (req, res) => {
       });
     }
     
-    let query = 'SELECT pc_id, name, ip_address, mac_address FROM pcs WHERE 1=1';
-    const queryParams = [];
-    let paramCounter = 1;
-    
-    if (ip_address) {
-      query += ` AND ip_address = $${paramCounter++}`;
-      queryParams.push(ip_address);
-    }
+    // First check if PC exists by MAC address (since MAC is more reliable)
     if (mac_address) {
-      query += ` AND mac_address = $${paramCounter++}`;
-      queryParams.push(mac_address);
+      const macQuery = 'SELECT pc_id, name, ip_address, mac_address, cafe_id, branch_id FROM pcs WHERE mac_address = $1';
+      const macResult = await pool.query(macQuery, [mac_address]);
+      
+      if (macResult.rows.length > 0) {
+        const existingPC = macResult.rows[0];
+        
+        // If IP address is provided and different from database IP, auto-update it
+        if (ip_address && existingPC.ip_address !== ip_address) {
+          console.log(`🔄 IP Auto-Update: MAC ${mac_address} found. Updating IP from ${existingPC.ip_address} to ${ip_address}`);
+          
+          const updateQuery = `
+            UPDATE pcs 
+            SET ip_address = $1, updated_at = CURRENT_TIMESTAMP 
+            WHERE mac_address = $2 
+            RETURNING *
+          `;
+          
+          const updateResult = await pool.query(updateQuery, [ip_address, mac_address]);
+          
+          return res.status(200).json({
+            success: true,
+            exists: true,
+            ip_updated: true,
+            message: `PC found. IP auto-updated from ${existingPC.ip_address} to ${ip_address}`,
+            data: updateResult.rows[0]
+          });
+        }
+        
+        // If IP is same or not provided, just return the existing PC
+        return res.status(200).json({
+          success: true,
+          exists: true,
+          ip_updated: false,
+          data: existingPC
+        });
+      }
     }
     
-    const result = await pool.query(query, queryParams);
-    
-    if (result.rows.length > 0) {
-      return res.status(200).json({
-        success: true,
-        exists: true,
-        data: result.rows[0]
-      });
+    // If MAC not found, check by IP address
+    if (ip_address) {
+      const ipQuery = 'SELECT pc_id, name, ip_address, mac_address FROM pcs WHERE ip_address = $1';
+      const ipResult = await pool.query(ipQuery, [ip_address]);
+      
+      if (ipResult.rows.length > 0) {
+        return res.status(200).json({
+          success: true,
+          exists: true,
+          ip_updated: false,
+          data: ipResult.rows[0]
+        });
+      }
     }
     
+    // PC not found in database
     res.status(200).json({
       success: true,
       exists: false,
@@ -519,6 +553,7 @@ export const checkPCExists = async (req, res) => {
 };
 
 // Register a new discovered PC
+// Auto-updates IP if MAC already exists (handles unknown PC with changed IP)
 export const registerDiscoveredPC = async (req, res) => {
   try {
     const { cafe_id, branch_id, name, ip_address, mac_address, port, hostname } = req.body;
@@ -538,18 +573,62 @@ export const registerDiscoveredPC = async (req, res) => {
     const final_cafe_id = cafe_id || 1;
     const final_branch_id = branch_id || 1;
     
-    // Check if IP or MAC address already exists
-    const existingCheck = await pool.query(
-      'SELECT pc_id FROM pcs WHERE ip_address = $1 OR mac_address = $2',
-      [ip_address, mac_address]
+    // Check if MAC address already exists (case where PC moved/changed IP)
+    const macExistsCheck = await pool.query(
+      'SELECT pc_id, ip_address FROM pcs WHERE mac_address = $1',
+      [mac_address]
     );
-    if (existingCheck.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'PC with this IP address or MAC address already exists'
+    
+    if (macExistsCheck.rows.length > 0) {
+      const existingPC = macExistsCheck.rows[0];
+      
+      // If IP is different, update it
+      if (existingPC.ip_address !== ip_address) {
+        console.log(`🔄 IP Auto-Update on Register: MAC ${mac_address} found. Updating IP from ${existingPC.ip_address} to ${ip_address}`);
+        
+        const updateQuery = `
+          UPDATE pcs 
+          SET ip_address = $1, updated_at = CURRENT_TIMESTAMP 
+          WHERE mac_address = $2 
+          RETURNING *
+        `;
+        
+        const updateResult = await pool.query(updateQuery, [ip_address, mac_address]);
+        
+        return res.status(200).json({
+          success: true,
+          registered: false,
+          ip_updated: true,
+          message: `PC already exists. IP auto-updated from ${existingPC.ip_address} to ${ip_address}`,
+          data: updateResult.rows[0]
+        });
+      }
+      
+      // MAC exists with same IP, just return the existing PC
+      return res.status(200).json({
+        success: true,
+        registered: false,
+        ip_updated: false,
+        message: 'PC already registered with same configuration',
+        data: macExistsCheck.rows[0]
       });
     }
     
+    // Check if IP address already exists for another PC
+    const ipExistsCheck = await pool.query(
+      'SELECT pc_id FROM pcs WHERE ip_address = $1',
+      [ip_address]
+    );
+    
+    if (ipExistsCheck.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'PC with this IP address already exists',
+        conflict: 'ip_address'
+      });
+    }
+    
+    // Create new PC since MAC doesn't exist
     const query = `
       INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port, is_active)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -568,6 +647,7 @@ export const registerDiscoveredPC = async (req, res) => {
     
     res.status(201).json({
       success: true,
+      registered: true,
       message: 'PC registered successfully',
       data: result.rows[0]
     });
