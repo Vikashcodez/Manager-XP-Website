@@ -113,6 +113,34 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    //pc_software Master table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS software_master (
+        software_id SERIAL PRIMARY KEY,
+        software_name VARCHAR(255) NOT NULL,
+        software_icon TEXT,
+        software_video TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+
+    //pc_software table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pc_software (
+        pc_software_id SERIAL PRIMARY KEY,
+        pc_id INTEGER REFERENCES pcs(pc_id) ON DELETE CASCADE,
+        software_name VARCHAR(255) NOT NULL,
+        software_icon TEXT,
+        software_video TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
 
     
     console.log('✅ Users table created/verified');
