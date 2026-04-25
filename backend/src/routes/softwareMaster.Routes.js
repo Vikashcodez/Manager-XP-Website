@@ -12,11 +12,11 @@ import {
 const softwareMasterRouter = express.Router();
 
 // Routes
-softwareMasterRouter.post('/software', upload, createSoftware);
-softwareMasterRouter.get('/software', getAllSoftware);
-softwareMasterRouter.get('/software/:id', getSoftwareById);
-softwareMasterRouter.put('/software/:id', upload, updateSoftware);
-softwareMasterRouter.delete('/software/:id', deleteSoftware);
-softwareMasterRouter.delete('/software/permanent/:id', permanentDeleteSoftware);
+softwareMasterRouter.post('/', upload, createSoftware);
+softwareMasterRouter.get('/', getAllSoftware);
+softwareMasterRouter.get('/:id', getSoftwareById);
+softwareMasterRouter.put('/:id', upload, updateSoftware);
+softwareMasterRouter.delete('/:id', deleteSoftware);
+softwareMasterRouter.delete('/permanent/:id', permanentDeleteSoftware);
 
 export default softwareMasterRouter;

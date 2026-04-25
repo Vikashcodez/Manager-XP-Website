@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import AdminSidebar from '../components/admin/AdminSidebar';
 import UserManagementPage from '../components/admin/UserManagementPage';
 import SubscriptionPlansPage from '../components/admin/SubscriptionPlansPage';
+import SoftwareMasterManagement from '../components/admin/pcSoftwareMasterManagement';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -23,6 +24,7 @@ const AdminDashboard = () => {
             <div className="p-4 sm:p-6 lg:p-7 overflow-y-auto min-h-0">
               {activeMenu === 'users' && <UserManagementPage />}
               {activeMenu === 'plans' && <SubscriptionPlansPage />}
+              {activeMenu === 'software' && <SoftwareMasterManagement />}
             </div>
           </div>
         </div>

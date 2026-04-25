@@ -30,6 +30,19 @@ const AdminSidebar = ({ user, activeMenu, onMenuChange, onLogout }) => {
         >
           Subscription Plans
         </button>
+
+        <button
+          type="button"
+          onClick={() => onMenuChange('software')}
+          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+            activeMenu === 'software'
+              ? 'bg-red-500/15 text-white border border-red-500/35'
+              : 'text-neutral-300 hover:text-white hover:bg-neutral-900 border border-transparent'
+          }`}
+        >
+          Software Master
+        </button>
+        
       </nav>
 
       <button
