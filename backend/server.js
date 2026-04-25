@@ -7,6 +7,7 @@ import subscriptionPlanRouter from './src/routes/subscriptionPlan.Routes.js';
 import cafeRouter from './src/routes/cafe.Routes.js';
 import subscriptionsRouter from './src/routes/subscriptions.Routes.js';
 import pcsRouter from './src/routes/pcs.Routes.js';
+import softwareMasterRouter from './src/routes/softwareMaster.Routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +23,7 @@ app.use('/api/subscription-plans',subscriptionPlanRouter);
 app.use('/api/cafes', cafeRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/pcs', pcsRouter);
+app.use('/api/software-master', softwareMasterRouter);
 
 // Health check route
 app.get('/health', (req, res) => {
