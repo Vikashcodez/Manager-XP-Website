@@ -10,6 +10,7 @@ import cafeRouter from './src/routes/cafe.Routes.js';
 import subscriptionsRouter from './src/routes/subscriptions.Routes.js';
 import pcsRouter from './src/routes/pcs.Routes.js';
 import softwareMasterRouter from './src/routes/softwareMaster.Routes.js';
+import pcSoftwareRouter from './src/routes/pcSoftware.Routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +31,7 @@ app.use('/api/cafes', cafeRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/pcs', pcsRouter);
 app.use('/api/software-master', softwareMasterRouter);
+app.use('/api/pc-software', pcSoftwareRouter);
 
 // Health check route
 app.get('/health', (req, res) => {

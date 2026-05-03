@@ -1,4 +1,3 @@
-// pcSoftware.controller.js
 import pool from '../config/database.js';
 
 // Get all pc_software records
