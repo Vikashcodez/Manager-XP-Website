@@ -133,6 +133,7 @@ export const initializeDatabase = async () => {
         pc_software_id SERIAL PRIMARY KEY,
         pc_id INTEGER REFERENCES pcs(pc_id) ON DELETE CASCADE,
         software_name VARCHAR(255) NOT NULL,
+        software_path TEXT NOT NULL,
         software_icon TEXT,
         software_video TEXT,
         is_active BOOLEAN DEFAULT TRUE,
