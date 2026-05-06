@@ -14,8 +14,8 @@ const pcSoftwareRouter = express.Router();
 
 pcSoftwareRouter.get('/', getAllPcSoftware);
 pcSoftwareRouter.post('/', createPcSoftware);
-pcSoftwareRouter.get('/:id', getPcSoftwareById);
 pcSoftwareRouter.get('/pc/:pcId', getSoftwareByPcId);
+pcSoftwareRouter.get('/:id', getPcSoftwareById);
 pcSoftwareRouter.put('/:id', updatePcSoftware);
 pcSoftwareRouter.delete('/:id', deletePcSoftware);
 pcSoftwareRouter.patch('/:id/toggle-status', togglePcSoftwareStatus);

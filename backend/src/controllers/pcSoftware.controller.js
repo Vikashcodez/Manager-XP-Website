@@ -4,7 +4,7 @@ import pool from '../config/database.js';
 export const getAllPcSoftware = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT ps.*, p.pc_name 
+      SELECT ps.*, p.name 
       FROM pc_software ps
       LEFT JOIN pcs p ON ps.pc_id = p.pc_id
       ORDER BY ps.created_at DESC
@@ -30,7 +30,7 @@ export const getPcSoftwareById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT ps.*, p.pc_name 
+      `SELECT ps.*, p.name 
        FROM pc_software ps
        LEFT JOIN pcs p ON ps.pc_id = p.pc_id
        WHERE ps.pc_software_id = $1`,
@@ -87,7 +87,7 @@ export const getSoftwareByPcId = async (req, res) => {
 // Create new pc_software record
 export const createPcSoftware = async (req, res) => {
   try {
-    const {
+    let {
       pc_id,
       software_name,
       software_path,
@@ -101,6 +101,30 @@ export const createPcSoftware = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: pc_id, software_name, software_path'
+      });
+    }
+    
+    // Convert pc_id to integer
+    pc_id = parseInt(pc_id, 10);
+    
+    // Validate that pc_id is a valid number
+    if (isNaN(pc_id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid pc_id format. Must be a number.'
+      });
+    }
+    
+    // Check if PC exists before inserting
+    const pcCheck = await pool.query(
+      'SELECT pc_id FROM pcs WHERE pc_id = $1',
+      [pc_id]
+    );
+    
+    if (pcCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `PC with ID ${pc_id} not found in database`
       });
     }
     
