@@ -2,6 +2,28 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js'; 
 
+function normalizeAddress(address) {
+  if (address && typeof address === 'object') {
+    return address;
+  }
+
+  if (typeof address === 'string') {
+    const trimmedAddress = address.trim();
+
+    if (!trimmedAddress) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(trimmedAddress);
+    } catch {
+      return { value: trimmedAddress };
+    }
+  }
+
+  return null;
+}
+
 // Register function
 export const register = async (req, res) => {
   try {
@@ -13,8 +35,10 @@ export const register = async (req, res) => {
       address
     } = req.body;
 
+    const normalizedAddress = normalizeAddress(address);
+
     // Validate required fields
-    if (!customer_name || !email || !phone_number || !password || !address) {
+    if (!customer_name || !email || !phone_number || !password || !normalizedAddress) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required: customer_name, email, phone_number, password, address'
@@ -68,7 +92,7 @@ export const register = async (req, res) => {
       RETURNING customer_id, customer_name, email, phone_number, address, created_at, updated_at
     `;
 
-    const values = [customer_name, email, phone_number, hashedPassword, address];
+    const values = [customer_name, email, phone_number, hashedPassword, normalizedAddress];
     const result = await pool.query(insertQuery, values);
 
     const newCustomer = result.rows[0];
