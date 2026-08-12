@@ -121,7 +121,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-neutral-600 text-xs font-mono tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-              &copy; {new Date().getFullYear()} ManagerXP. SYSTEM_ONLINE.
+              &copy; {new Date().getFullYear()} MANGERXP PRIVATE LIMITED. All rights reserved.
             </p>
             <div className="flex space-x-8">
               <a href="#" className="text-neutral-600 hover:text-red-500 text-xs font-mono transition-colors duration-300 uppercase tracking-wide">

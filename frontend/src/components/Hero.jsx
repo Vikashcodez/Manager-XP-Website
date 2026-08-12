@@ -101,12 +101,12 @@ const HeroSection = () => {
       {/* --- Main Content --- */}
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-20 pb-8">
         
-        {/* Top HUD Element */}
+        {/* Top HUD Element - Welcome Message */}
         <div className="flex justify-center mb-6">
-          <div className="flex items-center gap-4 text-xs text-neutral-500 font-mono tracking-[0.2em] uppercase">
-            <span className="w-10 h-[1px] bg-gradient-to-r from-transparent to-neutral-700" />
-            <span className="text-red-500 font-semibold">Cafe Management Solutions</span>
-            <span className="w-10 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />
+          <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs text-neutral-500 font-mono tracking-[0.15em] sm:tracking-[0.2em] uppercase">
+            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-r from-transparent to-neutral-700" />
+            <span className="text-red-500 font-semibold whitespace-nowrap">Welcome to ManagerXP Private Limited</span>
+            <span className="w-6 sm:w-10 h-[1px] bg-gradient-to-l from-transparent to-neutral-700" />
           </div>
         </div>
 

@@ -143,7 +143,7 @@ const AboutPage = () => {
               Who We Are
             </h3>
             <p className="text-neutral-300 text-sm leading-relaxed mb-4">
-              Founded in <span className="text-white">2026</span>, ManagerXP is a next-generation cafe software and AI solutions provider. We specialize in building intelligent management platforms that combine automation, real-time monitoring, billing systems, and AI-driven analytics.
+              Founded in <span className="text-white">2026</span>, MANAGERXP PRIVATE LIMITED is a next-generation cafe software and AI solutions provider. We specialize in building intelligent management platforms that combine automation, real-time monitoring, billing systems, and AI-driven analytics.
             </p>
             <p className="text-neutral-500 text-sm leading-relaxed">
               From high-performance gaming arenas to traditional cyber cafes, our solutions are designed to simplify operations, improve efficiency, and maximize profitability.
