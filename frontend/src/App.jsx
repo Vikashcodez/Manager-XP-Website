@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -16,6 +16,18 @@ import UserDashboard from './Pages/UserDashboard'
 import CafeManager from './components/cafeManager'
 import GamerXpLogin from './Pages/GamingXplogin'
 
+// Router keeps the previous scroll offset across navigations; reset it so each
+// page starts at the top.
+const ScrollToTop = () => {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+
+  return null
+}
+
 const AppLayout = () => {
   const location = useLocation()
   const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin' || location.pathname === '/gamingxp-login'
@@ -23,9 +35,10 @@ const AppLayout = () => {
   const hideFooter = hideNavAndFooter || isDashboardRoute
 
   return (
-    <div className={`flex flex-col min-h-screen ${isDashboardRoute ? 'bg-black' : 'bg-white'}`}>
+    <div className="flex flex-col min-h-screen bg-black">
+      <ScrollToTop />
       {!hideNavAndFooter && <Navbar />}
-      <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'} ${isDashboardRoute ? 'bg-black' : ''}`}>
+      <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />

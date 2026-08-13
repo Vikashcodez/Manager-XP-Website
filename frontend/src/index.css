@@ -29,4 +29,78 @@
   animation: scroll 2s infinite;
 }
 
+@keyframes racer-fast {
+  0% { transform: translateX(-100vw); }
+  100% { transform: translateX(100vw); }
+}
+
+.animate-racer-fast {
+  animation: racer-fast 4s linear infinite;
+}
+
+@keyframes racer-slow {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100vw); }
+}
+
+.animate-racer-slow {
+  animation: racer-slow 9s linear infinite;
+}
+
+/* Calmer streaks for the footer, so it doesn't compete with page content. */
+.animate-racer-drift {
+  animation: racer-fast 8s linear infinite;
+}
+
+.animate-racer-drift-slow {
+  animation: racer-slow 12s linear infinite;
+}
+
+/* Hero entrance: staggered fade + rise on first paint. */
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-enter-up {
+  animation: enter-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Global base ------------------------------------------------------------- */
+
+html {
+  scroll-behavior: smooth;
+  background-color: #000;
+}
+
+/* Guards against a stray wide child causing sideways scroll on mobile.
+   `clip` rather than `hidden`: `hidden` forces overflow-y to `auto`, which turns
+   the element into a scroll container and breaks window scroll position. */
+html {
+  overflow-x: clip;
+}
+
+/* Visible keyboard focus on the dark theme (mouse clicks stay ring-free). */
+:focus-visible {
+  outline: 2px solid rgb(239 68 68);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-racer-fast,
+  .animate-racer-slow,
+  .animate-racer-drift,
+  .animate-racer-drift-slow,
+  .animate-enter-up,
+  .animate-blob,
+  .animate-scroll {
+    animation: none;
+  }
+}
+
 

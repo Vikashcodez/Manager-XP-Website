@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Rocket, ArrowRight, Monitor } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Zap, Rocket, ArrowRight } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const FreeTrialRibbon = () => {
   const [trialData, setTrialData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [hasExistingTrial, setHasExistingTrial] = useState(false);
@@ -22,8 +21,6 @@ const FreeTrialRibbon = () => {
         }
       } catch (error) {
         console.error("Failed to fetch trial data:", error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -172,18 +169,18 @@ const FreeTrialRibbon = () => {
       </div>
 
       {/* Content Container */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
-        
+      <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
+
         {/* Text Section */}
-        <div className="flex items-center gap-5 text-center md:text-left">
-          <div className="p-3.5 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="flex items-center gap-4 sm:gap-5 text-left">
+          <div className="p-3 sm:p-3.5 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm shrink-0">
             <Zap className="w-6 h-6 text-red-500 animate-pulse" />
           </div>
-          <div>
-            <h3 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+          <div className="min-w-0">
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-white tracking-tight text-balance">
               START YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-700">{days}-DAY</span> TRIAL
             </h3>
-            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider mt-1">
+            <p className="text-[11px] sm:text-xs text-neutral-400 font-mono uppercase tracking-wider mt-1">
               Access {softwareName} on up to {maxPcs} PCs — No credit card required
             </p>
           </div>
@@ -193,32 +190,35 @@ const FreeTrialRibbon = () => {
         <div className="hidden md:block h-12 w-[1px] bg-gradient-to-b from-transparent via-neutral-700 to-transparent" />
 
         {/* Button Section */}
-        <div className="flex items-center gap-6">
-          <button 
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6 w-full md:w-auto shrink-0">
+          <button
             onClick={handleFreeTrialClick}
             disabled={isSubmitting || hasExistingTrial}
-            className="group relative flex items-center gap-3 px-8 py-3.5 
-                       text-sm font-semibold rounded-full text-white 
-                       transition-all duration-300 
+            className="group relative flex items-center justify-center gap-3 px-8 py-3.5
+                       text-sm font-semibold rounded-full text-white overflow-hidden
+                       transition-all duration-300
                        bg-red-600/10 border border-red-500/30
                        hover:bg-red-600/20 hover:border-red-500/60
-                       active:scale-95 
+                       active:scale-95 motion-reduce:active:scale-100
                        shadow-[0_0_25px_-10px_rgba(220,38,38,0.4)]
                        backdrop-blur-md
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             {/* Shine Animation */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 rounded-full" />
-            
+            <div aria-hidden="true" className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 rounded-full" />
+
             <Rocket className="w-4 h-4 relative z-10 text-red-400 group-hover:text-white transition-colors" />
             <span className="relative z-10">{isSubmitting ? 'STARTING...' : hasExistingTrial ? 'FREE TRIAL USED' : 'START FREE TRIAL'}</span>
           </button>
 
           {/* Secondary Ghost Button */}
-          <button className="group hidden sm:flex items-center gap-2 px-4 py-3 text-neutral-500 text-xs font-mono transition-colors hover:text-white border border-transparent hover:border-white/10 rounded-full">
+          <Link
+            to="/products"
+            className="group flex items-center justify-center gap-2 px-4 py-3 text-neutral-500 text-xs font-mono transition-colors hover:text-white border border-transparent hover:border-white/10 rounded-full"
+          >
             VIEW PLANS
-            <ArrowRight className="w-3 h-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-          </button>
+            <ArrowRight className="w-3 h-3 sm:opacity-0 sm:-translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+          </Link>
         </div>
       </div>
     </div>

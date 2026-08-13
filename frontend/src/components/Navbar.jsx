@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import logo from '../assets/whitelogo.png';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,13 +12,12 @@ const navItems = [
 ];
 
 const Navbar = () => {
-  // State to handle mobile menu toggle
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  // State to handle scroll position
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const profileRef = useRef(null);
 
   // Detect scroll position
   useEffect(() => {
@@ -39,41 +39,76 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Dismiss the profile dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    const onPointerDown = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setIsProfileOpen(false);
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isProfileOpen]);
+
   const isActive = (path) => location.pathname === path;
   const avatarLabel = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
+  const closeMenus = () => {
+    setIsMenuOpen(false);
+    setIsProfileOpen(false);
+  };
 
   return (
-    <nav className={`fixed z-50 top-0 left-0 right-0 antialiased font-sans border-b transition-[border-color,box-shadow] duration-200 ${
-      isScrolled
-        ? 'bg-black border-neutral-800 shadow-[0_8px_24px_rgba(0,0,0,0.38)]'
-        : 'bg-black border-white/5'
-    }`}>
+    <nav
+      className={`fixed z-50 top-0 left-0 right-0 antialiased font-sans border-b transition-all duration-300 ${
+        isScrolled
+          ? 'bg-black/80 backdrop-blur-xl border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.38)]'
+          : 'bg-black border-white/5'
+      }`}
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          
+        <div className={`flex items-center justify-between transition-[height] duration-300 ${isScrolled ? 'h-14' : 'h-16'}`}>
+
           {/* Left Side: Logo */}
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <Link to="/" className="flex items-center hover:opacity-80 transition-opacity duration-300">
-              <img src={logo} alt="ManagerXP Logo" className="h-7 w-auto" />
+              <img
+                src={logo}
+                alt="ManagerXP"
+                className={`w-auto transition-all duration-300 ${isScrolled ? 'h-6' : 'h-7'}`}
+              />
             </Link>
           </div>
 
           {/* Center: Desktop Navigation Links */}
-          <div className="hidden md:flex md:items-center md:space-x-6">
+          <div className="hidden md:flex md:items-center md:space-x-7">
             {navItems.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`relative text-[13px] font-medium tracking-[0.01em] transition-colors duration-200 ${
-                  isActive(item.to)
-                    ? 'text-white'
-                    : 'text-neutral-300 hover:text-white'
+                aria-current={isActive(item.to) ? 'page' : undefined}
+                className={`relative py-1 text-[13px] font-medium tracking-[0.01em] transition-colors duration-200 group ${
+                  isActive(item.to) ? 'text-white' : 'text-neutral-300 hover:text-white'
                 }`}
               >
                 {item.label}
-                {isActive(item.to) && (
-                  <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-red-500" />
-                )}
+                <span
+                  aria-hidden="true"
+                  className={`absolute -bottom-0.5 left-0 h-0.5 rounded-full bg-red-500 transition-all duration-300 ${
+                    isActive(item.to)
+                      ? 'w-full shadow-[0_0_8px_rgba(239,68,68,0.6)]'
+                      : 'w-0 group-hover:w-full'
+                  }`}
+                />
               </Link>
             ))}
           </div>
@@ -98,22 +133,29 @@ const Navbar = () => {
             )}
 
             {isAuthenticated && (
-              <div className="relative">
+              <div className="relative" ref={profileRef}>
                 <button
                   type="button"
                   onClick={() => setIsProfileOpen((prev) => !prev)}
                   className="h-9 w-9 rounded-full bg-white text-black text-sm font-semibold flex items-center justify-center border border-white/90 hover:bg-neutral-100 transition"
                   aria-expanded={isProfileOpen}
+                  aria-haspopup="menu"
+                  aria-label="Account menu"
                 >
                   {avatarLabel}
                 </button>
 
                 {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-2xl p-1.5">
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-48 rounded-xl border border-neutral-800 bg-neutral-950/95 backdrop-blur-xl shadow-2xl p-1.5"
+                  >
                     {user?.role !== 'admin' && (
                       <Link
                         to="/dashboard"
-                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                        role="menuitem"
+                        onClick={closeMenus}
+                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
                       >
                         Dashboard
                       </Link>
@@ -121,15 +163,18 @@ const Navbar = () => {
                     {user?.role === 'admin' && (
                       <Link
                         to="/admin"
-                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                        role="menuitem"
+                        onClick={closeMenus}
+                        className="block px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
                       >
                         Admin Dashboard
                       </Link>
                     )}
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={logout}
-                      className="w-full text-left px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg"
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
                     >
                       Logout
                     </button>
@@ -142,55 +187,55 @@ const Navbar = () => {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
             <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => setIsMenuOpen((prev) => !prev)}
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-neutral-300 hover:text-red-400 hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500/60 transition duration-200"
+              className="inline-flex items-center justify-center p-2 rounded-md text-neutral-300 hover:text-red-400 hover:bg-neutral-900 transition duration-200"
               aria-controls="mobile-menu"
-              aria-expanded="false"
+              aria-expanded={isMenuOpen}
+              aria-label={isMenuOpen ? 'Close main menu' : 'Open main menu'}
             >
-              <span className="sr-only">Open main menu</span>
-              {/* Hamburger Icon */}
-              {!isMenuOpen ? (
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              ) : (
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
       {/* Mobile Menu Overlay */}
-      <div className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`} id="mobile-menu">
-        <div className="px-4 pt-2 pb-4 space-y-1 bg-black border-t border-white/10">
+      <div
+        id="mobile-menu"
+        className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${
+          isMenuOpen ? 'max-h-[32rem] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="px-4 pt-2 pb-4 space-y-1 bg-black/95 backdrop-blur-xl border-t border-white/10">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
+              aria-current={isActive(item.to) ? 'page' : undefined}
               className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive(item.to)
                   ? 'text-white bg-red-500/15 border border-red-500/30'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-900'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-900 border border-transparent'
               }`}
-              onClick={() => setIsMenuOpen(false)}
+              onClick={closeMenus}
             >
               {item.label}
             </Link>
           ))}
+
           {!isAuthenticated && (
             <div className="pt-2 grid grid-cols-2 gap-2">
               <Link
                 to="/login"
+                onClick={closeMenus}
                 className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-neutral-700 hover:bg-neutral-900 transition-all duration-200"
               >
                 Login
               </Link>
               <Link
                 to="/signup"
+                onClick={closeMenus}
                 className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 transition-all duration-200"
               >
                 Sign up
@@ -203,6 +248,7 @@ const Navbar = () => {
               {user?.role !== 'admin' && (
                 <Link
                   to="/dashboard"
+                  onClick={closeMenus}
                   className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-red-600/70 bg-red-900/20 hover:bg-red-900/35 transition-all duration-200"
                 >
                   Dashboard
@@ -211,6 +257,7 @@ const Navbar = () => {
               {user?.role === 'admin' && (
                 <Link
                   to="/admin"
+                  onClick={closeMenus}
                   className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-neutral-700 hover:bg-neutral-900 transition-all duration-200"
                 >
                   Admin Dashboard

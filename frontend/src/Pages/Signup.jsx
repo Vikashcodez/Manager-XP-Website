@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AlertCircle, Loader2, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/AuthLayout';
 
 const initialState = {
   name: '',
@@ -18,6 +20,33 @@ const initialState = {
     pinCode: '',
   },
 };
+
+/** Small local field so the 12 inputs below don't repeat the same markup. */
+const Field = ({ id, label, value, onChange, type = 'text', required = true, autoComplete, placeholder }) => (
+  <div>
+    <label htmlFor={id} className={authLabelClasses}>
+      {label}
+    </label>
+    <input
+      id={id}
+      name={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      required={required}
+      autoComplete={autoComplete}
+      placeholder={placeholder}
+      className={authFieldClasses}
+    />
+  </div>
+);
+
+const SectionLabel = ({ children }) => (
+  <div className="flex items-center gap-3 pt-2">
+    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-red-500 whitespace-nowrap">{children}</span>
+    <span aria-hidden="true" className="h-[1px] flex-1 bg-gradient-to-r from-red-500/40 to-transparent" />
+  </div>
+);
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -59,101 +88,89 @@ const Signup = () => {
   };
 
   return (
-    <section className="min-h-screen bg-black text-white px-4 py-10">
-      <div className="w-full max-w-2xl mx-auto border border-neutral-800 rounded-2xl bg-neutral-950 p-6 sm:p-7">
-        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
-        <p className="text-sm text-neutral-400 mt-1">Register with details required by backend validation</p>
-
+    <AuthLayout
+      wide
+      title="Create account"
+      subtitle="Register with details required by backend validation"
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" className="text-white hover:text-red-400 underline underline-offset-4 transition-colors">
+            Login
+          </Link>
+        </>
+      }
+    >
+      <div aria-live="polite">
         {error && (
-          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2 text-sm">
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
           </div>
         )}
-
-        <form onSubmit={onSubmit} className="mt-5 space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="name" className="block text-sm text-neutral-300 mb-1.5">Name</label>
-              <input id="name" name="name" value={form.name} onChange={onChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="phoneNumber" className="block text-sm text-neutral-300 mb-1.5">Phone Number</label>
-              <input id="phoneNumber" name="phoneNumber" value={form.phoneNumber} onChange={onChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="email" className="block text-sm text-neutral-300 mb-1.5">Email</label>
-              <input id="email" name="email" type="email" value={form.email} onChange={onChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="street" className="block text-sm text-neutral-300 mb-1.5">Street</label>
-              <input id="street" name="street" value={form.address.street} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="landmark" className="block text-sm text-neutral-300 mb-1.5">Landmark (optional)</label>
-              <input id="landmark" name="landmark" value={form.address.landmark} onChange={onAddressChange} className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="city" className="block text-sm text-neutral-300 mb-1.5">City</label>
-              <input id="city" name="city" value={form.address.city} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="district" className="block text-sm text-neutral-300 mb-1.5">District</label>
-              <input id="district" name="district" value={form.address.district} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="state" className="block text-sm text-neutral-300 mb-1.5">State</label>
-              <input id="state" name="state" value={form.address.state} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="country" className="block text-sm text-neutral-300 mb-1.5">Country</label>
-              <input id="country" name="country" value={form.address.country} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="pinCode" className="block text-sm text-neutral-300 mb-1.5">Pin Code</label>
-              <input id="pinCode" name="pinCode" value={form.address.pinCode} onChange={onAddressChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="password" className="block text-sm text-neutral-300 mb-1.5">Password</label>
-              <input id="password" name="password" type="password" value={form.password} onChange={onChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm text-neutral-300 mb-1.5">Confirm Password</label>
-              <input id="confirmPassword" name="confirmPassword" type="password" value={form.confirmPassword} onChange={onChange} required className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-neutral-600" />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full rounded-xl bg-white text-black font-semibold py-2.5 hover:bg-neutral-100 disabled:opacity-60 disabled:cursor-not-allowed transition"
-          >
-            {isLoading ? 'Creating account...' : 'Sign up'}
-          </button>
-        </form>
-
-        <p className="mt-4 text-sm text-neutral-400">
-          Already have an account?{' '}
-          <Link to="/login" className="text-white underline underline-offset-4">
-            Login
-          </Link>
-        </p>
       </div>
-    </section>
+
+      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+
+        <SectionLabel>Account</SectionLabel>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field id="name" label="Name" value={form.name} onChange={onChange} autoComplete="name" />
+          <Field id="phoneNumber" label="Phone Number" value={form.phoneNumber} onChange={onChange} type="tel" autoComplete="tel" />
+        </div>
+
+        <Field id="email" label="Email" value={form.email} onChange={onChange} type="email" autoComplete="email" placeholder="name@example.com" />
+
+        <SectionLabel>Address</SectionLabel>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field id="street" label="Street" value={form.address.street} onChange={onAddressChange} autoComplete="address-line1" />
+          <Field id="landmark" label="Landmark (optional)" value={form.address.landmark} onChange={onAddressChange} required={false} autoComplete="address-line2" />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field id="city" label="City" value={form.address.city} onChange={onAddressChange} autoComplete="address-level2" />
+          <Field id="district" label="District" value={form.address.district} onChange={onAddressChange} />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field id="state" label="State" value={form.address.state} onChange={onAddressChange} autoComplete="address-level1" />
+          <Field id="country" label="Country" value={form.address.country} onChange={onAddressChange} autoComplete="country-name" />
+        </div>
+
+        <Field id="pinCode" label="Pin Code" value={form.address.pinCode} onChange={onAddressChange} autoComplete="postal-code" />
+
+        <SectionLabel>Security</SectionLabel>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field id="password" label="Password" value={form.password} onChange={onChange} type="password" autoComplete="new-password" />
+          <Field id="confirmPassword" label="Confirm Password" value={form.confirmPassword} onChange={onChange} type="password" autoComplete="new-password" />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl
+                     bg-gradient-to-br from-red-700 to-red-900 border border-white/10
+                     py-2.5 text-sm font-semibold text-white
+                     shadow-[0_0_20px_-5px_rgba(220,38,38,0.4)] hover:shadow-[0_0_28px_-5px_rgba(220,38,38,0.6)]
+                     transition-all duration-300 active:scale-[0.99]
+                     disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Creating account...
+            </>
+          ) : (
+            <>
+              <UserPlus className="w-4 h-4" />
+              Sign up
+            </>
+          )}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 
