@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
-import React, { useEffect } from 'react'
-=======
 import React, { useEffect, lazy, Suspense } from 'react'
->>>>>>> Stashed changes
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -41,18 +37,6 @@ const ScrollToTop = () => {
   return null
 }
 
-// Router keeps the previous scroll offset across navigations; reset it so each
-// page starts at the top.
-const ScrollToTop = () => {
-  const { pathname } = useLocation()
-
-  useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [pathname])
-
-  return null
-}
-
 const AppLayout = () => {
   const location = useLocation()
   const hideNavAndFooter = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/admin' || location.pathname === '/gamingxp-login'
@@ -64,10 +48,7 @@ const AppLayout = () => {
       <ScrollToTop />
       {!hideNavAndFooter && <Navbar />}
       <main className={`flex-grow ${hideNavAndFooter ? '' : 'mt-16'}`}>
-<<<<<<< Updated upstream
-=======
         <Suspense fallback={<RouteFallback />}>
->>>>>>> Stashed changes
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />

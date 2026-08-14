@@ -137,11 +137,7 @@ const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-<<<<<<< Updated upstream
-        <div className="mt-14 sm:mt-20 pt-8 border-t border-white/5">
-=======
         <div className="mt-14 sm:mt-14 sm:mt-16 pt-8 border-t border-white/5">
->>>>>>> Stashed changes
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-neutral-600 text-xs font-mono tracking-wider flex items-center gap-2 text-center md:text-left">
               <span aria-hidden="true" className="w-1.5 h-1.5 shrink-0 rounded-full bg-red-500 animate-pulse"></span>

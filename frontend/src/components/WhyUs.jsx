@@ -52,31 +52,19 @@ const features = [
 
 const WhyUsPage = () => {
   return (
-<<<<<<< Updated upstream
-    <section className="relative bg-black overflow-hidden antialiased font-sans text-white">
-=======
     <section className="section-seam relative bg-black overflow-hidden antialiased font-sans text-white">
->>>>>>> Stashed changes
 
       <PageBackground streakTop="top-1/4" streakBottom="bottom-1/3" />
 
       {/* --- Main Content --- */}
-<<<<<<< Updated upstream
-      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
-=======
       <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 section-y">
->>>>>>> Stashed changes
 
         <SectionHeading
           eyebrow="Technology Ecosystem"
           title="WHY"
           highlight="CHOOSE US?"
           description="We don’t just sell software. We build technology ecosystems."
-<<<<<<< Updated upstream
-          className="mb-16 sm:mb-20"
-=======
           className="mb-12 sm:mb-14"
->>>>>>> Stashed changes
         />
 
         {/* Feature Grid - Glassmorphism Cards */}
