@@ -66,7 +66,11 @@ const BookDemoPage = () => {
       <PageBackground streakTop="top-1/3" streakBottom="bottom-1/4" />
 
       {/* --- Main Content --- */}
+<<<<<<< Updated upstream
       <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
+=======
+      <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 section-y">
+>>>>>>> Stashed changes
 
         <SectionHeading
           as="h1"

@@ -54,7 +54,11 @@ const AboutPage = () => {
       <PageBackground streakTop="top-1/4" streakBottom="bottom-1/3" />
 
       {/* --- Main Content --- */}
+<<<<<<< Updated upstream
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
+=======
+      <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 section-y">
+>>>>>>> Stashed changes
 
         <SectionHeading
           as="h1"
@@ -62,11 +66,19 @@ const AboutPage = () => {
           title="ABOUT"
           highlight="MANAGERXP"
           description="A next-generation cafe software and AI solutions provider dedicated to transforming how digital spaces operate."
+<<<<<<< Updated upstream
           className="mb-16 sm:mb-20"
         />
 
         {/* Section 1: Who We Are & Our Story */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-20">
+=======
+          className="mb-12 sm:mb-14"
+        />
+
+        {/* Section 1: Who We Are & Our Story */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-14 sm:mb-16">
+>>>>>>> Stashed changes
 
           {/* Who We Are */}
           <Reveal className="h-full">
@@ -116,7 +128,11 @@ const AboutPage = () => {
         </div>
 
         {/* Section 2: What We Do */}
+<<<<<<< Updated upstream
         <div className="mb-20">
+=======
+        <div className="mb-14 sm:mb-16">
+>>>>>>> Stashed changes
           <SectionHeading
             title="What We Do"
             description="We don't just manage cafes — we build intelligent digital ecosystems."
@@ -141,7 +157,11 @@ const AboutPage = () => {
         </div>
 
         {/* Section 3: Vision & Mission */}
+<<<<<<< Updated upstream
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-20">
+=======
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-14 sm:mb-16">
+>>>>>>> Stashed changes
           {pillars.map((pillar, index) => (
             <Reveal key={pillar.title} delay={index * 120} className="h-full">
               <div className="relative overflow-hidden group h-full">

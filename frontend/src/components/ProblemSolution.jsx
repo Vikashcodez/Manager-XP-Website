@@ -38,16 +38,27 @@ const pairs = [
 
 const ProblemSolution = () => {
   return (
+<<<<<<< Updated upstream
     <section className="relative bg-black overflow-hidden antialiased font-sans text-white">
       <PageBackground streakTop="top-1/3" streakBottom="bottom-1/3" />
 
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
+=======
+    <section className="section-seam relative bg-black overflow-hidden antialiased font-sans text-white">
+      <PageBackground streakTop="top-1/3" streakBottom="bottom-1/3" />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 section-y">
+>>>>>>> Stashed changes
         <SectionHeading
           eyebrow="The Operating Problem"
           title="Running a cafe on notebooks"
           highlight="does not scale."
           description="The day-to-day friction is rarely the games — it is the admin around them. Here is what ManagerXP takes off the counter."
+<<<<<<< Updated upstream
           className="mb-14 sm:mb-16"
+=======
+          className="mb-14 sm:mb-12 sm:mb-14"
+>>>>>>> Stashed changes
         />
 
         <div className="space-y-4">

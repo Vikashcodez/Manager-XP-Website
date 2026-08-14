@@ -66,6 +66,54 @@
   animation: enter-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+<<<<<<< Updated upstream
+=======
+/* Section rhythm ----------------------------------------------------------
+   One vertical scale for every section, so stacked sections cannot drift into
+   the large unexplained gaps that come from each one picking its own padding. */
+
+.section-y {
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+}
+
+/* Sections that should read as a continuation of the one above. */
+.section-y-tight {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+@media (min-width: 640px) {
+  .section-y { padding-top: 4.5rem; padding-bottom: 4.5rem; }
+  .section-y-tight { padding-top: 2.5rem; padding-bottom: 4.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .section-y { padding-top: 5rem; padding-bottom: 5rem; }
+  .section-y-tight { padding-top: 2.5rem; padding-bottom: 5rem; }
+}
+
+/* A hairline red bridge across a section boundary, so consecutive sections
+   read as one continuous surface instead of stacked boxes. */
+.section-seam::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(220, 38, 38, 0.28) 30%,
+    rgba(220, 38, 38, 0.45) 50%,
+    rgba(220, 38, 38, 0.28) 70%,
+    transparent
+  );
+}
+
+>>>>>>> Stashed changes
 /* Global base ------------------------------------------------------------- */
 
 html {

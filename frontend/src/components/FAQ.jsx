@@ -1,14 +1,29 @@
 import React, { useState } from 'react';
+<<<<<<< Updated upstream
+=======
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+>>>>>>> Stashed changes
 import { Plus } from 'lucide-react';
 import PageBackground from './PageBackground';
 import SectionHeading from './SectionHeading';
 import Reveal from './Reveal';
+<<<<<<< Updated upstream
 
 /**
  * Answers are limited to what the product actually models: the two software
  * products, branch-aware plans, PC limits per plan, time-based sessions and the
  * free-trial plan. Trial length / PC counts are deliberately not hard-coded here
  * because they come from the subscription plan shown in the trial banner.
+=======
+import { EASE_MOTION } from '../lib/motion';
+
+/**
+ * Answers are limited to what the product actually models: CafeXP's packages,
+ * branch-aware plans, PC limits per plan, time-based sessions and the free-trial
+ * plan. RaceXP is described only as Phase 2. Trial length / PC counts are
+ * deliberately not hard-coded because they come from the subscription plan
+ * shown in the trial banner.
+>>>>>>> Stashed changes
  */
 const faqs = [
   {
@@ -16,8 +31,21 @@ const faqs = [
     a: 'It is management software for gaming and internet cafes. You register each PC in the system, control and time customer sessions, bill from those sessions, and see the state of the floor from one dashboard.'
   },
   {
+<<<<<<< Updated upstream
     q: 'What is the difference between GamingXP and CafeXP?',
     a: 'GamingXP is built for gaming cafes, with game and system control, session handling and telemetry. CafeXP targets internet cafes and browsing centres, focusing on user access, time-based billing and reporting.'
+=======
+    q: 'How do ManagerXP, CafeXP and RaceXP relate?',
+    a: 'ManagerXP is the platform. CafeXP is the product you can run today for gaming and internet cafes, and it comes in three packages — Basic, Pro and Elite. RaceXP is a Phase 2 expansion into sim racing that is still in development.'
+  },
+  {
+    q: 'Which CafeXP package should I pick?',
+    a: 'Basic covers the fundamentals for a small floor. Pro adds a higher PC allowance, multiple branches, live monitoring and hardware telemetry. Elite is for high-volume and multi-location operators. Pricing is not published, so talk to us and we will match a package to your floor.'
+  },
+  {
+    q: 'Can I buy RaceXP now?',
+    a: 'No. RaceXP is Phase 2 and still in development. The plan is for it to work both as an add-on to CafeXP for cafes adding racing simulators, and eventually as a standalone product for dedicated sim-racing centres.'
+>>>>>>> Stashed changes
   },
   {
     q: 'Can I manage more than one branch?',
@@ -45,10 +73,17 @@ const FAQ = () => {
   const [openIndex, setOpenIndex] = useState(0);
 
   return (
+<<<<<<< Updated upstream
     <section className="relative bg-black overflow-hidden antialiased font-sans text-white">
       <PageBackground streakTop="top-1/4" streakBottom="bottom-1/3" />
 
       <div className="relative z-10 max-w-3xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
+=======
+    <section className="section-seam relative bg-black overflow-hidden antialiased font-sans text-white">
+      <PageBackground streakTop="top-1/4" streakBottom="bottom-1/3" />
+
+      <div className="relative z-10 max-w-3xl mx-auto px-5 sm:px-6 section-y">
+>>>>>>> Stashed changes
         <SectionHeading
           eyebrow="Questions"
           title="Before you"
@@ -81,6 +116,7 @@ const FAQ = () => {
                       <span className={`text-sm sm:text-base font-medium transition-colors ${isOpen ? 'text-white' : 'text-neutral-300'}`}>
                         {faq.q}
                       </span>
+<<<<<<< Updated upstream
                       <Plus
                         aria-hidden="true"
                         className={`w-4 h-4 shrink-0 transition-transform duration-300 ${
@@ -99,6 +135,38 @@ const FAQ = () => {
                   >
                     <p className="text-sm text-neutral-400 leading-relaxed text-pretty">{faq.a}</p>
                   </div>
+=======
+                      <Motion.span
+                        aria-hidden="true"
+                        animate={{ rotate: isOpen ? 45 : 0 }}
+                        transition={{ duration: 0.3, ease: EASE_MOTION }}
+                        className={`shrink-0 ${isOpen ? 'text-red-500' : 'text-neutral-500'}`}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Motion.span>
+                    </button>
+                  </h3>
+
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <Motion.div
+                        id={panelId}
+                        role="region"
+                        aria-labelledby={buttonId}
+                        key="panel"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.32, ease: EASE_MOTION }}
+                        className="overflow-hidden"
+                      >
+                        <p className="px-5 pb-5 -mt-1 text-sm text-neutral-400 leading-relaxed text-pretty">
+                          {faq.a}
+                        </p>
+                      </Motion.div>
+                    )}
+                  </AnimatePresence>
+>>>>>>> Stashed changes
                 </div>
               </Reveal>
             );
