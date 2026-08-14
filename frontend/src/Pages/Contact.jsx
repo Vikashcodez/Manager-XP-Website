@@ -75,11 +75,7 @@ const ContactPage = () => {
       <PageBackground streakTop="top-1/3" streakBottom="bottom-1/4" />
 
       {/* --- Main Content --- */}
-<<<<<<< Updated upstream
-      <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
-=======
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 section-y">
->>>>>>> Stashed changes
 
         <SectionHeading
           as="h1"
@@ -87,11 +83,7 @@ const ContactPage = () => {
           title="CONTACT"
           highlight="US"
           description="Have a project in mind or need support? Initialize a connection."
-<<<<<<< Updated upstream
-          className="mb-14 sm:mb-16"
-=======
           className="mb-14 sm:mb-12 sm:mb-14"
->>>>>>> Stashed changes
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">

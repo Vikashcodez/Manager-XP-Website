@@ -103,17 +103,10 @@ const CafeFloor = () => {
   ];
 
   return (
-<<<<<<< Updated upstream
-    <section ref={sectionRef} className="relative bg-black overflow-hidden antialiased font-sans text-white">
-      <PageBackground streakTop="top-1/4" streakBottom="bottom-1/4" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
-=======
     <section ref={sectionRef} className="section-seam relative bg-black overflow-hidden antialiased font-sans text-white">
       <PageBackground streakTop="top-1/4" streakBottom="bottom-1/4" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 section-y">
->>>>>>> Stashed changes
         <SectionHeading
           eyebrow="Live Floor View"
           title="Every station,"

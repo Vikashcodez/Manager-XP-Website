@@ -21,26 +21,15 @@ const visionPoints = [
 
 const MissionVisionPage = () => {
   return (
-<<<<<<< Updated upstream
-    <section className="relative bg-black overflow-hidden antialiased font-sans text-white">
-=======
     <section className="section-seam relative bg-black overflow-hidden antialiased font-sans text-white">
->>>>>>> Stashed changes
 
       <PageBackground streakTop="top-1/3" streakBottom="bottom-1/4" />
 
       {/* --- Main Content --- */}
-<<<<<<< Updated upstream
-      <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-24">
-
-        {/* Section 1: Our Mission */}
-        <div className="mb-20 sm:mb-24">
-=======
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 section-y">
 
         {/* Section 1: Our Mission */}
         <div className="mb-14 sm:mb-12 sm:mb-14">
->>>>>>> Stashed changes
           <SectionHeading
             eyebrow="Core Directive"
             icon={<Target className="w-3 h-3" />}
@@ -102,11 +91,7 @@ const MissionVisionPage = () => {
         </div>
 
         {/* Section Divider */}
-<<<<<<< Updated upstream
-        <div className="relative h-px bg-white/10 my-16 sm:my-20">
-=======
         <div className="relative h-px bg-white/10 my-12 sm:my-14">
->>>>>>> Stashed changes
           <div className="absolute left-1/2 -translate-x-1/2 -top-3 bg-black px-4 text-neutral-600 text-[10px] sm:text-xs font-mono tracking-widest whitespace-nowrap">
             SYSTEM UPGRADE PATH
           </div>
