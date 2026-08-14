@@ -29,4 +29,126 @@
   animation: scroll 2s infinite;
 }
 
+@keyframes racer-fast {
+  0% { transform: translateX(-100vw); }
+  100% { transform: translateX(100vw); }
+}
+
+.animate-racer-fast {
+  animation: racer-fast 4s linear infinite;
+}
+
+@keyframes racer-slow {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100vw); }
+}
+
+.animate-racer-slow {
+  animation: racer-slow 9s linear infinite;
+}
+
+/* Calmer streaks for the footer, so it doesn't compete with page content. */
+.animate-racer-drift {
+  animation: racer-fast 8s linear infinite;
+}
+
+.animate-racer-drift-slow {
+  animation: racer-slow 12s linear infinite;
+}
+
+/* Hero entrance: staggered fade + rise on first paint. */
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-enter-up {
+  animation: enter-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+<<<<<<< Updated upstream
+=======
+/* Section rhythm ----------------------------------------------------------
+   One vertical scale for every section, so stacked sections cannot drift into
+   the large unexplained gaps that come from each one picking its own padding. */
+
+.section-y {
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+}
+
+/* Sections that should read as a continuation of the one above. */
+.section-y-tight {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+@media (min-width: 640px) {
+  .section-y { padding-top: 4.5rem; padding-bottom: 4.5rem; }
+  .section-y-tight { padding-top: 2.5rem; padding-bottom: 4.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .section-y { padding-top: 5rem; padding-bottom: 5rem; }
+  .section-y-tight { padding-top: 2.5rem; padding-bottom: 5rem; }
+}
+
+/* A hairline red bridge across a section boundary, so consecutive sections
+   read as one continuous surface instead of stacked boxes. */
+.section-seam::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(220, 38, 38, 0.28) 30%,
+    rgba(220, 38, 38, 0.45) 50%,
+    rgba(220, 38, 38, 0.28) 70%,
+    transparent
+  );
+}
+
+>>>>>>> Stashed changes
+/* Global base ------------------------------------------------------------- */
+
+html {
+  scroll-behavior: smooth;
+  background-color: #000;
+}
+
+/* Guards against a stray wide child causing sideways scroll on mobile.
+   `clip` rather than `hidden`: `hidden` forces overflow-y to `auto`, which turns
+   the element into a scroll container and breaks window scroll position. */
+html {
+  overflow-x: clip;
+}
+
+/* Visible keyboard focus on the dark theme (mouse clicks stay ring-free). */
+:focus-visible {
+  outline: 2px solid rgb(239 68 68);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-racer-fast,
+  .animate-racer-slow,
+  .animate-racer-drift,
+  .animate-racer-drift-slow,
+  .animate-enter-up,
+  .animate-blob,
+  .animate-scroll {
+    animation: none;
+  }
+}
+
 
