@@ -236,8 +236,9 @@ const SubscriptionPlansPage = () => {
 
             {/* Plan Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Plan Name *</label>
+              <label htmlFor="plan-name" className="block text-sm font-medium text-gray-300 mb-2">Plan Name *</label>
               <input
+                id="plan-name"
                 name="name"
                 value={form.name}
                 onChange={onChange}
@@ -249,8 +250,9 @@ const SubscriptionPlansPage = () => {
 
             {/* Description */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+              <label htmlFor="plan-description" className="block text-sm font-medium text-gray-300 mb-2">Description</label>
               <textarea
+                id="plan-description"
                 name="description"
                 value={form.description}
                 onChange={onChange}
@@ -262,8 +264,9 @@ const SubscriptionPlansPage = () => {
 
             {/* Max Branches */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Maximum Branches *</label>
+              <label htmlFor="plan-max-branches" className="block text-sm font-medium text-gray-300 mb-2">Maximum Branches *</label>
               <input
+                id="plan-max-branches"
                 name="max_branches"
                 type="number"
                 min="1"
@@ -276,8 +279,9 @@ const SubscriptionPlansPage = () => {
 
             {/* Number of Days */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Number of Days</label>
+              <label htmlFor="plan-no-of-days" className="block text-sm font-medium text-gray-300 mb-2">Number of Days</label>
               <input
+                id="plan-no-of-days"
                 name="no_of_days"
                 type="number"
                 min="0"
@@ -305,8 +309,9 @@ const SubscriptionPlansPage = () => {
             {/* Max PCs - Only show if single PC price is NOT checked */}
             {!form.is_single_pc_price && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Maximum PCs *</label>
+                <label htmlFor="plan-max-pcs" className="block text-sm font-medium text-gray-300 mb-2">Maximum PCs *</label>
                 <input
+                  id="plan-max-pcs"
                   name="max_pcs"
                   type="number"
                   min="1"
@@ -329,6 +334,7 @@ const SubscriptionPlansPage = () => {
                     onChange={(e) => setGameInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && addGame()}
                     placeholder="Enter game name and press Enter"
+                    aria-label="Add a game to this plan"
                     className="flex-1 bg-neutral-900 border border-red-500/30 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-500 transition-colors"
                   />
                   <button

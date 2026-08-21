@@ -1,0 +1,205 @@
+/*
+ * Client for the ManagerXP admin API.
+ *
+ * Deliberately separate from `platformApi.js`, which talks to the older
+ * `/api/platform` endpoints using a café owner's token. This one carries a
+ * ManagerXP administrator token — a different principal, a different audience
+ * claim, a different storage key. Sharing a client between them would sooner
+ * or later send one principal's token to the other's endpoint.
+ */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+const TOKEN_KEY = 'mxp_admin_token';
+const ADMIN_KEY = 'mxp_admin_user';
+
+export const adminAuth = {
+  token: () => localStorage.getItem(TOKEN_KEY) || '',
+  setToken: (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY)),
+
+  /* The signed-in administrator, cached so the shell can render its sidebar on
+     the first paint instead of after a round trip. The server re-reads
+     permissions on every request regardless, so a stale copy here can only
+     ever offer something the API then refuses — never grant it. */
+  admin: () => {
+    try { return JSON.parse(localStorage.getItem(ADMIN_KEY) || 'null'); } catch { return null; }
+  },
+  setAdmin: (a) => (a ? localStorage.setItem(ADMIN_KEY, JSON.stringify(a)) : localStorage.removeItem(ADMIN_KEY)),
+
+  signOut: () => {
+    [TOKEN_KEY, ADMIN_KEY].forEach((k) => localStorage.removeItem(k));
+  },
+  isSignedIn: () => !!localStorage.getItem(TOKEN_KEY),
+
+  /** What the sidebar uses to decide whether to offer a section. */
+  can: (key) => {
+    const a = adminAuth.admin();
+    if (!a) return false;
+    if (a.is_superuser) return true;
+    return (a.permissions || []).includes(key);
+  }
+};
+
+async function request(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (adminAuth.token()) headers.Authorization = `Bearer ${adminAuth.token()}`;
+
+  const res = await fetch(`${API_BASE_URL}/api/admin${path}`, { ...options, headers });
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const err = new Error(body.message || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.data = body.data;
+    /* A dead session should land on the sign-in page rather than showing an
+       error nobody can act on. 403 is left alone — that is a real answer
+       about permissions, not a broken session. */
+    if (res.status === 401) adminAuth.signOut();
+    throw err;
+  }
+  return body;
+}
+
+const qs = (params) => {
+  const s = new URLSearchParams();
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') s.set(k, v);
+  });
+  const out = s.toString();
+  return out ? `?${out}` : '';
+};
+
+export const adminApi = {
+  login: (email, password) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+      .then((b) => b.data),
+  me: () => request('/auth/me').then((b) => b.data),
+  logout: () => request('/auth/logout', { method: 'POST' }).catch(() => ({})),
+  forgotPassword: (email) =>
+    request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token, password) =>
+    request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  changePassword: (current_password, new_password) =>
+    request('/auth/change-password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) }),
+
+  dashboard: () => request('/dashboard').then((b) => b.data),
+
+  organizations: (params) => request(`/organizations${qs(params)}`).then((b) => b.data),
+  organization: (id) => request(`/organizations/${id}`).then((b) => b.data),
+  entitlements: (id, branchId) =>
+    request(`/organizations/${id}/entitlements${qs({ branch_id: branchId })}`).then((b) => b.data),
+  setOverride: (id, featureKey, payload) =>
+    request(`/organizations/${id}/overrides/${featureKey}`, {
+      method: 'PUT', body: JSON.stringify(payload)
+    }).then((b) => b.data),
+  setOrganizationStatus: (id, status, reason) =>
+    request(`/organizations/${id}/status`, { method: 'POST', body: JSON.stringify({ status, reason }) }),
+
+  packages: () => request('/packages').then((b) => b.data),
+  package: (id) => request(`/packages/${id}`).then((b) => b.data),
+  createPackage: (payload) =>
+    request('/packages', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updatePackage: (id, payload) =>
+    request(`/packages/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+  setPackageFeatures: (id, features) =>
+    request(`/packages/${id}/features`, { method: 'PUT', body: JSON.stringify({ features }) }),
+  setPackagePrices: (id, prices) =>
+    request(`/packages/${id}/prices`, { method: 'PUT', body: JSON.stringify({ prices }) }),
+
+  features: () => request('/features').then((b) => b.data),
+  createFeature: (payload) =>
+    request('/features', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updateFeature: (key, payload) =>
+    request(`/features/${key}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+
+  addons: () => request('/addons').then((b) => b.data),
+  createAddon: (payload) =>
+    request('/addons', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+
+  branches: (params) => request(`/branches${qs(params)}`).then((b) => b.data),
+  updateBranch: (id, payload) =>
+    request(`/branches/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+  pcPool: (organizationId) => request(`/organizations/${organizationId}/pool`).then((b) => b.data),
+
+  subscriptions: (params) => request(`/subscriptions${qs(params)}`).then((b) => b.data),
+  subscription: (id) => request(`/subscriptions/${id}`).then((b) => b.data),
+  updateSubscription: (id, payload) =>
+    request(`/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+  extendSubscription: (id, days) =>
+    request(`/subscriptions/${id}/extend`, { method: 'POST', body: JSON.stringify({ days }) }),
+  setSubscriptionStatus: (id, status, reason) =>
+    request(`/subscriptions/${id}/status`, { method: 'POST', body: JSON.stringify({ status, reason }) }),
+  addAddon: (id, addon_id, quantity) =>
+    request(`/subscriptions/${id}/addons`, { method: 'POST', body: JSON.stringify({ addon_id, quantity }) }),
+  removeAddon: (id, rowId) =>
+    request(`/subscriptions/${id}/addons/${rowId}`, { method: 'DELETE' }),
+
+  audit: (params) => request(`/audit${qs(params)}`).then((b) => b.data)
+};
+
+/* ──────────────────────────────────────────────────────────────────────────
+   THE GAMING SOFTWARE CATALOGUE
+
+   Lives at /api/software-master rather than under /api/admin, because it is
+   not an admin-only resource: the café console reads it to build a station's
+   library, and the station shows the artwork. Only writing is restricted.
+
+   Uploads go as multipart, so these bypass the JSON client above — and
+   deliberately do NOT set Content-Type, because the browser has to add the
+   multipart boundary itself. Setting it by hand produces a request the server
+   cannot parse, with no useful error.
+   ────────────────────────────────────────────────────────────────────────── */
+const softwareRequest = async (path, options = {}) => {
+  const headers = { ...(options.headers || {}) };
+  if (adminAuth.token()) headers.Authorization = `Bearer ${adminAuth.token()}`;
+  if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(`${API_BASE_URL}/api/software-master${path}`, { ...options, headers });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body.message || `Request failed (${res.status})`);
+    err.status = res.status;
+    if (res.status === 401) adminAuth.signOut();
+    throw err;
+  }
+  return body;
+};
+
+/** Absolute URL for an uploaded asset. Stored paths are server-relative. */
+export const assetUrl = (p) =>
+  !p ? null : (p.startsWith('http') ? p : `${API_BASE_URL}${p.startsWith('/') ? '' : '/'}${p}`);
+
+export const softwareApi = {
+  list: (params) => softwareRequest(`${qs({ limit: 100, ...params })}`),
+  get: (id) => softwareRequest(`/${id}`).then((b) => b.data),
+  create: (formData) => softwareRequest('', { method: 'POST', body: formData }).then((b) => b.data),
+  update: (id, formData) => softwareRequest(`/${id}`, { method: 'PUT', body: formData }).then((b) => b.data),
+  /* Deactivate, not destroy: a station that still has this title linked keeps
+     its artwork. */
+  retire: (id) => softwareRequest(`/${id}`, { method: 'DELETE' }),
+  destroy: (id) => softwareRequest(`/permanent/${id}`, { method: 'DELETE' })
+};
+
+/* ── formatting, shared so every page agrees ── */
+
+export const money = (amount, currency = 'INR') =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 })
+    .format(Number(amount || 0));
+
+export const shortDate = (value) =>
+  value ? new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+export const dateTime = (value) =>
+  value ? new Date(value).toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+  }) : '—';
+
+export const relativeTime = (value) => {
+  if (!value) return 'never';
+  const seconds = Math.floor((Date.now() - new Date(value).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+};
+
+export default adminApi;

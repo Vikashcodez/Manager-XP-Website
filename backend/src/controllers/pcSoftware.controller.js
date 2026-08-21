@@ -62,10 +62,31 @@ export const getPcSoftwareById = async (req, res) => {
 export const getSoftwareByPcId = async (req, res) => {
   try {
     const { pcId } = req.params;
+    /*
+     * The icon falls back to Software Master.
+     *
+     * Every station used to carry its own copy of a game's logo, which meant
+     * the same artwork was uploaded once per station and a rebrand had to be
+     * repeated everywhere — and in practice it never was, so stations showed
+     * blank tiles. Software Master is the one place a logo is uploaded; a
+     * station row only overrides it when it deliberately has its own.
+     *
+     * Matched on name, case-insensitively, because that is the only thing the
+     * two tables share: pc_software rows are created by the station agent
+     * discovering installed software, and it knows a name, not an id.
+     */
     const result = await pool.query(
-      `SELECT * FROM pc_software 
-       WHERE pc_id = $1 
-       ORDER BY created_at DESC`,
+      `SELECT ps.*,
+              COALESCE(NULLIF(ps.software_icon, ''), sm.software_icon)   AS software_icon,
+              COALESCE(NULLIF(ps.software_video, ''), sm.software_video) AS software_video,
+              sm.software_id AS master_id,
+              (NULLIF(ps.software_icon, '') IS NULL AND sm.software_icon IS NOT NULL) AS icon_from_master
+       FROM pc_software ps
+       LEFT JOIN software_master sm
+         ON LOWER(TRIM(sm.software_name)) = LOWER(TRIM(ps.software_name))
+        AND sm.is_active
+       WHERE ps.pc_id = $1
+       ORDER BY ps.created_at DESC`,
       [pcId]
     );
     

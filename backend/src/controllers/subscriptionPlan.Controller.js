@@ -307,7 +307,9 @@ export const getGamingXPFreeTrialPlan = async (req, res) => {
         max_pcs, games_allowed, is_telmetry_enabled, no_of_days, is_active, 
         is_freeTrial, description, created_at, updated_at
       FROM subscription_plans
-      WHERE is_freeTrial = true AND subs_software = 'gamingxp'
+      -- 'gamingxp' was the old name for CafeXP; accept both so a plan
+      -- created before the rename is still found.
+      WHERE is_freeTrial = true AND subs_software IN ('cafexp', 'gamingxp')
       ORDER BY created_at DESC
     `;
     

@@ -12,7 +12,7 @@ const GamerXpLogin = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { login: authLogin, staffLogin } = useAuth();
 
   // Send token to electron app
   const sendTokenToElectron = (token, user) => {
@@ -57,31 +57,61 @@ const GamerXpLogin = () => {
         return;
       }
 
-      // Call backend login API
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password
-        })
-      });
+      /*
+       * Two kinds of account sign in at this door, and they live in different
+       * tables: the cafe owner in `users`, their staff in `staff`. The owner
+       * endpoint is tried first, and a rejection there falls through to the
+       * staff endpoint rather than being reported as a bad password — a
+       * cashier typing correct credentials was previously just told
+       * "Invalid credentials".
+       */
+      const credentials = { email: email.trim(), password };
 
-      const data = await response.json();
+      const attempt = async (path) => {
+        const res = await fetch(`http://localhost:5000${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentials)
+        });
+        return { ok: res.ok, body: await res.json() };
+      };
 
-      if (!response.ok) {
-        setError(data.message || 'Login failed. Please try again.');
+      let kind = 'owner';
+      let attemptResult = await attempt('/api/auth/login');
+
+      if (!attemptResult.ok || !attemptResult.body?.success) {
+        const staffAttempt = await attempt('/api/staff/login');
+        if (staffAttempt.ok && staffAttempt.body?.success) {
+          kind = 'staff';
+          attemptResult = staffAttempt;
+        }
+      }
+
+      const data = attemptResult.body;
+
+      if (!attemptResult.ok || !data?.success) {
+        setError(data?.message || 'Login failed. Please try again.');
         setLoading(false);
         return;
       }
 
       if (data.success && data.data) {
-        const { user, token } = data.data;
+        // A staff record carries staff_name/role_name; present it in the shape
+        // the rest of this screen already reads.
+        const token = data.data.token;
+        const user = kind === 'staff'
+          ? {
+              ...data.data.staff,
+              name: data.data.staff?.staff_name,
+              role: data.data.staff?.role_name,
+              permissions: data.data.permissions || []
+            }
+          : data.data.user;
 
         // Store auth data in context and localStorage
-        if (authLogin) {
+        if (kind === 'staff' && staffLogin) {
+          await staffLogin(credentials);
+        } else if (authLogin) {
           await authLogin({ email, password });
         } else {
           localStorage.setItem('auth_token', token);
@@ -99,7 +129,17 @@ const GamerXpLogin = () => {
         sendTokenToElectron(token, user);
 
         // Show success message
-        setSuccessMessage(`Welcome ${user.name || user.email}! Token sent to Server App. You can close this window.`);
+        // Some staff names already carry the role, so only add it when it is
+        // not already there — otherwise you get "Priya (Cashier) (Cashier)".
+        const who = user.name || user.email;
+        const roleSuffix =
+          kind === 'staff' && user.role &&
+          !who.toLowerCase().includes(String(user.role).toLowerCase())
+            ? ` (${user.role})`
+            : '';
+        setSuccessMessage(
+          `Welcome ${who}${roleSuffix}! Token sent to Server App. You can close this window.`
+        );
         console.log('Login successful for:', user.name || user.email);
         
         // Reset form

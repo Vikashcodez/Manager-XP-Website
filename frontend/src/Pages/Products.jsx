@@ -115,7 +115,11 @@ const ProductsPage = () => {
           })}
         </div>
 
-        <AnimatePresence mode="wait">
+        {/* popLayout, not wait: the incoming product panel mounts immediately
+            rather than queueing behind the outgoing panel's exit animation, so
+            switching never lands on an empty panel if that animation is
+            throttled (background or prerendered tab). */}
+        <AnimatePresence mode="popLayout">
           {/* ============================ CafeXP ============================ */}
           {active === 'cafexp' && (
             <Motion.div

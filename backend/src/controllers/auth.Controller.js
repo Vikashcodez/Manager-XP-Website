@@ -143,9 +143,16 @@ export const login = async (req, res) => {
     
     user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
-    // Generate token
+    /*
+     * The café goes in the token, not only in the response body.
+     *
+     * It was previously looked up here and attached to `user` for the frontend,
+     * while the JWT carried nothing — so every guard that reads req.actor saw
+     * no café and any tenant-scoped query had nothing to scope by. The backend
+     * cannot trust a café id sent up from a client, so it has to be a claim.
+     */
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, cafe_id: user.cafe_id },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRE }
     );

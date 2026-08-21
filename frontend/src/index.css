@@ -66,8 +66,6 @@
   animation: enter-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-<<<<<<< Updated upstream
-=======
 /* Section rhythm ----------------------------------------------------------
    One vertical scale for every section, so stacked sections cannot drift into
    the large unexplained gaps that come from each one picking its own padding. */
@@ -113,7 +111,6 @@
   );
 }
 
->>>>>>> Stashed changes
 /* Global base ------------------------------------------------------------- */
 
 html {
@@ -152,3 +149,60 @@ html {
 }
 
 
+
+/* ==========================================================================
+   INTERACTIVE DEFAULTS
+   Tailwind v4 dropped the opinionated `cursor: pointer` on buttons and now
+   follows the browser, which uses the arrow. Across the site that left 47 of
+   71 clickable elements on /products with no pointer cursor and 26 with no
+   hover transition — an interface that looks clickable but does not feel it.
+
+   Set once here rather than sprinkling `cursor-pointer transition-colors` on
+   every button, which is what let it drift in the first place.
+   ========================================================================== */
+@layer base {
+  button,
+  [role="button"],
+  summary,
+  label[for],
+  a[href] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  [role="button"]:disabled {
+    cursor: not-allowed;
+  }
+
+  /*
+     Colour-only transition, deliberately. Transform and opacity are left out
+     because framer-motion drives those through inline styles on many of these
+     same elements — a CSS transition on them would fight the animation and
+     produce a visible lag on exit.
+
+     150-300ms is the range the design guidance calls for; 180ms sits inside it
+     and stays out of the way.
+  */
+  button,
+  [role="button"],
+  a[href] {
+    transition-property: color, background-color, border-color, box-shadow,
+      text-decoration-color, fill, stroke;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* A component that sets its own transition still wins: its declaration comes
+     later in the cascade, and utilities outrank base layer rules regardless. */
+
+  /*
+     Keyboard focus has to be visible, and the ring has to survive on black.
+     :focus-visible only, so a mouse click does not leave a ring behind.
+  */
+  :focus-visible {
+    outline: 2px solid var(--color-red-500, #ef4444);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}

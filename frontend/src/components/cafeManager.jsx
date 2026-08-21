@@ -91,9 +91,10 @@ const CafeManager = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Cafe Name */}
             <div>
-              <label className="block text-red-400 font-semibold mb-1.5">Cafe Name *</label>
+              <label htmlFor="cafe-name" className="block text-red-400 font-semibold mb-1.5">Cafe Name *</label>
               <input
                 type="text"
+                id="cafe-name"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
@@ -105,9 +106,10 @@ const CafeManager = () => {
 
             {/* Designation */}
             <div>
-              <label className="block text-red-400 font-semibold mb-1.5">Designation *</label>
+              <label htmlFor="cafe-user-designation" className="block text-red-400 font-semibold mb-1.5">Designation *</label>
               <input
                 type="text"
+                id="cafe-user-designation"
                 name="user_designation"
                 value={formData.user_designation}
                 onChange={handleInputChange}
@@ -119,8 +121,9 @@ const CafeManager = () => {
 
             {/* Description */}
             <div>
-              <label className="block text-red-400 font-semibold mb-1.5">Description</label>
+              <label htmlFor="cafe-description" className="block text-red-400 font-semibold mb-1.5">Description</label>
               <textarea
+                id="cafe-description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -137,9 +140,10 @@ const CafeManager = () => {
               <div className="space-y-3">
                 {/* Street Address */}
                 <div>
-                  <label className="block text-gray-300 mb-1.5 text-sm">Street Address *</label>
+                  <label htmlFor="cafe-address-street" className="block text-gray-300 mb-1.5 text-sm">Street Address *</label>
                   <input
                     type="text"
+                    id="cafe-address-street"
                     name="address.street"
                     value={formData.address.street}
                     onChange={handleInputChange}
@@ -152,9 +156,10 @@ const CafeManager = () => {
                 {/* City and State */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-gray-300 mb-1.5 text-sm">City *</label>
+                    <label htmlFor="cafe-address-city" className="block text-gray-300 mb-1.5 text-sm">City *</label>
                     <input
                       type="text"
+                      id="cafe-address-city"
                       name="address.city"
                       value={formData.address.city}
                       onChange={handleInputChange}
@@ -164,9 +169,10 @@ const CafeManager = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-300 mb-1.5 text-sm">State *</label>
+                    <label htmlFor="cafe-address-state" className="block text-gray-300 mb-1.5 text-sm">State *</label>
                     <input
                       type="text"
+                      id="cafe-address-state"
                       name="address.state"
                       value={formData.address.state}
                       onChange={handleInputChange}
@@ -180,9 +186,10 @@ const CafeManager = () => {
                 {/* Country and Zip Code */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-gray-300 mb-1.5 text-sm">Country *</label>
+                    <label htmlFor="cafe-address-country" className="block text-gray-300 mb-1.5 text-sm">Country *</label>
                     <input
                       type="text"
+                      id="cafe-address-country"
                       name="address.country"
                       value={formData.address.country}
                       onChange={handleInputChange}
@@ -192,9 +199,10 @@ const CafeManager = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-300 mb-1.5 text-sm">Zip Code *</label>
+                    <label htmlFor="cafe-address-zip-code" className="block text-gray-300 mb-1.5 text-sm">Zip Code *</label>
                     <input
                       type="text"
+                      id="cafe-address-zip-code"
                       name="address.zip_code"
                       value={formData.address.zip_code}
                       onChange={handleInputChange}

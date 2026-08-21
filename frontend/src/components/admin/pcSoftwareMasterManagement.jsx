@@ -227,6 +227,7 @@ const SoftwareMasterManagement = () => {
             <input
               type="text"
               placeholder="Search software..."
+              aria-label="Search software"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-red-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-red-500 transition-colors"
@@ -234,6 +235,8 @@ const SoftwareMasterManagement = () => {
           </div>
           <button
             onClick={() => fetchSoftware(currentPage)}
+            aria-label="Refresh the software list"
+            title="Refresh"
             className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-lg transition-colors"
           >
             <RefreshCw size={20} />
@@ -269,18 +272,24 @@ const SoftwareMasterManagement = () => {
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button
                         onClick={() => openModal('view', item)}
+                        aria-label={`View ${item.software_name}`}
+                        title="View"
                         className="bg-red-600 hover:bg-red-700 p-2 rounded-full transition-colors"
                       >
                         <Eye size={20} />
                       </button>
                       <button
                         onClick={() => openModal('edit', item)}
+                        aria-label={`Edit ${item.software_name}`}
+                        title="Edit"
                         className="bg-blue-600 hover:bg-blue-700 p-2 rounded-full transition-colors"
                       >
                         <Edit size={20} />
                       </button>
                       <button
                         onClick={() => handleDelete(item.software_id, item.software_name)}
+                        aria-label={`Delete ${item.software_name}`}
+                        title="Delete"
                         className="bg-red-600 hover:bg-red-700 p-2 rounded-full transition-colors"
                       >
                         <Trash2 size={20} />
@@ -311,6 +320,8 @@ const SoftwareMasterManagement = () => {
                 <button
                   onClick={() => fetchSoftware(currentPage - 1)}
                   disabled={currentPage === 1}
+                  aria-label="Previous page"
+                  title="Previous page"
                   className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
                 >
                   <ChevronLeft size={20} />
@@ -321,6 +332,8 @@ const SoftwareMasterManagement = () => {
                 <button
                   onClick={() => fetchSoftware(currentPage + 1)}
                   disabled={currentPage === totalPages}
+                  aria-label="Next page"
+                  title="Next page"
                   className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
                 >
                   <ChevronRight size={20} />
@@ -343,6 +356,8 @@ const SoftwareMasterManagement = () => {
               </h2>
               <button
                 onClick={closeModal}
+                aria-label="Close"
+                title="Close"
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 <X size={24} />

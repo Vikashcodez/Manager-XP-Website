@@ -7,7 +7,7 @@ import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/Au
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading } = useAuth();
+  const { signIn, isLoading } = useAuth();
 
   const [form, setForm] = useState({
     email: '',
@@ -26,19 +26,26 @@ const Login = () => {
     setError('');
 
     try {
-      const user = await login(form);
-      const from = location.state?.from?.pathname;
+      /* One form, two kinds of account. The server says which this is; the
+         person signing in never had to choose, and there is no second login
+         page to end up on the wrong one of. */
+      const result = await signIn(form);
 
-      if (from) {
+      /* ProtectedRoute stores a location object; the shells store a plain
+         path. Both mean "put me back where I was trying to go" — but only if
+         that destination belongs to the principal who just signed in. An
+         administrator returning to a café owner's page, or the reverse, would
+         bounce straight back here. */
+      const state = location.state?.from;
+      const from = typeof state === 'string' ? state : state?.pathname;
+      const isAdminPath = from?.startsWith('/admin');
+
+      if (from && isAdminPath === (result.kind === 'admin')) {
         navigate(from, { replace: true });
         return;
       }
 
-      if (user?.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      navigate(result.kind === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
       setError(err.message || 'Unable to login');
     }

@@ -12,6 +12,32 @@ import pcsRouter from './src/routes/pcs.Routes.js';
 import softwareMasterRouter from './src/routes/softwareMaster.Routes.js';
 import pcSoftwareRouter from './src/routes/pcSoftware.Routes.js';
 import customerRouter from './src/routes/customer.Routes.js';
+import walletRouter from './src/routes/wallet.Routes.js';
+import sessionRouter from './src/routes/session.Routes.js';
+import sessionMasterRouter from './src/routes/sessionMaster.Routes.js';
+import gamingPriceRouter from './src/routes/gamingPrice.Routes.js';
+import settingsRouter from './src/routes/settings.Routes.js';
+import billingRouter from './src/routes/billing.Routes.js';
+import packagesRouter from './src/routes/packages.Routes.js';
+import membershipsRouter from './src/routes/memberships.Routes.js';
+import productsRouter from './src/routes/products.Routes.js';
+import ordersRouter from './src/routes/orders.Routes.js';
+import staffRouter from './src/routes/staff.Routes.js';
+import floorZonesRouter from './src/routes/floorZones.Routes.js';
+import telemetryRouter from './src/routes/telemetry.Routes.js';
+import auditRouter from './src/routes/audit.Routes.js';
+import reportsRouter from './src/routes/reports.Routes.js';
+import stationPowerRouter from './src/routes/stationPower.Routes.js';
+import discountsRouter from './src/routes/discounts.Routes.js';
+import aiRouter from './src/modules/ai/ai.routes.js';
+import paymentsRouter, { webhookRouter as paymentsWebhookRouter } from './src/routes/payments.Routes.js';
+import platformRouter from './src/routes/platform.Routes.js';
+import licensesRouter from './src/routes/licenses.Routes.js';
+import updatesRouter from './src/routes/updates.Routes.js';
+import refundsRouter from './src/routes/refunds.Routes.js';
+import portalRouter from './src/routes/portal.Routes.js';
+import adminRouter from './src/routes/admin.Routes.js';
+import entitlementsRouter from './src/routes/entitlements.Routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +47,15 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
+
+/*
+ * Payment webhooks are mounted ahead of express.json() on purpose. Providers
+ * sign the raw request bytes, and a JSON parser consumes the stream before the
+ * handler can hash it — leaving no way to tell a genuine payment from a forged
+ * one. This one route needs the body untouched; everything below it does not.
+ */
+app.use('/api/payments', paymentsWebhookRouter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
@@ -34,6 +69,32 @@ app.use('/api/pcs', pcsRouter);
 app.use('/api/software-master', softwareMasterRouter);
 app.use('/api/pc-software', pcSoftwareRouter);
 app.use('/api/customers', customerRouter);
+app.use('/api/wallet', walletRouter);
+app.use('/api/sessions', sessionRouter);
+app.use('/api/session-master', sessionMasterRouter);
+app.use('/api/gaming-prices', gamingPriceRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/bills', billingRouter);
+app.use('/api/packages', packagesRouter);
+app.use('/api/memberships', membershipsRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/staff', staffRouter);
+app.use('/api/floor-zones', floorZonesRouter);
+app.use('/api/telemetry', telemetryRouter);
+app.use('/api/audit', auditRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/stations', stationPowerRouter);
+app.use('/api/discounts', discountsRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/api/platform', platformRouter);
+app.use('/api/licenses', licensesRouter);
+app.use('/api/updates', updatesRouter);
+app.use('/api/refunds', refundsRouter);
+app.use('/api/portal', portalRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/entitlements', entitlementsRouter);
 
 // Health check route
 app.get('/health', (req, res) => {

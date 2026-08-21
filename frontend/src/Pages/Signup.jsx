@@ -80,7 +80,10 @@ const Signup = () => {
       if (user?.role === 'admin') {
         navigate('/admin', { replace: true });
       } else {
-        navigate('/', { replace: true });
+        /* Same destination as signing in and as starting a trial. A new
+           account owns no business yet, so the dashboard asks for those
+           details there rather than dropping them on the marketing page. */
+        navigate('/dashboard', { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Unable to signup');

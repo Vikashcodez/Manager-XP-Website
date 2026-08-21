@@ -1,4 +1,6 @@
-import pool from '../config/database.js'; 
+import pool from '../config/database.js';
+import { recordAudit } from '../config/audit.js';
+import { getSetting } from '../config/settings.js';
 
 // Get all PCs with optional filtering
 export const getAllPCs = async (req, res) => {
@@ -141,7 +143,7 @@ export const createPC = async (req, res) => {
       name,
       ip_address,
       mac_address,
-      port || 9090,
+      port || await getSetting('station.default_port', 9090),
       is_active !== undefined ? is_active : true
     ]);
     
@@ -290,17 +292,48 @@ export const deletePC = async (req, res) => {
     const { permanent } = req.query;
     
     // Check if PC exists
-    const pcCheck = await pool.query('SELECT pc_id FROM pcs WHERE pc_id = $1', [id]);
+    const pcCheck = await pool.query('SELECT pc_id, name FROM pcs WHERE pc_id = $1', [id]);
     if (pcCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'PC not found'
       });
     }
-    
+
     if (permanent === 'true') {
-      // Permanent delete
+      // Permanent delete. Sessions, bills and telemetry reference this row, so
+      // refuse rather than cascade away a station's trading history.
+      const history = await pool.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM sessions WHERE pc_id = $1) AS sessions,
+           (SELECT COUNT(*)::int FROM station_telemetry WHERE pc_id = $1) AS telemetry`,
+        [id]
+      );
+      const counts = history.rows[0];
+
+      if (counts.sessions > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `This station has ${counts.sessions} session(s) against it. ` +
+            'Deactivate it instead — deleting would take its trading history with it.',
+          data: counts
+        });
+      }
+
+      // Telemetry is disposable, so clear it rather than block on it.
+      await pool.query('DELETE FROM station_telemetry WHERE pc_id = $1', [id]);
       await pool.query('DELETE FROM pcs WHERE pc_id = $1', [id]);
+
+      await recordAudit(req, {
+        action: 'station.delete',
+        category: 'station',
+        entity: 'station',
+        entity_id: id,
+        sensitive: true,
+        summary: `Permanently deleted station ${pcCheck.rows[0].name}`,
+        meta: { telemetry_removed: counts.telemetry }
+      });
+
       res.status(200).json({
         success: true,
         message: 'PC permanently deleted successfully'
@@ -308,12 +341,23 @@ export const deletePC = async (req, res) => {
     } else {
       // Soft delete - just deactivate
       const result = await pool.query(
-        `UPDATE pcs 
-         SET is_active = false, updated_at = CURRENT_TIMESTAMP 
-         WHERE pc_id = $1 
+        `UPDATE pcs
+         SET is_active = false, updated_at = CURRENT_TIMESTAMP
+         WHERE pc_id = $1
          RETURNING *`,
         [id]
       );
+
+      await recordAudit(req, {
+        action: 'station.deactivate',
+        category: 'station',
+        entity: 'station',
+        entity_id: id,
+        sensitive: true,
+        summary: `Deactivated station ${result.rows[0].name}`,
+        meta: { ip_address: result.rows[0].ip_address }
+      });
+
       res.status(200).json({
         success: true,
         message: 'PC deactivated successfully',
@@ -350,6 +394,15 @@ export const restorePC = async (req, res) => {
       });
     }
     
+    await recordAudit(req, {
+      action: 'station.restore',
+      category: 'station',
+      entity: 'station',
+      entity_id: id,
+      summary: `Reactivated station ${result.rows[0].name}`,
+      meta: { ip_address: result.rows[0].ip_address }
+    });
+
     res.status(200).json({
       success: true,
       message: 'PC restored successfully',
@@ -569,9 +622,10 @@ export const registerDiscoveredPC = async (req, res) => {
     // Use provided name or hostname as fallback
     const pc_name = name || hostname || `PC-${mac_address.substring(0, 8)}`;
     
-    // If cafe_id not provided, use default or return error
-    const final_cafe_id = cafe_id || 1;
-    const final_branch_id = branch_id || 1;
+    // Auto-discovered stations often arrive without a cafe or branch. The
+    // fallbacks come from app_settings rather than being pinned to 1 in code.
+    const final_cafe_id = cafe_id || await getSetting('station.default_cafe_id', 1);
+    const final_branch_id = branch_id || await getSetting('station.default_branch_id', 1);
     
     // Check if MAC address already exists (case where PC moved/changed IP)
     const macExistsCheck = await pool.query(
@@ -641,7 +695,7 @@ export const registerDiscoveredPC = async (req, res) => {
       pc_name,
       ip_address,
       mac_address,
-      port || 9090,
+      port || await getSetting('station.default_port', 9090),
       true
     ]);
     
