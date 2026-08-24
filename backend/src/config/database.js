@@ -3,6 +3,8 @@ import dotenv from './env.js';
 import { initializeTenancy } from './schema.tenancy.js';
 import { initializeCatalogue } from './schema.catalogue.js';
 import { initializeAdmin } from './schema.admin.js';
+import { initializeBilling } from './schema.billing.js';
+import { initializeLocations } from './schema.locations.js';
 
 const { Pool } = pg;
 
@@ -128,7 +130,36 @@ export const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    /* What kind of thing this is: "PC", "PS5", "Pool", "Darts".
+       Free text rather than a lookup table, because the list is the café's own
+       and differs between them — one has racing rigs, another has a snooker
+       table — and making them administer a category master before they can
+       price a dartboard is a gate, not a feature. Existing rows keep NULL and
+       are shown as uncategorised; nothing has to be migrated.
+
+       Added separately from CREATE TABLE so an existing install gains the
+       column too. */
+    await client.query(`
+      ALTER TABLE software_master ADD COLUMN IF NOT EXISTS category VARCHAR(60)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_software_master_category
+        ON software_master (category)
+    `);
+
+    /* A house activity is one the café added itself — a pool table, a
+       dartboard, a racing rig. It sits in the same table as the published
+       titles because the price master, the till and the bill all treat it
+       identically; what differs is who may change it.
+
+       Published titles are ManagerXP's: only an administrator may rename or
+       remove one. House activities belong to the café that created them, and
+       the café may do as it likes with its own dartboard. */
+    await client.query(`
+      ALTER TABLE software_master ADD COLUMN IF NOT EXISTS is_house BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
 
     //pc_software table
     await client.query(`
@@ -243,6 +274,89 @@ export const initializeDatabase = async () => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_sessions_status_started
         ON sessions (status, started_at DESC)
+    `);
+
+    /* ----------------------------------------------------------------------
+       Gaming price snapshot on the session.
+
+       A session already captured `rate_per_hour` so a later price change could
+       not rewrite history. That stays the engine — these columns record which
+       Gaming Price row the rate came from, and cover the shapes an hourly rate
+       alone cannot express.
+
+       pricing_unit:
+         HOUR  charged pro-rata from rate_per_hour, as before. A block price
+               such as "₹200 / 30 minutes" is converted to its hourly
+               equivalent when the session starts, so there is exactly one
+               calculation path rather than one per pricing shape.
+         FLAT  an unlimited session: flat_amount regardless of duration, so
+               there is no hourly rate to derive.
+
+       price_label is the human sentence the price was sold under — "PS5 · 1
+       Hour · ₹400". Stored rather than re-joined so a receipt reprinted next
+       year still reads the way it did on the day, even if the game or the
+       duration has since been renamed.
+       ---------------------------------------------------------------------- */
+    await client.query(`
+      ALTER TABLE sessions
+        ADD COLUMN IF NOT EXISTS gaming_price_id INTEGER REFERENCES gaming_prices(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS pricing_unit VARCHAR(16) NOT NULL DEFAULT 'HOUR',
+        ADD COLUMN IF NOT EXISTS flat_amount NUMERIC(10,2),
+        ADD COLUMN IF NOT EXISTS price_label VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP
+    `);
+
+    /* 'cancelled' joins the existing statuses. A session started by mistake is
+       recorded and released, never deleted — the row is the evidence that a
+       station was briefly held. */
+    await client.query(`
+      ALTER TABLE sessions DROP CONSTRAINT IF EXISTS sessions_status_check
+    `);
+    await client.query(`
+      ALTER TABLE sessions ADD CONSTRAINT sessions_status_check
+        CHECK (status IN ('active','paused','ended','cancelled'))
+    `);
+
+    /* ----------------------------------------------------------------------
+       Stations: what kind of play they host, and whether they can host it.
+
+       `category` is the gaming type — "PS5", "VR", "Pool" — and matches the
+       category on software_master, so picking a type narrows the stations and
+       the prices from the same vocabulary. It is deliberately not device_type,
+       which describes the machine's role in the network (GAMING_PC, SERVER,
+       FRONT_DESK) and answers a different question.
+
+       `status` covers the states a station can be put into. OCCUPIED is
+       deliberately absent: occupancy is whether an open session exists, and
+       storing it here as well would be a second copy of that truth, free to
+       drift the moment a session ends and an update fails. It is derived on
+       read instead.
+       ---------------------------------------------------------------------- */
+    await client.query(`
+      ALTER TABLE pcs
+        ADD COLUMN IF NOT EXISTS category VARCHAR(60),
+        ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'AVAILABLE',
+        -- Staff-facing note: "corner table", "left of the counter". A station
+        -- that is hard to find is a station a customer is sent to twice.
+        ADD COLUMN IF NOT EXISTS description VARCHAR(160)
+    `);
+    /* Not every station is a networked machine.
+       A pool table, a dartboard and a PS5 without the client installed are all
+       things a café sells time on, and none of them has an IP address. These
+       columns were NOT NULL from when a station could only be a gaming PC, so
+       the only way to register a pool table was to invent an address for it —
+       fake data in the one table the network code trusts. */
+    await client.query(`ALTER TABLE pcs ALTER COLUMN ip_address DROP NOT NULL`);
+    await client.query(`ALTER TABLE pcs ALTER COLUMN mac_address DROP NOT NULL`);
+
+    await client.query(`ALTER TABLE pcs DROP CONSTRAINT IF EXISTS pcs_status_check`);
+    await client.query(`
+      ALTER TABLE pcs ADD CONSTRAINT pcs_status_check
+        CHECK (status IN ('AVAILABLE','MAINTENANCE','INACTIVE'))
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_pcs_category ON pcs (category)
     `);
 
     console.log('✅ Session tables created/verified');
@@ -2067,6 +2181,14 @@ export const initializeDatabase = async () => {
     /* The admin schema last: its audit table references organizations and
        branches, and its bootstrap reads the legacy admin user. */
     await initializeAdmin(client);
+
+    /* Billing last: its refunds reference admin_users, and its invoices
+       reference organizations and subscriptions. */
+    await initializeBilling(client);
+
+    /* The location master last: its backfill reads the organizations it is
+       matching, and its columns hang off tables created above. */
+    await initializeLocations(client);
 
     console.log('✅ Platform billing tables created/verified');
 

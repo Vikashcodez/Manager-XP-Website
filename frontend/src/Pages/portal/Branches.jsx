@@ -113,7 +113,7 @@ const Branches = () => {
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {branches.map((b) => (
-              <article key={b.branch_id} className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5">
+              <article key={b.branch_id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -136,7 +136,7 @@ const Branches = () => {
                   />
                 </div>
 
-                <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-neutral-800 pt-4">
+                <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-white/10 pt-4">
                   <div>
                     <dt className="text-[11px] uppercase tracking-wider text-neutral-500">Gaming PCs</dt>
                     <dd className="mt-0.5 text-lg font-semibold text-white">{b.pc_count}</dd>

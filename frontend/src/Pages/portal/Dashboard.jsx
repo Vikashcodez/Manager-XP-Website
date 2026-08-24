@@ -158,7 +158,7 @@ const Dashboard = () => {
           <ul className="space-y-2">
             {installations.map((i) => (
               <li key={i.installation_id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-800 px-4 py-3">
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 px-4 py-3">
                 <div>
                   <div className="text-sm font-medium text-white">{i.name || i.public_id}</div>
                   <div className="mt-0.5 font-mono text-[11px] text-neutral-600">{i.public_id}</div>

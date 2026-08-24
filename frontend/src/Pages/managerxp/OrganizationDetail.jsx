@@ -50,7 +50,7 @@ const OverrideControl = ({ value, disabled, onChange }) => {
     { v: false, label: 'Off' }
   ];
   return (
-    <div className="inline-flex overflow-hidden rounded-lg border border-neutral-800">
+    <div className="inline-flex overflow-hidden rounded-lg border border-white/10">
       {options.map((o) => {
         const active = value === o.v;
         return (
@@ -212,7 +212,7 @@ const OrganizationDetail = () => {
         </div>
       </Panel>
 
-      <div className="flex flex-wrap gap-1 border-b border-neutral-800">
+      <div className="flex flex-wrap gap-1 border-b border-white/10">
         {TABS.map((t) => (
           <button
             key={t}
@@ -256,7 +256,7 @@ const OrganizationDetail = () => {
         >
           <Table columns={['Feature', 'Package', 'Override', 'Add-on', 'Effective']}>
             {ent.matrix.map((f) => (
-              <tr key={f.feature_key} className="hover:bg-neutral-900/40">
+              <tr key={f.feature_key} className="hover:bg-white/[0.03]">
                 <td className="px-4 py-2">
                   <div className="text-sm text-neutral-200">{f.label}</div>
                   <div className="text-[10px] uppercase tracking-wider text-neutral-600">
@@ -300,7 +300,7 @@ const OrganizationDetail = () => {
           : (
             <Table columns={['Branch', 'Code', 'City', 'Gaming PCs', 'Installations', 'Status']}>
               {branches.map((b) => (
-                <tr key={b.branch_id} className="hover:bg-neutral-900/40">
+                <tr key={b.branch_id} className="hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5 font-medium text-white">{b.name}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-neutral-500">{b.code || '—'}</td>
                   <td className="px-4 py-2.5 text-neutral-400">{b.city || '—'}</td>
@@ -318,7 +318,7 @@ const OrganizationDetail = () => {
       {tab === 'Users' && (
         <Table columns={['Name', 'Email', 'Phone', 'Role', 'Status', 'Joined']}>
           {owners.map((u) => (
-            <tr key={u.id} className="hover:bg-neutral-900/40">
+            <tr key={u.id} className="hover:bg-white/[0.03]">
               <td className="px-4 py-2.5 font-medium text-white">{u.name}</td>
               <td className="px-4 py-2.5 text-neutral-400">{u.email}</td>
               <td className="px-4 py-2.5 text-neutral-400">{u.phone_number || '—'}</td>
@@ -340,7 +340,7 @@ const OrganizationDetail = () => {
           : (
             <Table columns={['Installation', 'Branch', 'Version', 'Devices', 'Last seen', 'Status']}>
               {installations.map((i) => (
-                <tr key={i.installation_id} className="hover:bg-neutral-900/40">
+                <tr key={i.installation_id} className="hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{i.name || 'Unnamed'}</div>
                     <div className="font-mono text-[10px] text-neutral-600">{i.public_id}</div>

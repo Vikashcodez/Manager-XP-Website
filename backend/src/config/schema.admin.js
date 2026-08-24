@@ -82,7 +82,12 @@ const ROLE_GRANTS = {
   ADMIN: [
     'organizations.', 'branches.', 'packages.', 'features.', 'subscriptions.',
     'addons.', 'payments.view', 'installations.', 'devices.', 'software.view',
-    'support.manage', 'audit.view'
+    'support.manage', 'audit.view',
+    /* Read-only. Someone running the platform day to day should be able to see
+       who else has access — that is basic operational awareness, and it is the
+       first thing anyone checks after a security scare. Changing who has
+       access stays `admins.manage`, which this role does not hold. */
+    'admins.view'
   ],
   SUPPORT: [
     'organizations.view', 'branches.view', 'subscriptions.view', 'packages.view',

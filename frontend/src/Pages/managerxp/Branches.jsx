@@ -47,7 +47,7 @@ const PoolPanel = ({ pool }) => {
           ['Registered', pool.used, `${pool.available} available`],
           ['Branches', pool.branches.length, '']
         ].map(([label, value, sub]) => (
-          <div key={label} className="rounded-lg border border-neutral-800 p-3">
+          <div key={label} className="rounded-lg border border-white/10 p-3">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{label}</div>
             <div className="mt-1 text-xl font-semibold tabular-nums text-white">{value}</div>
             {sub && <div className="mt-0.5 text-[11px] text-neutral-600">{sub}</div>}
@@ -167,7 +167,7 @@ const Branches = () => {
                 {data.items.map((b) => {
                   const isEditing = editing === b.branch_id;
                   return (
-                    <tr key={b.branch_id} className="align-top hover:bg-neutral-900/40">
+                    <tr key={b.branch_id} className="align-top hover:bg-white/[0.03]">
                       <td className="px-4 py-2.5">
                         {isEditing ? (
                           <Input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />

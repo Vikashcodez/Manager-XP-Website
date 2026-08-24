@@ -8,6 +8,7 @@ import {
   extendSession,
   transferSession,
   endSession,
+  cancelSession,
   getDefaults
 } from '../controllers/session.Controller.js';
 import { requireStaff } from '../middleware/authGuards.js';
@@ -27,5 +28,9 @@ sessionRouter.post('/:id/resume', staff, resumeSession);
 sessionRouter.post('/:id/extend', staff, extendSession);
 sessionRouter.post('/:id/transfer', staff, transferSession);
 sessionRouter.post('/:id/end', staff, endSession);
+
+/* Started by mistake. Records who and when, releases the station, charges
+   nothing — and never removes the row. */
+sessionRouter.post('/:id/cancel', staff, cancelSession);
 
 export default sessionRouter;

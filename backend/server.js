@@ -38,6 +38,8 @@ import refundsRouter from './src/routes/refunds.Routes.js';
 import portalRouter from './src/routes/portal.Routes.js';
 import adminRouter from './src/routes/admin.Routes.js';
 import entitlementsRouter from './src/routes/entitlements.Routes.js';
+import installationsRouter from './src/routes/installations.Routes.js';
+import locationsRouter from './src/routes/locations.Routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +97,8 @@ app.use('/api/refunds', refundsRouter);
 app.use('/api/portal', portalRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/entitlements', entitlementsRouter);
+app.use('/api/installations', installationsRouter);
+app.use('/api/locations', locationsRouter);
 
 // Health check route
 app.get('/health', (req, res) => {

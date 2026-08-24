@@ -96,7 +96,7 @@ export const Features = () => {
             <div className="space-y-2">
               {m.features.map((f) => (
                 <div key={f.feature_key}
-                     className="flex items-start justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2">
+                     className="flex items-start justify-between gap-3 rounded-lg border border-white/10 px-3 py-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm text-neutral-200">{f.label}</span>
@@ -217,7 +217,7 @@ export const Addons = () => {
         : (
           <Table columns={['Add-on', 'Price', 'Grants capacity', 'Grants features', 'In use']}>
             {rows.map((a) => (
-              <tr key={a.addon_id} className="hover:bg-neutral-900/40">
+              <tr key={a.addon_id} className="hover:bg-white/[0.03]">
                 <td className="px-4 py-2.5">
                   <div className="font-medium text-white">{a.name}</div>
                   <div className="font-mono text-[10px] text-neutral-600">{a.code}</div>
@@ -288,7 +288,7 @@ export const AuditLogs = () => {
           <>
             <Table columns={['When', 'Who', 'Action', 'Resource', 'Customer', 'Change']}>
               {data.items.map((a) => (
-                <tr key={a.audit_id} className="align-top hover:bg-neutral-900/40">
+                <tr key={a.audit_id} className="align-top hover:bg-white/[0.03]">
                   <td className="whitespace-nowrap px-4 py-2 text-[11px] text-neutral-500">{dateTime(a.created_at)}</td>
                   <td className="px-4 py-2 text-[11px] text-neutral-400">{a.admin_email || 'system'}</td>
                   <td className="px-4 py-2">
@@ -309,7 +309,7 @@ export const AuditLogs = () => {
                     {a.old_value || a.new_value ? (
                       <details className="text-[11px] text-neutral-500">
                         <summary className="cursor-pointer hover:text-neutral-300">view</summary>
-                        <pre className="mt-1 max-w-md overflow-x-auto rounded bg-neutral-950 p-2 text-[10px] text-neutral-400">
+                        <pre className="mt-1 max-w-md overflow-x-auto rounded bg-black/40 p-2 text-[10px] text-neutral-400">
 {JSON.stringify({ from: a.old_value, to: a.new_value }, null, 1)}
                         </pre>
                       </details>

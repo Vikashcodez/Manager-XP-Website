@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { softwareApi, assetUrl, adminAuth, shortDate } from '../../lib/adminApi';
 import {
   Page, Panel, Pill, Banner, Skeleton, Empty, Button, Field, Input
@@ -31,8 +31,8 @@ const bytes = (n) => {
 const SoftwareCard = ({ item, onEdit, onRetire, onDestroy, mayEdit }) => {
   const icon = assetUrl(item.software_icon);
   return (
-    <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/60">
-      <div className="flex aspect-[16/10] items-center justify-center bg-neutral-950">
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+      <div className="flex aspect-[16/10] items-center justify-center bg-black/40">
         {icon ? (
           <img
             src={icon}
@@ -55,7 +55,10 @@ const SoftwareCard = ({ item, onEdit, onRetire, onDestroy, mayEdit }) => {
               #{item.software_id} · added {shortDate(item.created_at)}
             </div>
           </div>
-          {item.software_video && <Pill tone="info">video</Pill>}
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {item.category && <Pill>{item.category}</Pill>}
+            {item.software_video && <Pill tone="info">video</Pill>}
+          </div>
         </div>
         {mayEdit && (
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -76,6 +79,7 @@ const SoftwareMaster = () => {
   const [editing, setEditing] = useState(null);      // null | {} for new | the row
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
   const [iconFile, setIconFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -91,6 +95,17 @@ const SoftwareMaster = () => {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  /* The categories already in use, offered as suggestions so the same kind of
+     play does not end up spelled three ways — "PS5", "ps5" and "PlayStation 5"
+     would be three separate tabs on every café's till. Derived from the loaded
+     titles, so it needs no second request and updates as soon as one is saved. */
+  const knownCategories = useMemo(
+    () => Array.from(new Set((items || [])
+      .map((i) => (i.category || '').trim())
+      .filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+
   /* Object URLs are revoked when they stop being shown. Without this every
      file the admin previews leaks until the tab closes. */
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
@@ -98,6 +113,7 @@ const SoftwareMaster = () => {
   const openNew = () => {
     setEditing({});
     setName('');
+    setCategory('');
     setIconFile(null); setVideoFile(null);
     setPreview(null);
     setNotice(null);
@@ -106,6 +122,7 @@ const SoftwareMaster = () => {
   const openEdit = (item) => {
     setEditing(item);
     setName(item.software_name);
+    setCategory(item.category || '');
     setIconFile(null); setVideoFile(null);
     setPreview(assetUrl(item.software_icon));
     setNotice(null);
@@ -143,6 +160,10 @@ const SoftwareMaster = () => {
 
     const fd = new FormData();
     fd.append('software_name', name.trim());
+    /* Always sent, including empty — that is how a category is cleared. The
+       server treats an absent field as "leave it alone" and an empty one as
+       "remove it", so the two must not be conflated here. */
+    fd.append('category', category.trim());
     if (iconFile) fd.append('software_icon', iconFile);
     if (videoFile) fd.append('software_video', videoFile);
 
@@ -214,7 +235,7 @@ const SoftwareMaster = () => {
         >
           <form onSubmit={save} className="grid gap-4 lg:grid-cols-[220px_1fr]">
             <div>
-              <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950">
+              <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
                 {preview
                   ? <img src={preview} alt="" className="h-full w-full object-cover" />
                   : <span className="text-xs text-neutral-700">no artwork</span>}
@@ -233,6 +254,23 @@ const SoftwareMaster = () => {
               <Field label="Title" id="sw-name" hint="Shown to the player exactly as typed">
                 <Input id="sw-name" value={name} onChange={(e) => setName(e.target.value)}
                        placeholder="Counter-Strike 2" autoFocus />
+              </Field>
+
+              {/* What kind of play this is. The café's till groups its rate
+                  tiles by this, so "PS5" and "Pool" become tabs a cashier taps
+                  rather than a flat list they scroll.
+
+                  Free text with the existing values offered: typing a new one
+                  creates it, and there is no category master to administer
+                  before a dartboard can be priced. */}
+              <Field label="Category" id="sw-category"
+                     hint="Groups this on the café till — PC, PS5, Pool, Darts. Leave blank if it does not belong to one.">
+                <Input id="sw-category" list="sw-category-options" value={category}
+                       onChange={(e) => setCategory(e.target.value)}
+                       placeholder="PC" maxLength={60} />
+                <datalist id="sw-category-options">
+                  {knownCategories.map((c) => <option key={c} value={c} />)}
+                </datalist>
               </Field>
 
               <div>

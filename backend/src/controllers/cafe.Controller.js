@@ -247,10 +247,37 @@ export const deleteCafe = async (req, res) => {
 };
 
 // Get all cafes with their branches
+/*
+ * Which cafés the caller may see.
+ *
+ * A café's name and address are not secrets in themselves, but the list of
+ * every café on the platform is: it tells any operator who else is a ManagerXP
+ * customer, and how many. That is our commercial information, not theirs.
+ *
+ * A platform administrator sees everything — running the platform is the job.
+ * Anyone else sees the café their token names, and nothing else. Returning an
+ * empty list rather than a 403 for a café-less principal keeps the shape of
+ * the answer the same however the caller is authenticated.
+ */
+const cafeScope = (actor) => {
+  if (!actor) return { sql: 'FALSE', params: [] };
+  /* Only the vendor's own token widens this. Checking `role === 'admin'` here
+     would have been useless: café owners live in the same users table and at
+     least one of them carries that role, so it would have shown one customer
+     every other customer on the platform. */
+  if (actor.isPlatformAdmin) {
+    return { sql: null, params: [] };            // no restriction
+  }
+  if (actor.cafe_id) {
+    return { sql: 'c.cafe_id = $$', params: [actor.cafe_id] };
+  }
+  return { sql: 'FALSE', params: [] };
+};
+
 export const getAllCafes = async (req, res) => {
   try {
     const { include_inactive, city, state, country } = req.query;
-    
+
     let cafesQuery = `
       SELECT 
         c.*,
@@ -274,12 +301,23 @@ export const getAllCafes = async (req, res) => {
     const queryParams = [];
     const conditions = [];
     let paramCounter = 1;
-    
+
+    /* Applied first and never optional — a filter the caller cannot influence,
+       unlike everything below it. */
+    const scope = cafeScope(req.actor);
+    if (scope.sql === 'FALSE') {
+      return res.status(200).json({ success: true, data: [], count: 0 });
+    }
+    if (scope.sql) {
+      conditions.push(scope.sql.replace('$$', `$${paramCounter++}`));
+      queryParams.push(...scope.params);
+    }
+
     // Filter by active status
     if (include_inactive !== 'true') {
       conditions.push(`c.is_active = true`);
     }
-    
+
     // Filter branches by location
     if (city) {
       conditions.push(`b.city = $${paramCounter++}`);
@@ -327,7 +365,15 @@ export const getAllCafes = async (req, res) => {
 export const getCafeById = async (req, res) => {
   try {
     const { cafe_id } = req.params;
-    
+
+    /* Someone else's café is answered as though it does not exist, not as
+       "you may not see that" — the second confirms it is there and that the
+       id is worth guessing at. Same rule the tenant routes follow. */
+    const actor = req.actor || {};
+    if (!actor.isPlatformAdmin && String(actor.cafe_id || '') !== String(cafe_id)) {
+      return res.status(404).json({ success: false, message: 'Cafe not found' });
+    }
+
     const query = `
       SELECT 
         c.*,

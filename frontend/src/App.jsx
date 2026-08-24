@@ -15,7 +15,7 @@ const About = lazy(() => import('./Pages/About'))
 const Contact = lazy(() => import('./Pages/Contact'))
 const BookDemoPage = lazy(() => import('./Pages/BookDemo'))
 const Login = lazy(() => import('./Pages/Login'))
-const Signup = lazy(() => import('./Pages/Signup'))
+
 const StoreLogin = lazy(() => import('./Pages/StoreLogin'))
 
 // Signed-in surfaces are large and never needed by a first-time visitor, so they
@@ -28,7 +28,7 @@ const PayLink = lazy(() => import('./Pages/PayLink'))
 
 // CafeXP customer portal. Its own shell, its own token, its own chunk — a
 // visitor reading the marketing site should never download it.
-const StartTrial = lazy(() => import('./Pages/StartTrial'))
+const Signup = lazy(() => import('./Pages/SignupPage'))
 const AcceptInvite = lazy(() => import('./Pages/AcceptInvite'))
 const PortalShell = lazy(() => import('./components/portal/PortalShell'))
 const PortalDashboard = lazy(() => import('./Pages/portal/Dashboard'))
@@ -70,6 +70,22 @@ const fromSubs = (name) =>
   lazy(() => import('./Pages/managerxp/Subscriptions').then((m) => ({ default: m[name] })))
 const MxSubscriptions = fromSubs('SubscriptionList')
 const MxSubscriptionEditor = fromSubs('SubscriptionEditor')
+const fromEstate = (name) =>
+  lazy(() => import('./Pages/managerxp/Estate').then((m) => ({ default: m[name] })))
+const MxInstallations = fromEstate('Installations')
+const MxDevices = fromEstate('Devices')
+const fromBilling = (name) =>
+  lazy(() => import('./Pages/managerxp/Billing').then((m) => ({ default: m[name] })))
+const MxInvoices = fromBilling('Invoices')
+const MxPayments = fromBilling('Payments')
+const MxGateways = lazy(() => import('./Pages/managerxp/Gateways'))
+const MxPaymentLinks = lazy(() => import('./Pages/managerxp/PaymentLinks'))
+const MxSettings = lazy(() => import('./Pages/managerxp/Settings'))
+const MxAdminReset = lazy(() => import('./Pages/managerxp/AdminReset'))
+const fromTeam = (name) =>
+  lazy(() => import('./Pages/managerxp/Team').then((m) => ({ default: m[name] })))
+const MxAdminUsers = fromTeam('AdminUsers')
+const MxRoles = fromTeam('Roles')
 const PortalSupport = fromSimple('Support')
 const PortalProfile = fromSimple('Profile')
 const PortalSecurity = fromSimple('Security')
@@ -128,12 +144,15 @@ const AppLayout = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/demo" element={<BookDemoPage/>} />
           <Route path="/login" element={<Login />} />
+          {/* One signup page. "Start free trial" and "Sign up" are the same
+              act — an account always comes with a business and a trial — so
+              /start-trial redirects here rather than being a second form. */}
           <Route path="/signup" element={<Signup />} />
           <Route path="/gamingxp-login" element={<GamerXpLogin />} />
 
           {/* CafeXP sign-up and invitations: public, because the person using
               them does not have an account yet. */}
-          <Route path="/start-trial" element={<StartTrial />} />
+          <Route path="/start-trial" element={<Navigate to="/signup" replace />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
 
           {/*
@@ -211,6 +230,8 @@ const AppLayout = () => {
               redirects, so a bookmark still works and nobody ends up on a
               second door wondering why their password is refused. */}
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+          {/* Public: an administrator setting their password has no session yet. */}
+          <Route path="/admin/reset" element={<MxAdminReset />} />
           <Route
             path="/admin"
             element={(
@@ -238,16 +259,18 @@ const AppLayout = () => {
             <Route path="branches" element={<MxBranches />} />
             <Route path="subscriptions" element={<MxSubscriptions />} />
             <Route path="subscriptions/:id" element={<MxSubscriptionEditor />} />
-            <Route path="payments" element={<MxNotBuilt title="Payments" what="Payment and invoice management is not wired to this console yet." />} />
-            <Route path="invoices" element={<MxNotBuilt title="Invoices" what="Invoice generation is not built yet." />} />
-            <Route path="installations" element={<MxNotBuilt title="Installations" what="Installation registration from the desktop app is not built; existing installations are visible on each customer's page." />} />
-            <Route path="devices" element={<MxNotBuilt title="Devices / PCs" what="A cross-customer device list needs its own endpoint." />} />
+            <Route path="payments" element={<MxPayments />} />
+            <Route path="payment-links" element={<MxPaymentLinks />} />
+            <Route path="gateways" element={<MxGateways />} />
+            <Route path="invoices" element={<MxInvoices />} />
+            <Route path="installations" element={<MxInstallations />} />
+            <Route path="devices" element={<MxDevices />} />
             <Route path="software" element={<MxSoftware />} />
             <Route path="support" element={<MxNotBuilt title="Support Tickets" what="Ticketing is not built yet." />} />
             <Route path="announcements" element={<MxNotBuilt title="Announcements" what="Announcements are not built yet." />} />
-            <Route path="admin-users" element={<MxNotBuilt title="Admin Users" what="Administrator accounts, roles and permissions exist in the database and are enforced on every request, but there is no screen to manage them yet." />} />
-            <Route path="roles" element={<MxNotBuilt title="Roles & Permissions" what="The five roles and 33 permissions are seeded and enforced; editing them from here is not built." />} />
-            <Route path="settings" element={<MxNotBuilt title="Settings" what="System settings live in app_settings and are read everywhere, but there is no editor yet." />} />
+            <Route path="admin-users" element={<MxAdminUsers />} />
+            <Route path="roles" element={<MxRoles />} />
+            <Route path="settings" element={<MxSettings />} />
           </Route>
 
           {/* The previous admin console, kept reachable while its licence and

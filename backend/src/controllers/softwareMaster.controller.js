@@ -92,18 +92,31 @@ async function validateVideo(filePath) {
   }
 }
 
+/*
+ * A category is the café's own word for a kind of play — "PC", "PS5", "Pool",
+ * "Darts". Trimmed and length-capped here rather than trusted from the client,
+ * and an empty string becomes NULL so "no category" has one representation
+ * instead of two.
+ */
+const cleanCategory = (value) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed.slice(0, 60) : null;
+};
+
 // CREATE - Add new software
 export const createSoftware = async (req, res) => {
   try {
     const { software_name } = req.body;
-    
+    const category = cleanCategory(req.body.category);
+
     if (!software_name) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Software name is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Software name is required'
       });
     }
-    
+
     let iconPath = null;
     let videoPath = null;
     
@@ -134,10 +147,10 @@ export const createSoftware = async (req, res) => {
     }
     
     const result = await pool.query(
-      `INSERT INTO software_master (software_name, software_icon, software_video) 
-       VALUES ($1, $2, $3) 
+      `INSERT INTO software_master (software_name, software_icon, software_video, category)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [software_name, iconPath, videoPath]
+      [software_name, iconPath, videoPath, category]
     );
     
     res.status(201).json({
@@ -170,11 +183,11 @@ export const getAllSoftware = async (req, res) => {
     
     // Get paginated data
     const result = await pool.query(
-      `SELECT software_id, software_name, software_icon, software_video, 
-              is_active, created_at, updated_at 
-       FROM software_master 
-       WHERE is_active = true 
-       ORDER BY created_at DESC 
+      `SELECT software_id, software_name, software_icon, software_video,
+              category, is_house, is_active, created_at, updated_at
+       FROM software_master
+       WHERE is_active = true
+       ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -198,15 +211,196 @@ export const getAllSoftware = async (req, res) => {
   }
 };
 
+/*
+ * The distinct categories in use, with how many active games sit in each.
+ *
+ * Derived rather than stored: the categories that exist are exactly the ones
+ * somebody typed on a game, so the list cannot drift out of step with reality
+ * and there is no orphaned "Darts" left behind after the last dartboard goes.
+ */
+export const getSoftwareCategories = async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT category, COUNT(*)::int AS software_count
+         FROM software_master
+        WHERE is_active = true AND category IS NOT NULL
+        GROUP BY category
+        ORDER BY category ASC`
+    );
+
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error fetching software categories:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/* ==========================================================================
+   HOUSE ACTIVITIES — the café's own
+
+   A café sells time on things ManagerXP never published: a pool table, a
+   dartboard, a racing rig. Those cannot go through the admin catalogue, and
+   before this there was no way to price them at all — the price master could
+   only reference titles somebody else had created.
+
+   These endpoints are open to any signed-in café user, and are deliberately
+   narrow: a café may create its own activities and change its own, and may
+   not touch a published title beyond filing it into a category.
+   ========================================================================== */
+
+/** Create an activity owned by this café. No uploads — it is a name and a shelf. */
+export const createHouseActivity = async (req, res) => {
+  try {
+    const name = String(req.body.software_name || '').trim();
+    const category = cleanCategory(req.body.category);
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'A name is required' });
+    }
+    if (name.length > 255) {
+      return res.status(400).json({ success: false, message: 'That name is too long' });
+    }
+
+    /* A duplicate name would give the till two identical tiles with different
+       prices behind them, which is a mis-charge waiting to happen. */
+    const clash = await pool.query(
+      `SELECT software_id FROM software_master
+        WHERE LOWER(software_name) = LOWER($1) AND is_active = true`,
+      [name]
+    );
+    if (clash.rows.length) {
+      return res.status(409).json({
+        success: false,
+        message: `${name} is already in the catalogue`
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO software_master (software_name, category, is_house)
+       VALUES ($1, $2, TRUE)
+       RETURNING *`,
+      [name, category]
+    );
+
+    res.status(201).json({ success: true, message: 'Activity added', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating house activity:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/** Rename or recategorise an activity the café created. Published titles are refused. */
+export const updateHouseActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await pool.query(
+      'SELECT * FROM software_master WHERE software_id = $1', [id]
+    );
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Activity not found' });
+    }
+    if (!existing.rows[0].is_house) {
+      return res.status(403).json({
+        success: false,
+        message: 'That title is published by ManagerXP and cannot be edited here'
+      });
+    }
+
+    const name = req.body.software_name === undefined
+      ? existing.rows[0].software_name
+      : String(req.body.software_name).trim();
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'A name is required' });
+    }
+
+    const category = req.body.category === undefined
+      ? existing.rows[0].category
+      : cleanCategory(req.body.category);
+
+    const result = await pool.query(
+      `UPDATE software_master
+          SET software_name = $1, category = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE software_id = $3
+        RETURNING *`,
+      [name, category, id]
+    );
+
+    res.status(200).json({ success: true, message: 'Activity updated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating house activity:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/** Retire an activity the café created. Soft, so existing bills keep their name. */
+export const deleteHouseActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await pool.query(
+      'SELECT * FROM software_master WHERE software_id = $1', [id]
+    );
+    if (!existing.rows.length) {
+      return res.status(404).json({ success: false, message: 'Activity not found' });
+    }
+    if (!existing.rows[0].is_house) {
+      return res.status(403).json({
+        success: false,
+        message: 'That title is published by ManagerXP and cannot be removed here'
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE software_master SET is_active = false, updated_at = CURRENT_TIMESTAMP
+        WHERE software_id = $1 RETURNING *`,
+      [id]
+    );
+    res.status(200).json({ success: true, message: 'Activity retired', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error retiring house activity:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/*
+ * Set the category on any title, published or house.
+ *
+ * Deliberately wider than the rest: a category is not part of a title's
+ * identity, it is how this café arranges its own till. Telling an operator to
+ * raise a ticket with ManagerXP because their PS5 tiles are under the wrong
+ * tab would be absurd. Name, artwork and existence stay admin-only.
+ */
+export const setSoftwareCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const category = cleanCategory(req.body.category);
+
+    const result = await pool.query(
+      `UPDATE software_master
+          SET category = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE software_id = $2 AND is_active = true
+        RETURNING software_id, software_name, category, is_house`,
+      [category, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: 'Title not found' });
+    }
+    res.status(200).json({ success: true, message: 'Category updated', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error setting category:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 // READ - Get single software by ID
 export const getSoftwareById = async (req, res) => {
   try {
     const { id } = req.params;
     
     const result = await pool.query(
-      `SELECT software_id, software_name, software_icon, software_video, 
-              is_active, created_at, updated_at 
-       FROM software_master 
+      `SELECT software_id, software_name, software_icon, software_video,
+              category, is_house, is_active, created_at, updated_at
+       FROM software_master
        WHERE software_id = $1 AND is_active = true`,
       [id]
     );
@@ -304,17 +498,25 @@ export const updateSoftware = async (req, res) => {
       }
     }
     
+    /* Only touched when the caller actually sent the field. COALESCE cannot
+       express this: clearing a category is a legitimate edit that sends null,
+       and COALESCE would silently keep the old value instead. */
+    const category = req.body.category === undefined
+      ? oldData.category
+      : cleanCategory(req.body.category);
+
     const result = await pool.query(
-      `UPDATE software_master 
+      `UPDATE software_master
        SET software_name = COALESCE($1, software_name),
            software_icon = $2,
            software_video = $3,
            is_active = COALESCE($4, is_active),
+           category = $5,
            updated_at = CURRENT_TIMESTAMP
-       WHERE software_id = $5
+       WHERE software_id = $6
        RETURNING *`,
-      [software_name || oldData.software_name, iconPath, videoPath, 
-       is_active !== undefined ? is_active : oldData.is_active, id]
+      [software_name || oldData.software_name, iconPath, videoPath,
+       is_active !== undefined ? is_active : oldData.is_active, category, id]
     );
     
     res.status(200).json({

@@ -133,6 +133,68 @@ export const adminApi = {
   removeAddon: (id, rowId) =>
     request(`/subscriptions/${id}/addons/${rowId}`, { method: 'DELETE' }),
 
+  installations: (params) => request(`/installations${qs(params)}`).then((b) => b.data),
+  setInstallationStatus: (id, status, reason) =>
+    request(`/installations/${id}/status`, { method: 'POST', body: JSON.stringify({ status, reason }) }),
+  forceReauth: (id) => request(`/installations/${id}/reauth`, { method: 'POST' }),
+
+  devices: (params) => request(`/devices${qs(params)}`).then((b) => b.data),
+  setDeviceStatus: (id, active, reason) =>
+    request(`/devices/${id}/status`, { method: 'POST', body: JSON.stringify({ active, reason }) }),
+
+  invoices: (params) => request(`/invoices${qs(params)}`).then((b) => b.data),
+  invoice: (id) => request(`/invoices/${id}`).then((b) => b.data),
+  createInvoice: (payload) =>
+    request('/invoices', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  recordPayment: (invoiceId, payload) =>
+    request(`/invoices/${invoiceId}/payments`, { method: 'POST', body: JSON.stringify(payload) }),
+  voidInvoice: (id, reason) =>
+    request(`/invoices/${id}/void`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  payments: (params) => request(`/payments${qs(params)}`).then((b) => b.data),
+  refundPayment: (id, payload) =>
+    request(`/payments/${id}/refund`, { method: 'POST', body: JSON.stringify(payload) }),
+
+  runBilling: (payload) =>
+    request('/billing/run', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+
+  gateways: () => request('/gateways').then((b) => b.data),
+  saveGateway: (provider, payload) =>
+    request(`/gateways/${provider}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  verifyGateway: (provider) => request(`/gateways/${provider}/verify`, { method: 'POST' }),
+  createPaymentLink: (invoiceId, payload) =>
+    request(`/invoices/${invoiceId}/payment-link`, { method: 'POST', body: JSON.stringify(payload) }),
+  emailOutbox: (params) => request(`/email-outbox${qs(params)}`).then((b) => b.data),
+
+  paymentLinks: (params) => request(`/payment-links${qs(params)}`).then((b) => b.data),
+  createPaymentLinkStandalone: (payload) =>
+    request('/payment-links', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  sendPaymentLink: (id, payload) =>
+    request(`/payment-links/${id}/send`, { method: 'POST', body: JSON.stringify(payload) }),
+  cancelPaymentLink: (id, reason) =>
+    request(`/payment-links/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  adminUsers: () => request('/admin-users').then((b) => b.data),
+  createAdminUser: (payload) =>
+    request('/admin-users', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updateAdminUser: (id, payload) =>
+    request(`/admin-users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  resetAdminPassword: (id) =>
+    request(`/admin-users/${id}/reset`, { method: 'POST' }).then((b) => ({ ...b.data, message: b.message })),
+  adminLogins: (id) => request(`/admin-users/${id}/logins`).then((b) => b.data),
+
+  roles: () => request('/roles').then((b) => b.data),
+  createRole: (payload) =>
+    request('/roles', { method: 'POST', body: JSON.stringify(payload) }),
+  setRolePermissions: (id, permissions) =>
+    request(`/roles/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
+
+  settings: () => request('/settings').then((b) => b.data),
+  saveSettings: (settings) =>
+    request('/settings', { method: 'PUT', body: JSON.stringify({ settings }) }).then((b) => b.data),
+  testEmail: (to) =>
+    request('/settings/test-email', { method: 'POST', body: JSON.stringify({ to }) }),
+
   audit: (params) => request(`/audit${qs(params)}`).then((b) => b.data)
 };
 

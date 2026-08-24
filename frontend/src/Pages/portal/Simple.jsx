@@ -42,7 +42,7 @@ export const Profile = () => {
       <Card title="Your access" description="Which businesses and branches you can reach.">
         <div className="space-y-3">
           {(me?.organizations || []).map((o) => (
-            <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-800 px-4 py-3">
+            <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 px-4 py-3">
               <span className="text-sm font-medium text-white">{o.name}</span>
               <Pill tone={o.role === 'OWNER' ? 'bad' : 'info'}>{o.role.replace('_', ' ').toLowerCase()}</Pill>
             </div>
@@ -145,7 +145,7 @@ export const Help = () => (
   <Page title="Help Center" lede="The questions we are asked most.">
     <div className="space-y-3">
       {FAQS.map((f) => (
-        <details key={f.q} className="group rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
+        <details key={f.q} className="group rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <summary className="cursor-pointer list-none text-sm font-medium text-white marker:hidden">
             <span className="mr-2 text-neutral-600 transition group-open:rotate-90 inline-block">›</span>
             {f.q}
@@ -193,7 +193,7 @@ export const Support = () => {
               value={form.message}
               onChange={set('message')}
               required
-              className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5 text-sm text-white placeholder-neutral-600 outline-none focus:border-red-500/60"
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white placeholder-neutral-600 outline-none focus:border-red-500/60"
               placeholder="PC-04 at the Hyderabad branch shows offline in the portal, but it is switched on and CafeXP is running."
             />
           </Field>

@@ -34,12 +34,25 @@ export const register = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Get cafeId if user has a cafe
+    /*
+     * The café this account is scoped to.
+     *
+     * Ordered and limited on purpose. An owner can hold more than one café —
+     * a second branch registered separately — and this used to take whichever
+     * row the database handed back first. That order is physical, not logical:
+     * an UPDATE rewrites a row to the end of the heap, so the same person could
+     * be scoped to café 42 one day and 43 the next. The only visible symptom
+     * would be a console quietly showing another branch's stations and takings.
+     *
+     * Oldest café wins: stable, and the one they set up first. Moving between
+     * several is the portal's organization switcher, not an accident of row
+     * order.
+     */
     const cafeResult = await pool.query(
-      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      'SELECT cafe_id FROM cafes WHERE user_id = $1 ORDER BY cafe_id ASC LIMIT 1',
       [user.id]
     );
-    
+
     user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
     // Generate token
@@ -72,40 +85,23 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check if it's admin login
-    if (email === process.env.ADMIN_EMAIL) {
-      // Verify admin password
-      const isAdminPasswordValid = password === process.env.ADMIN_PASSWORD;
-      
-      if (!isAdminPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid admin credentials'
-        });
-      }
-
-      // Admin login successful
-      const token = jwt.sign(
-        { 
-          email: process.env.ADMIN_EMAIL, 
-          role: 'admin' 
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRE }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Admin logged in successfully',
-        data: {
-          user: {
-            email: process.env.ADMIN_EMAIL,
-            role: 'admin'
-          },
-          token
-        }
-      });
-    }
+    /*
+     * The ADMIN_EMAIL / ADMIN_PASSWORD branch is gone.
+     *
+     * It compared the submitted password to an environment variable with `===`
+     * — in plaintext, not constant time, against a credential that sat in a
+     * file on disk and in the process environment of anything that could read
+     * it. It also minted a token with no `id` and no `cafe_id`, which is what
+     * left the desktop console signed in and unable to name its own café.
+     *
+     * Administrators are `admin_users` rows with bcrypt hashes and
+     * audience-scoped tokens, and sign in through /api/admin/auth/login. This
+     * path had become a second door to the same building with a worse lock.
+     *
+     * Anyone still using it falls through to the ordinary user login below and
+     * is refused there unless they have a real account — which is the correct
+     * answer, and the same one an unknown address gets.
+     */
 
     // Regular user login
     const result = await pool.query(
@@ -135,12 +131,25 @@ export const login = async (req, res) => {
     // Remove password from response
     delete user.password;
 
-    // Get cafeId if user has a cafe
+    /*
+     * The café this account is scoped to.
+     *
+     * Ordered and limited on purpose. An owner can hold more than one café —
+     * a second branch registered separately — and this used to take whichever
+     * row the database handed back first. That order is physical, not logical:
+     * an UPDATE rewrites a row to the end of the heap, so the same person could
+     * be scoped to café 42 one day and 43 the next. The only visible symptom
+     * would be a console quietly showing another branch's stations and takings.
+     *
+     * Oldest café wins: stable, and the one they set up first. Moving between
+     * several is the portal's organization switcher, not an accident of row
+     * order.
+     */
     const cafeResult = await pool.query(
-      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      'SELECT cafe_id FROM cafes WHERE user_id = $1 ORDER BY cafe_id ASC LIMIT 1',
       [user.id]
     );
-    
+
     user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
     /*
@@ -228,12 +237,25 @@ export const verifyToken = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Get cafeId if user has a cafe
+    /*
+     * The café this account is scoped to.
+     *
+     * Ordered and limited on purpose. An owner can hold more than one café —
+     * a second branch registered separately — and this used to take whichever
+     * row the database handed back first. That order is physical, not logical:
+     * an UPDATE rewrites a row to the end of the heap, so the same person could
+     * be scoped to café 42 one day and 43 the next. The only visible symptom
+     * would be a console quietly showing another branch's stations and takings.
+     *
+     * Oldest café wins: stable, and the one they set up first. Moving between
+     * several is the portal's organization switcher, not an accident of row
+     * order.
+     */
     const cafeResult = await pool.query(
-      'SELECT cafe_id FROM cafes WHERE user_id = $1',
+      'SELECT cafe_id FROM cafes WHERE user_id = $1 ORDER BY cafe_id ASC LIMIT 1',
       [user.id]
     );
-    
+
     user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
     res.status(200).json({

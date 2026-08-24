@@ -16,6 +16,7 @@ import { recordAudit } from '../config/audit.js';
 import { getProvider } from '../modules/payments/payments.providers.js';
 import { decryptSecret } from '../modules/payments/payments.crypto.js';
 import { issueLicense } from './licenses.Controller.js';
+import { recalcInvoice } from './adminBilling.Controller.js';
 
 /* ==========================================================================
    HELPERS
@@ -1389,12 +1390,23 @@ export const completeLinkPayment = async (req, res) => {
       return res.json({ success: true, message: 'Already paid', data: { status: 'paid' } });
     }
 
-    await client.query(`
+    const recorded = (await client.query(`
       INSERT INTO subscription_payments
-        (cafe_id, link_id, amount, currency, method, provider, provider_payment_id, note)
-      VALUES ($1,$2,$3,$4,'link',$5,$6,$7)
-    `, [link.cafe_id, link.link_id, money(link.amount), link.currency,
-        gateway.row.provider, verdict.paymentId, link.description]);
+        (cafe_id, organization_id, invoice_id, link_id, amount, currency, method,
+         provider, provider_payment_id, note, status)
+      VALUES ($1,$2,$3,$4,$5,$6,'link',$7,$8,$9,'SUCCESS')
+      RETURNING *
+    `, [link.cafe_id, link.organization_id || null, link.invoice_id || null, link.link_id,
+        money(link.amount), link.currency,
+        gateway.row.provider, verdict.paymentId, link.description])).rows[0];
+
+    /* A link raised against an invoice settles that invoice. Without this the
+       money would arrive, be recorded, and the invoice would still read as
+       outstanding — the customer having paid and the ledger disagreeing is the
+       one outcome worse than not taking the payment at all. */
+    if (link.invoice_id) {
+      await recalcInvoice(client, link.invoice_id);
+    }
 
     /* Apply what was bought. A link with no café attached is a plain invoice —
        money recorded, nothing provisioned — which is the right behaviour for a

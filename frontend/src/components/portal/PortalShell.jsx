@@ -1,8 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, LogOut, Menu } from 'lucide-react';
 import { portalApi, portalAuth } from '../../lib/portalApi';
-import { Banner, Button, Select } from './ui';
+import { Banner, Button, Select, surface } from './ui';
 import CreateBusiness from './CreateBusiness';
+import ShellBackground from '../ShellBackground';
+import logo from '../../assets/whitelogo.png';
 
 /*
  * The portal shell: navigation, the org and branch switchers, and the trial
@@ -135,15 +138,16 @@ const PortalShell = ({ children }) => {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-800 border-t-red-500" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black px-4">
-        <div className="max-w-md rounded-2xl border border-neutral-800 bg-neutral-950 p-8 text-center">
+      <div className="relative flex min-h-screen items-center justify-center bg-black px-4">
+        <ShellBackground />
+        <div className={`relative z-10 max-w-md ${surface} p-8 text-center`}>
           <p className="text-sm text-neutral-300">{error}</p>
           <Button className="mt-5" onClick={() => { portalAuth.signOut(); window.location.href = '/login'; }}>
             Sign in again
@@ -173,18 +177,33 @@ const PortalShell = ({ children }) => {
 
   return (
     <PortalContext.Provider value={value}>
-      <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto flex max-w-[1400px]">
+      <div className="relative min-h-screen bg-black text-white antialiased">
+        <ShellBackground />
+
+        <div className="relative z-10 mx-auto flex max-w-[1400px]">
 
           {/* ── sidebar ── */}
           <aside
-            className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 overflow-y-auto border-r border-neutral-800
-                        bg-neutral-950 px-4 py-6 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
+            className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 overflow-y-auto border-r border-white/10
+                        bg-neutral-950/80 px-4 py-6 backdrop-blur-xl transition-transform
+                        lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
                         ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
           >
-            <Link to="/dashboard" className="flex items-center gap-2 px-2">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-red-500 text-sm font-black">XP</span>
-              <span className="text-lg font-semibold tracking-tight">CafeXP</span>
+            <Link to="/dashboard" className="flex items-center px-2 transition-opacity hover:opacity-80">
+              <img src={logo} alt="ManagerXP" className="h-7 w-auto" />
+            </Link>
+            <p className="mt-2 px-2 font-mono text-[10px] uppercase tracking-wider text-neutral-600">
+              cafexp_portal
+            </p>
+
+            {/* The way out. The dashboard had no route back to the public site
+                short of editing the address bar. */}
+            <Link
+              to="/"
+              className="group mt-4 flex items-center gap-1.5 px-2 font-mono text-[11px] text-neutral-500 transition-colors hover:text-white"
+            >
+              <ArrowLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
+              Back to site
             </Link>
 
             {/* Only shown when there is a choice to make. */}
@@ -206,7 +225,7 @@ const PortalShell = ({ children }) => {
               {NAV.map((group, i) => (
                 <div key={group.label || i}>
                   {group.label && (
-                    <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+                    <div className="mb-1.5 px-3 font-mono text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
                       {group.label}
                     </div>
                   )}
@@ -221,10 +240,10 @@ const PortalShell = ({ children }) => {
                           to={item.to}
                           onClick={() => setNavOpen(false)}
                           aria-current={active ? 'page' : undefined}
-                          className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
+                          className={`block rounded-lg border px-3 py-2 text-sm font-medium transition ${
                             active
-                              ? 'bg-red-500/10 text-white ring-1 ring-red-500/25'
-                              : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                              ? 'border-red-500/25 bg-gradient-to-r from-red-500/15 to-transparent text-white'
+                              : 'border-transparent text-neutral-400 hover:bg-white/[0.04] hover:text-white'
                           }`}
                         >
                           {item.label}
@@ -239,8 +258,9 @@ const PortalShell = ({ children }) => {
             <button
               type="button"
               onClick={() => { portalAuth.signOut(); window.location.href = '/login'; }}
-              className="mt-8 w-full rounded-lg border border-neutral-800 px-3 py-2 text-sm font-medium text-neutral-400 transition hover:border-red-500/40 hover:text-white"
+              className="mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-semibold text-neutral-400 transition-colors hover:border-red-500/40 hover:text-white"
             >
+              <LogOut className="h-3.5 w-3.5" />
               Sign out
             </button>
           </aside>
@@ -256,15 +276,22 @@ const PortalShell = ({ children }) => {
 
           {/* ── main ── */}
           <div className="min-w-0 flex-1">
-            <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-neutral-800 bg-black/85 px-4 py-3 backdrop-blur sm:px-6">
+            <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur-xl sm:px-6">
               <button
                 type="button"
                 onClick={() => setNavOpen(true)}
-                className="rounded-lg border border-neutral-800 px-2.5 py-1.5 text-sm text-neutral-300 lg:hidden"
+                className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-neutral-300 transition-colors hover:text-white lg:hidden"
                 aria-label="Open navigation"
               >
-                ☰
+                <Menu className="h-4 w-4" />
               </button>
+
+              {/* The same three lights as the login card's strip. */}
+              <div aria-hidden="true" className="hidden items-center gap-1.5 sm:flex">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              </div>
 
               {/* The branch selector. "All branches" only offered when there
                   is more than one — a single-branch café should never have to
@@ -285,14 +312,14 @@ const PortalShell = ({ children }) => {
 
               <div className="ml-auto flex items-center gap-3">
                 {sub && (
-                  <span className="hidden text-xs text-neutral-500 sm:inline">
+                  <span className="hidden font-mono text-[11px] text-neutral-500 sm:inline">
                     {sub.is_trial ? 'Trial' : 'Subscription'} ·{' '}
                     <span className={sub.status === 'ACTIVE' ? 'text-neutral-300' : 'text-red-300'}>
                       {sub.status === 'ACTIVE' ? `${sub.days_remaining} days left` : sub.status.toLowerCase()}
                     </span>
                   </span>
                 )}
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-neutral-800 text-xs font-bold">
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-xs font-bold">
                   {(me?.user?.name || '?').slice(0, 1).toUpperCase()}
                 </span>
               </div>

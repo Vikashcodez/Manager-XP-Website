@@ -12,26 +12,30 @@ import {
   checkPCExists,
   registerDiscoveredPC
 } from '../controllers/pcs.Controller.js';
-import { requireStaff } from '../middleware/authGuards.js';
+import { requireAuth, requireStaff } from '../middleware/authGuards.js';
 
 const pcsRouter = express.Router();
 
 /*
- * Every route here was previously open: anyone who could reach the port could
- * delete a station. The mutating ones are now staff-only, which also means the
- * audit trail can name who did it instead of recording "System".
+ * Stations.
  *
- * The reads are left open deliberately — the admin console and the discovery
- * flow both poll them before a token is necessarily in hand, and they expose
- * nothing beyond the café's own machine names.
+ * The mutating routes have been staff-only for a while. The reads were left
+ * open on the reasoning that they "expose nothing beyond the café's own machine
+ * names" — which was wrong. Every row carries the station's IP address, MAC
+ * address and the port the console connects on, so the endpoint handed out a
+ * map of a café's internal network to anyone who could reach the port.
+ *
+ * They now require a token and are scoped to the caller's own café inside the
+ * controller: the vendor sees everything, everybody else sees their own, and
+ * another café's stations read as absent rather than forbidden.
  */
 const staff = requireStaff('Café staff access required');
 
-pcsRouter.get('/', getAllPCs);
-pcsRouter.get('/active', getActivePCs);
-pcsRouter.get('/branch/:branchId', getPCsByBranch);
-pcsRouter.get('/:id', getPCById);
-pcsRouter.get('/cafe/:cafeId', getPCsByCafe);
+pcsRouter.get('/', requireAuth, getAllPCs);
+pcsRouter.get('/active', requireAuth, getActivePCs);
+pcsRouter.get('/branch/:branchId', requireAuth, getPCsByBranch);
+pcsRouter.get('/:id', requireAuth, getPCById);
+pcsRouter.get('/cafe/:cafeId', requireAuth, getPCsByCafe);
 
 // check-exists only answers "is this MAC known", and the discovery listener
 // calls it as stations announce themselves, so it stays open.

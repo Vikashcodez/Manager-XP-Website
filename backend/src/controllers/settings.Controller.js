@@ -40,13 +40,26 @@ const validateValue = (value, type) => {
 };
 
 // GET /api/settings?category=
+/*
+ * Café-scoped only.
+ *
+ * This table also holds ManagerXP's own configuration — SMTP credentials,
+ * trial length, platform tax — and this API is reachable by any café staff
+ * account with `settings.view`. Without the scope filter a cashier could read
+ * the outbound mail password and an owner could lengthen their own trial.
+ *
+ * Applied in the query rather than by filtering the result, so a future caller
+ * that forgets to filter cannot reintroduce it.
+ */
+const CAFE_SCOPE = `scope = 'cafe'`;
+
 export const listSettings = async (req, res) => {
   try {
     const params = [];
-    let where = '';
+    let where = `WHERE ${CAFE_SCOPE}`;
     if (req.query.category) {
       params.push(String(req.query.category));
-      where = 'WHERE category = $1';
+      where += ` AND category = $1`;
     }
 
     const result = await pool.query(
@@ -75,9 +88,11 @@ export const listSettings = async (req, res) => {
 export const getSettingByKey = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM app_settings WHERE setting_key = $1',
+      `SELECT * FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
       [req.params.key]
     );
+    /* A platform key answers the same as a missing one. Saying "that exists
+       but is not yours" tells a caller which keys are worth probing for. */
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Setting not found' });
     }
@@ -93,7 +108,7 @@ export const updateSetting = async (req, res) => {
   try {
     const key = req.params.key;
     const existing = await pool.query(
-      'SELECT * FROM app_settings WHERE setting_key = $1',
+      `SELECT * FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
       [key]
     );
     if (existing.rows.length === 0) {
@@ -155,7 +170,7 @@ export const updateSettings = async (req, res) => {
 
     for (const key of keys) {
       const existing = await client.query(
-        'SELECT value_type FROM app_settings WHERE setting_key = $1',
+        `SELECT value_type FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
         [key]
       );
       if (existing.rows.length === 0) {

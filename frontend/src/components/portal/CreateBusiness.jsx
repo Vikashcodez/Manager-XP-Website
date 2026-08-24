@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { portalApi, portalAuth } from '../../lib/portalApi';
 import { Button, Field, Input, Banner } from './ui';
+import AuthLayout from '../AuthLayout';
 
 /*
  * The other half of signing up.
@@ -48,56 +49,48 @@ const CreateBusiness = ({ name, onDone }) => {
     }
   };
 
+  /* Same shell as /login and /signup — this is the last step of signing up,
+     just reached from the other side, so it should not look like a different
+     page than the one it continues. */
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black px-4 py-12">
-      <div className="w-full max-w-lg">
-        <div className="mb-8 flex items-center justify-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-red-500 text-sm font-black text-white">XP</span>
-          <span className="text-xl font-semibold tracking-tight text-white">CafeXP</span>
-        </div>
-
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-7">
-          <h1 className="text-xl font-semibold tracking-tight text-white">
-            {name ? `Almost there, ${name.split(' ')[0]}` : 'Tell us about your café'}
-          </h1>
-          <p className="mt-1.5 text-sm text-neutral-400">
-            Name your business and we will set up your first branch and free trial. Every CafeXP
-            feature is switched on from the moment you finish.
-          </p>
-
-          {error && <div className="mt-5"><Banner tone="bad">{error}</Banner></div>}
-
-          <form onSubmit={submit} className="mt-6 space-y-4">
-            <Field label="Business name" id="cb-org" required
-                   hint="The company or group — you can add more branches later">
-              <Input id="cb-org" value={form.organization_name} onChange={set('organization_name')}
-                     placeholder="Riverside Gaming Group" autoFocus />
-            </Field>
-            <Field label="First branch" id="cb-branch" hint="Leave blank to use your business name">
-              <Input id="cb-branch" value={form.branch_name} onChange={set('branch_name')}
-                     placeholder="Hyderabad" />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="City" id="cb-city">
-                <Input id="cb-city" value={form.city} onChange={set('city')} placeholder="Hyderabad" />
-              </Field>
-              <Field label="Number of PCs" id="cb-pcs" hint="Roughly is fine">
-                <Input id="cb-pcs" type="number" min="1" value={form.pc_count}
-                       onChange={set('pc_count')} placeholder="20" />
-              </Field>
-            </div>
-            <Field label="Address" id="cb-address">
-              <Input id="cb-address" value={form.address} onChange={set('address')}
-                     placeholder="Road No. 12, Banjara Hills" />
-            </Field>
-
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving ? 'Setting up your business…' : 'Finish setting up'}
-            </Button>
-          </form>
-        </div>
+    <AuthLayout
+      wide
+      title={name ? `Almost there, ${name.split(' ')[0]}` : 'Tell us about your café'}
+      subtitle="Name your business and we will set up your first branch and free trial. Every CafeXP feature is switched on from the moment you finish."
+    >
+      <div aria-live="polite">
+        {error && <div className="mt-5"><Banner tone="bad">{error}</Banner></div>}
       </div>
-    </div>
+
+      <form onSubmit={submit} className="mt-6 space-y-4">
+        <Field label="Business name" id="cb-org" required
+               hint="The company or group — you can add more branches later">
+          <Input id="cb-org" value={form.organization_name} onChange={set('organization_name')}
+                 placeholder="Riverside Gaming Group" autoFocus />
+        </Field>
+        <Field label="First branch" id="cb-branch" hint="Leave blank to use your business name">
+          <Input id="cb-branch" value={form.branch_name} onChange={set('branch_name')}
+                 placeholder="Hyderabad" />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="City" id="cb-city">
+            <Input id="cb-city" value={form.city} onChange={set('city')} placeholder="Hyderabad" />
+          </Field>
+          <Field label="Number of PCs" id="cb-pcs" hint="Roughly is fine">
+            <Input id="cb-pcs" type="number" min="1" value={form.pc_count}
+                   onChange={set('pc_count')} placeholder="20" />
+          </Field>
+        </div>
+        <Field label="Address" id="cb-address">
+          <Input id="cb-address" value={form.address} onChange={set('address')}
+                 placeholder="Road No. 12, Banjara Hills" />
+        </Field>
+
+        <Button type="submit" className="w-full" disabled={saving}>
+          {saving ? 'Setting up your business…' : 'Finish setting up'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 };
 

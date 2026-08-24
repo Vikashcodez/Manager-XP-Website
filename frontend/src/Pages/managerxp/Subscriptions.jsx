@@ -65,7 +65,7 @@ export const SubscriptionList = () => {
                 const expiringSoon = s.days_left != null && s.days_left <= 7
                   && ['TRIAL', 'ACTIVE'].includes(s.status);
                 return (
-                  <tr key={s.subscription_id} className="hover:bg-neutral-900/40">
+                  <tr key={s.subscription_id} className="hover:bg-white/[0.03]">
                     <td className="px-4 py-2.5">
                       <Link to={`/admin/organizations/${s.organization_id}`}
                             className="font-medium text-white transition hover:text-red-300">
@@ -281,7 +281,7 @@ export const SubscriptionEditor = () => {
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/40 px-4 py-3">
           <span className="text-[11px] uppercase tracking-wider text-neutral-500">Customer pays</span>
           <span className="text-xl font-semibold text-white">{money(preview, s.currency)}</span>
           <span className="text-xs text-neutral-500">
@@ -336,7 +336,7 @@ export const SubscriptionEditor = () => {
             <div className="space-y-2">
               {activeAddons.map((a) => (
                 <div key={a.subscription_addon_id}
-                     className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2">
+                     className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2">
                   <div>
                     <span className="text-sm text-neutral-200">{a.name}</span>
                     {a.quantity > 1 && <span className="ml-1 text-xs text-neutral-500">×{a.quantity}</span>}

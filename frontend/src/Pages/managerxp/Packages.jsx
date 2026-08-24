@@ -88,7 +88,7 @@ export const PackageList = () => {
           {rows.map((p) => {
             const monthly = (p.prices || []).find((x) => x.billing_period === 'monthly');
             return (
-              <tr key={p.plan_id} className="hover:bg-neutral-900/40">
+              <tr key={p.plan_id} className="hover:bg-white/[0.03]">
                 <td className="px-4 py-2.5">
                   <div className="font-medium text-white">{p.name}</div>
                   <div className="font-mono text-[10px] text-neutral-600">{p.code}</div>
@@ -265,7 +265,7 @@ export const PackageEditor = () => {
       >
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((m) => (
-            <div key={m.module_key} className="rounded-lg border border-neutral-800 p-3">
+            <div key={m.module_key} className="rounded-lg border border-white/10 p-3">
               <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
                 {m.label}
               </div>

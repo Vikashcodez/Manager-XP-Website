@@ -53,12 +53,45 @@ export const canReadWallet = (req, res, next) => {
  * Any valid token. Populates req.actor so the controller can decide ownership
  * itself — used where the record's owner is not in the URL.
  */
+/**
+ * Is this token the vendor's, rather than a café's?
+ *
+ * `role === 'admin'` is not the answer and never was: café owners live in the
+ * same `users` table and one of them has that role today. The only reliable
+ * mark is an `admin_users` token carrying the managerxp-admin audience, which
+ * a café token cannot be made to satisfy.
+ *
+ * Exported so controllers scoping their own reads ask the same question as the
+ * guards do, instead of each inventing a looser version of it.
+ */
+export const isPlatformAdminToken = (req) => {
+  const payload = readToken(req);
+  if (!payload || !payload.admin_user_id) return false;
+  try {
+    jwt.verify(
+      (req.headers.authorization || '').slice(7).trim(),
+      process.env.JWT_SECRET,
+      { audience: 'managerxp-admin' }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const requireAuth = (req, res, next) => {
   const payload = readToken(req);
   if (!payload) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
-  req.actor = { ...payload, isStaff: !!payload.role, label: describe(payload) };
+  req.actor = {
+    ...payload,
+    isStaff: !!payload.role,
+    /* Carried on the actor so a controller can widen a scope for the vendor
+       without re-deriving what "vendor" means. */
+    isPlatformAdmin: isPlatformAdminToken(req),
+    label: describe(payload)
+  };
   next();
 };
 

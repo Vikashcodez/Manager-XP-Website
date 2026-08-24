@@ -107,7 +107,7 @@ const Organizations = ({ lens = 'organization' }) => {
                 const suspended = o.status === 'SUSPENDED';
                 const subStatus = suspended ? 'SUSPENDED' : (o.subscription_status || '—');
                 return (
-                  <tr key={o.organization_id} className="hover:bg-neutral-900/40">
+                  <tr key={o.organization_id} className="hover:bg-white/[0.03]">
                     {byOwner ? (
                       <>
                         <td className="px-4 py-2.5">

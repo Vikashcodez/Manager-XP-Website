@@ -131,7 +131,7 @@ const Users = () => {
                         aria-pressed={on}
                         className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition ${
                           on ? 'bg-red-500/15 text-white ring-red-500/35'
-                             : 'bg-neutral-900 text-neutral-400 ring-neutral-800 hover:text-white'
+                             : 'bg-white/[0.03] text-neutral-400 ring-white/10 hover:text-white'
                         }`}
                       >
                         {b.name}

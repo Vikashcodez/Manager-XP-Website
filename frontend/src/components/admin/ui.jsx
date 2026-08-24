@@ -1,4 +1,5 @@
 import React from 'react';
+import { authFieldClasses, authLabelClasses } from '../AuthLayout';
 
 /*
  * Shared admin primitives.
@@ -7,7 +8,29 @@ import React from 'react';
  * own input styling and its own idea of what a heading weighs — which is most
  * of why it read as unfinished. These are the pieces they all now use, so a
  * change to how a panel looks happens once.
+ *
+ * They wear the same clothes as /login: glassy white/10 surfaces over black,
+ * mono uppercase labels, the red bloom, and the gradient button. Signing in
+ * should not feel like being handed off to a different product, and an
+ * operator who lives in this console all day should recognise it as the same
+ * one they logged into.
+ *
+ * The field and label styles are imported from AuthLayout rather than restated
+ * here. Two copies of a colour is how the login page and the console drifted
+ * apart in the first place.
  */
+
+/** Glass panel surface — the login card's treatment, reusable. */
+export const surface =
+  'rounded-2xl border border-white/10 bg-neutral-950/70 backdrop-blur-xl ' +
+  'shadow-[0_0_50px_-20px_rgba(220,38,38,0.25)]';
+
+/** The gradient action button, shared by Button and anything hand-rolled. */
+export const primaryButtonClass =
+  'inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 ' +
+  'bg-gradient-to-br from-red-700 to-red-900 px-4 py-2 text-sm font-semibold text-white ' +
+  'shadow-[0_0_20px_-5px_rgba(220,38,38,0.4)] hover:shadow-[0_0_28px_-5px_rgba(220,38,38,0.6)] ' +
+  'transition-all duration-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60';
 
 export const Page = ({ title, lede, actions, children }) => (
   <div className="space-y-6">
@@ -22,30 +45,42 @@ export const Page = ({ title, lede, actions, children }) => (
   </div>
 );
 
-export const Panel = ({ title, description, children, className = '' }) => (
-  <section className={`rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 sm:p-5 ${className}`}>
-    {(title || description) && (
-      <div className="mb-4">
-        {title && <h3 className="text-sm font-semibold text-white">{title}</h3>}
-        {description && <p className="mt-1 text-xs leading-relaxed text-neutral-400">{description}</p>}
+/*
+ * A panel. `hud` adds the terminal strip from the login card — worth it on a
+ * page's primary panel, noise if every panel on the page wears one.
+ */
+export const Panel = ({ title, description, hud, children, className = '' }) => (
+  <section className={`${surface} overflow-hidden ${className}`}>
+    {hud && (
+      <div className="flex items-center gap-1.5 border-b border-white/5 bg-white/[0.02] px-4 py-3">
+        <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+        <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+        <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-neutral-600">
+          {typeof hud === 'string' ? hud : 'panel'}
+        </span>
       </div>
     )}
-    {children}
+    <div className="p-4 sm:p-5">
+      {(title || description) && (
+        <div className="mb-4">
+          {title && <h3 className="text-sm font-semibold text-white">{title}</h3>}
+          {description && <p className="mt-1 text-xs leading-relaxed text-neutral-400">{description}</p>}
+        </div>
+      )}
+      {children}
+    </div>
   </section>
 );
 
 export const Button = ({ variant = 'primary', className = '', children, ...props }) => {
   const variants = {
-    primary: 'bg-red-500 text-white hover:bg-red-400 disabled:opacity-50',
-    ghost: 'border border-neutral-700 text-neutral-300 hover:border-red-500/50 hover:text-white disabled:opacity-50',
-    danger: 'border border-neutral-700 text-neutral-400 hover:border-red-500/50 hover:text-red-300 disabled:opacity-50',
-    good: 'border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50'
+    ghost: 'inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-neutral-300 transition-colors hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50',
+    danger: 'inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-neutral-400 transition-colors hover:border-red-500/50 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50',
+    good: 'inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50'
   };
   return (
-    <button
-      className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${variants[variant]} ${className}`}
-      {...props}
-    >
+    <button className={`${variants[variant] || primaryButtonClass} ${className}`} {...props}>
       {children}
     </button>
   );
@@ -58,16 +93,13 @@ export const Button = ({ variant = 'primary', className = '', children, ...props
  */
 export const Field = ({ label, hint, id, children }) => (
   <div>
-    <label htmlFor={id} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-      {label}
-    </label>
+    <label htmlFor={id} className={authLabelClasses}>{label}</label>
     {children}
-    {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+    {hint && <p className="mt-1.5 text-xs text-neutral-500">{hint}</p>}
   </div>
 );
 
-export const inputClass =
-  'w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white placeholder-neutral-600 outline-none transition focus:border-red-500/50';
+export const inputClass = authFieldClasses;
 
 export const Input = (props) => <input className={inputClass} {...props} />;
 export const Select = ({ children, ...props }) => (
@@ -80,10 +112,10 @@ export const Pill = ({ tone = 'mute', children }) => {
     warn: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     bad: 'bg-red-500/15 text-red-300 border-red-500/30',
     info: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-    mute: 'bg-neutral-800 text-neutral-400 border-neutral-700'
+    mute: 'bg-white/[0.06] text-neutral-400 border-white/10'
   };
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tones[tone]}`}>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -91,16 +123,16 @@ export const Pill = ({ tone = 'mute', children }) => {
 
 export const Banner = ({ tone = 'info', children }) => {
   const tones = {
-    good: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200',
-    warn: 'border-amber-500/35 bg-amber-500/10 text-amber-200',
-    bad: 'border-red-500/35 bg-red-500/10 text-red-200',
-    info: 'border-neutral-800 bg-neutral-900 text-neutral-300'
+    good: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    warn: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    bad: 'border-red-500/30 bg-red-500/10 text-red-300',
+    info: 'border-white/10 bg-white/[0.03] text-neutral-300'
   };
   return <div className={`rounded-xl border p-3 text-sm ${tones[tone]}`}>{children}</div>;
 };
 
 export const Empty = ({ title, text, action }) => (
-  <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-10 text-center">
+  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
     <p className="text-sm font-medium text-neutral-300">{title}</p>
     {text && <p className="mx-auto mt-1.5 max-w-sm text-sm text-neutral-500">{text}</p>}
     {action && <div className="mt-4 flex justify-center">{action}</div>}
@@ -110,22 +142,22 @@ export const Empty = ({ title, text, action }) => (
 export const Skeleton = ({ rows = 3, height = 'h-20' }) => (
   <div className="space-y-2">
     {Array.from({ length: rows }).map((_, i) => (
-      <div key={i} className={`${height} animate-pulse rounded-xl border border-neutral-800 bg-neutral-900/40`} />
+      <div key={i} className={`${height} animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]`} />
     ))}
   </div>
 );
 
 export const Table = ({ columns, children }) => (
-  <div className="overflow-x-auto rounded-xl border border-neutral-800">
+  <div className="overflow-x-auto rounded-2xl border border-white/10">
     <table className="w-full text-sm">
-      <thead className="bg-neutral-900/80 text-left text-[11px] uppercase tracking-wider text-neutral-500">
+      <thead className="bg-white/[0.04] text-left font-mono text-[10px] uppercase tracking-wider text-neutral-500">
         <tr>
           {columns.map((c) => (
-            <th key={c} className="whitespace-nowrap px-4 py-2.5 font-semibold">{c}</th>
+            <th key={c} className="whitespace-nowrap px-4 py-3 font-semibold">{c}</th>
           ))}
         </tr>
       </thead>
-      <tbody className="divide-y divide-neutral-800">{children}</tbody>
+      <tbody className="divide-y divide-white/5">{children}</tbody>
     </table>
   </div>
 );
@@ -150,10 +182,10 @@ export const CopyableSecret = ({ label, value, note }) => {
   };
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">{label}</div>
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+      <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-300">{label}</div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code className="select-all break-all rounded-lg bg-neutral-950 px-3 py-2 font-mono text-sm text-white">
+        <code className="select-all break-all rounded-xl border border-white/10 bg-black/60 px-3 py-2 font-mono text-sm text-white">
           {value}
         </code>
         <Button variant="ghost" type="button" onClick={copy}>{copied ? 'Copied' : 'Copy'}</Button>

@@ -6,7 +6,12 @@ import {
   getSoftwareById,
   updateSoftware,
   deleteSoftware,
-  permanentDeleteSoftware
+  permanentDeleteSoftware,
+  getSoftwareCategories,
+  createHouseActivity,
+  updateHouseActivity,
+  deleteHouseActivity,
+  setSoftwareCategory
 } from '../controllers/softwareMaster.Controller.js';
 import { requireAuth, requirePlatformAdmin } from '../middleware/authGuards.js';
 
@@ -30,6 +35,36 @@ const softwareMasterRouter = express.Router();
  *          café's library too.
  */
 softwareMasterRouter.get('/', requireAuth, getAllSoftware);
+
+/* Must be declared before '/:id', or Express reads "categories" as an id and
+   this endpoint is never reached. */
+softwareMasterRouter.get('/categories', requireAuth, getSoftwareCategories);
+
+/*
+ * House activities — what the café itself sells time on.
+ *
+ * A pool table or a dartboard is not something ManagerXP publishes, and before
+ * these routes existed there was no way to price one: the price master can only
+ * reference a row in this table, and only an administrator could create one.
+ *
+ * Café-writable, and narrow on purpose. The controller refuses any of these
+ * against a published title, so a café can add and manage its own dartboard
+ * and cannot rename or delete somebody else's catalogue.
+ */
+softwareMasterRouter.post('/house', requireAuth, createHouseActivity);
+softwareMasterRouter.put('/house/:id', requireAuth, updateHouseActivity);
+softwareMasterRouter.delete('/house/:id', requireAuth, deleteHouseActivity);
+
+/*
+ * Filing a title into a category is café-writable for both kinds.
+ *
+ * A category is not part of a title's identity — it is how this café arranges
+ * its own till. Making an operator raise a ticket with ManagerXP because their
+ * PS5 tiles sit under the wrong tab would be absurd. Name, artwork and whether
+ * a published title exists at all remain administrator-only below.
+ */
+softwareMasterRouter.patch('/:id/category', requireAuth, setSoftwareCategory);
+
 softwareMasterRouter.get('/:id', requireAuth, getSoftwareById);
 
 softwareMasterRouter.post('/', requirePlatformAdmin, upload, createSoftware);

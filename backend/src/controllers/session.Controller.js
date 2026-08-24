@@ -2,6 +2,7 @@ import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
 import { createBillForSession } from './billing.Controller.js';
+import { resolveGamingPrice, amountForSeconds } from '../config/sessionPricing.js';
 
 /*
  * Play sessions.
@@ -41,12 +42,22 @@ const elapsedSeconds = (row, at) => {
 };
 
 const shape = (row) => {
-  const elapsed = row.status === 'ended'
+  const elapsed = (row.status === 'ended' || row.status === 'cancelled')
     ? (row.billable_seconds || 0)
     : elapsedSeconds(row);
   const plannedSeconds = row.planned_minutes ? row.planned_minutes * 60 : null;
 
   return {
+    /* The price this session was sold at, as captured when it started. A later
+       edit to the Gaming Price Master cannot reach back and change it. */
+    gaming_price_id: row.gaming_price_id || null,
+    pricing_unit: row.pricing_unit || 'HOUR',
+    flat_amount: num(row.flat_amount),
+    price_label: row.price_label || null,
+    category: row.pc_category || null,
+    cancelled_by: row.cancelled_by || null,
+    cancelled_at: row.cancelled_at || null,
+
     session_id: row.session_id,
     pc_id: row.pc_id,
     pc_name: row.pc_name || null,
@@ -63,8 +74,10 @@ const shape = (row) => {
     ended_at: row.ended_at,
     elapsed_seconds: elapsed,
     remaining_seconds: plannedSeconds === null ? null : Math.max(0, plannedSeconds - elapsed),
-    // What the session would cost if it ended right now.
-    running_amount: num((num(row.rate_per_hour) * (elapsed / 3600)).toFixed(2)),
+    /* What the session would cost if it ended right now — produced by the same
+       function that bills it, so the running figure and the final charge can
+       never disagree about the arithmetic. */
+    running_amount: amountForSeconds(row, elapsed),
     amount_charged: num(row.amount_charged),
     payment_status: row.payment_status,
     end_reason: row.end_reason,
@@ -75,7 +88,8 @@ const shape = (row) => {
 };
 
 const SELECT_SESSION = `
-  SELECT s.*, p.name AS pc_name, c.customer_name, w.balance AS wallet_balance
+  SELECT s.*, p.name AS pc_name, p.category AS pc_category,
+         c.customer_name, w.balance AS wallet_balance
   FROM sessions s
   LEFT JOIN pcs p ON p.pc_id = s.pc_id
   LEFT JOIN customers c ON c.customer_id = s.customer_id
@@ -96,7 +110,7 @@ export const startSession = async (req, res) => {
   try {
     const {
       pc_id, customer_id, guest_name, guest_phone,
-      planned_minutes, rate_per_hour, cafe_id
+      planned_minutes, rate_per_hour, cafe_id, gaming_price_id
     } = req.body || {};
 
     const pcId = parseInt(pc_id, 10);
@@ -121,17 +135,64 @@ export const startSession = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Duration must be between 1 and 1440 minutes' });
     }
 
-    const rate = rate_per_hour === undefined || rate_per_hour === null || rate_per_hour === ''
-      ? await defaultRatePerHour()
-      : Number(rate_per_hour);
-    if (!Number.isFinite(rate) || rate < 0) {
-      return res.status(400).json({ success: false, message: 'Rate must be zero or more' });
-    }
-
-    const pc = await client.query('SELECT pc_id, cafe_id FROM pcs WHERE pc_id = $1', [pcId]);
+    const pc = await client.query(
+      'SELECT pc_id, cafe_id, name, category, status FROM pcs WHERE pc_id = $1', [pcId]
+    );
     if (pc.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Station not found' });
     }
+    const station = pc.rows[0];
+
+    /* A station taken out of service cannot take a customer, whatever the
+       screen that sent this request last believed. */
+    if (station.status && station.status !== 'AVAILABLE') {
+      const why = station.status === 'MAINTENANCE'
+        ? 'under maintenance'
+        : 'not in service';
+      return res.status(409).json({
+        success: false,
+        message: `${station.name || 'That station'} is ${why} and cannot take a session`
+      });
+    }
+
+    /*
+     * Pricing comes from the Gaming Price Master, not from the request.
+     *
+     * `gaming_price_id` is the path everything new uses: the server loads the
+     * price, checks it is still on sale and still matches the station's type,
+     * and snapshots it onto the session. Nothing about the amount is taken
+     * from the caller, so a modified request cannot set its own rate.
+     *
+     * The `rate_per_hour` path below it is the original behaviour, kept for
+     * open-ended play at the counter that no catalogue price covers. It is not
+     * a way around the master — it produces an hourly session exactly as it
+     * always did.
+     */
+    let pricing;
+    if (gaming_price_id !== undefined && gaming_price_id !== null && gaming_price_id !== '') {
+      const resolved = await resolveGamingPrice(client, gaming_price_id, {
+        stationCategory: station.category
+      });
+      if (resolved.error) {
+        return res.status(400).json({ success: false, message: resolved.error });
+      }
+      pricing = resolved.snapshot;
+    } else {
+      const rate = rate_per_hour === undefined || rate_per_hour === null || rate_per_hour === ''
+        ? await defaultRatePerHour()
+        : Number(rate_per_hour);
+      if (!Number.isFinite(rate) || rate < 0) {
+        return res.status(400).json({ success: false, message: 'Rate must be zero or more' });
+      }
+      pricing = {
+        gaming_price_id: null,
+        pricing_unit: 'HOUR',
+        rate_per_hour: rate,
+        flat_amount: null,
+        price_label: null
+      };
+    }
+    const rate = pricing.rate_per_hour;
 
     if (customerId) {
       const customer = await client.query('SELECT customer_id FROM customers WHERE customer_id = $1', [customerId]);
@@ -155,18 +216,23 @@ export const startSession = async (req, res) => {
     const inserted = await client.query(
       `INSERT INTO sessions
          (cafe_id, pc_id, customer_id, guest_name, guest_phone,
-          planned_minutes, rate_per_hour, started_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          planned_minutes, rate_per_hour, started_by,
+          gaming_price_id, pricing_unit, flat_amount, price_label)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING session_id`,
       [
-        cafe_id || pc.rows[0].cafe_id || null,
+        cafe_id || station.cafe_id || null,
         pcId,
         customerId,
         customerId ? null : guestName,
         customerId ? null : (guest_phone ? String(guest_phone).trim().slice(0, 20) : null),
         minutes,
         rate,
-        req.actor?.label || null
+        req.actor?.label || null,
+        pricing.gaming_price_id,
+        pricing.pricing_unit,
+        pricing.flat_amount,
+        pricing.price_label
       ]
     );
 
@@ -440,10 +506,17 @@ export const endSession = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(409).json({ success: false, message: 'That session has already ended' });
     }
+    if (row.status === 'cancelled') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'That session was cancelled' });
+    }
 
+    /* Duration from the server's own timestamps and the amount from the
+       session's own snapshot. Neither is taken from the request: what the
+       browser believed the timer said has no bearing on what is charged. */
     const billableSeconds = elapsedSeconds(row);
     const rate = Number(row.rate_per_hour || 0);
-    const amount = Number((rate * (billableSeconds / 3600)).toFixed(2));
+    const amount = amountForSeconds(row, billableSeconds);
 
     let paymentStatus = 'not_applicable';
     let walletTransactionId = null;
@@ -583,6 +656,106 @@ export const endSession = async (req, res) => {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Error ending session:', error);
     res.status(500).json({ success: false, message: 'Error ending session' });
+  } finally {
+    client.release();
+  }
+};
+
+/* ==========================================================================
+   CANCEL
+   ========================================================================== */
+/*
+ * A session started by mistake — wrong station, wrong customer, wrong price.
+ *
+ * Cancelling is not deleting. The row stays, with who cancelled it and when,
+ * because it is the evidence that a station was held and released; a café
+ * where mistakes leave no trace is a café where a missing hour cannot be
+ * explained. It bills nothing and leaves no bill behind.
+ *
+ * POST /api/sessions/:id/cancel
+ */
+export const cancelSession = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid session id' });
+    }
+    const reason = req.body?.reason ? String(req.body.reason).trim().slice(0, 255) : null;
+
+    await client.query('BEGIN');
+
+    const locked = await client.query(
+      'SELECT * FROM sessions WHERE session_id = $1 FOR UPDATE', [id]
+    );
+    if (locked.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    const row = locked.rows[0];
+    if (row.status === 'ended') {
+      /* An ended session has been billed. Reversing that is a refund, which
+         has its own path and its own trail — not a quiet status change. */
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        message: 'That session has already ended and been billed. Refund the bill instead.'
+      });
+    }
+    if (row.status === 'cancelled') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'That session is already cancelled' });
+    }
+
+    /* The time played is recorded even though nothing is charged for it —
+       how long a station was held is the fact somebody will want later. */
+    const heldSeconds = elapsedSeconds(row);
+
+    await client.query(
+      `UPDATE sessions
+          SET status = 'cancelled',
+              ended_at = CURRENT_TIMESTAMP,
+              cancelled_at = CURRENT_TIMESTAMP,
+              cancelled_by = $1,
+              paused_at = NULL,
+              billable_seconds = $2,
+              amount_charged = 0,
+              payment_status = 'not_applicable',
+              end_reason = $3,
+              updated_at = CURRENT_TIMESTAMP
+        WHERE session_id = $4`,
+      [req.actor?.label || null, heldSeconds, reason || 'cancelled', id]
+    );
+
+    await client.query('COMMIT');
+
+    const fresh = await fetchSession(client, id);
+
+    await recordAudit(req, {
+      action: 'session.cancel',
+      category: 'sessions',
+      entity: 'session',
+      entity_id: id,
+      /* Always worth an owner's attention: a cancelled session is a station
+         that was occupied and produced no money. */
+      sensitive: true,
+      summary: `Cancelled session ${id} on ${fresh.pc_name || 'a station'} for ` +
+        `${fresh.customer_name || fresh.guest_name || 'a guest'} after ` +
+        `${Math.round(heldSeconds / 60)} min — nothing charged` +
+        (reason ? ` (${reason})` : ''),
+      meta: { held_seconds: heldSeconds, reason: reason }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Session cancelled — nothing charged',
+      data: shape(fresh)
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error cancelling session:', error);
+    res.status(500).json({ success: false, message: 'Error cancelling session' });
   } finally {
     client.release();
   }

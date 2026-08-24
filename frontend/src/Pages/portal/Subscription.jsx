@@ -139,7 +139,7 @@ const Subscription = () => {
                 <div
                   key={p.sub_id}
                   className={`rounded-xl border p-4 ${
-                    isCurrent ? 'border-red-500/50 bg-red-500/5' : 'border-neutral-800'
+                    isCurrent ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">

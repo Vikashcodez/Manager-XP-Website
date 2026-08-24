@@ -15,6 +15,7 @@ const SELECT_PRICE = `
   SELECT gp.*,
          sm.software_name,
          sm.software_icon,
+         sm.category             AS software_category,
          sm.is_active            AS software_active,
          s.session_name,
          s.duration_type,
@@ -42,6 +43,9 @@ const shape = (row) => ({
   // joined for display only — never stored on gaming_prices
   software_name: row.software_name,
   software_icon: row.software_icon,
+  /* Lets the till group rates by PC / PS5 / Pool / Darts without a second
+     request per tile. */
+  category: row.software_category,
   software_active: row.software_active,
   session_name: row.session_name,
   duration_type: row.duration_type,

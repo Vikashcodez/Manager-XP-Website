@@ -27,7 +27,7 @@ const Stat = ({ label, value, sub, tone = 'default', to }) => {
       {sub && <div className="mt-0.5 text-[11px] text-neutral-500">{sub}</div>}
     </>
   );
-  const className = 'rounded-xl border border-neutral-800 bg-neutral-900/60 p-4';
+  const className = 'rounded-xl border border-white/10 bg-white/[0.03] p-4';
   return to
     ? <Link to={to} className={`${className} block transition hover:border-red-500/40`}>{body}</Link>
     : <div className={className}>{body}</div>;
@@ -133,7 +133,7 @@ const Dashboard = () => {
             <li key={t.organization_id}>
               <Link
                 to={`/admin/organizations/${t.organization_id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-sm transition hover:border-red-500/40"
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm transition hover:border-red-500/40"
               >
                 <span className="truncate text-neutral-300">{t.name}</span>
                 <Pill tone={t.days_left <= 1 ? 'bad' : t.days_left <= 3 ? 'warn' : 'info'}>
@@ -153,7 +153,7 @@ const Dashboard = () => {
             <li key={u.organization_id}>
               <Link
                 to={`/admin/organizations/${u.organization_id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-sm transition hover:border-red-500/40"
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm transition hover:border-red-500/40"
               >
                 <span className="truncate text-neutral-300">{u.name}</span>
                 <Pill tone={u.used >= u.max ? 'bad' : 'warn'}>{u.used} / {u.max} PCs</Pill>
@@ -169,7 +169,7 @@ const Dashboard = () => {
           empty="Every installation has checked in."
           render={(i) => (
             <li key={i.installation_id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-sm">
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
               <span className="min-w-0">
                 <span className="block truncate text-neutral-300">{i.name || i.public_id}</span>
                 <span className="block truncate text-[11px] text-neutral-600">{i.organization}</span>
@@ -188,7 +188,7 @@ const Dashboard = () => {
             <li key={c.organization_id}>
               <Link
                 to={`/admin/organizations/${c.organization_id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-sm transition hover:border-red-500/40"
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm transition hover:border-red-500/40"
               >
                 <span className="truncate text-neutral-300">{c.name}</span>
                 <span className="shrink-0 text-[11px] text-neutral-600">{shortDate(c.created_at)}</span>

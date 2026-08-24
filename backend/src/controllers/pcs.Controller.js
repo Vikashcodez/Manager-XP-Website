@@ -3,6 +3,30 @@ import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
 
 // Get all PCs with optional filtering
+/*
+ * Which café's stations the caller may read.
+ *
+ * A station row is not just a name: it carries the IP address, the MAC address
+ * and the port the console connects on. That is a map of a café's internal
+ * network, and it was readable by anyone who could reach the port. "Machine
+ * names are not a secret" was the reasoning; the rest of the row is.
+ *
+ * The vendor sees everything — supporting an install means seeing it. Everyone
+ * else sees the café their token names.
+ */
+const cafeOf = (req) => {
+  const actor = req.actor || {};
+  if (actor.isPlatformAdmin) return null;          // no restriction
+  return actor.cafe_id || 0;                       // 0 matches nothing
+};
+
+/** Someone else's café is answered as absent, never as forbidden. */
+const deniesCafe = (req, cafeId) => {
+  const scope = cafeOf(req);
+  if (scope === null) return false;
+  return String(scope) !== String(cafeId);
+};
+
 export const getAllPCs = async (req, res) => {
   try {
     const { cafe_id, branch_id, is_active } = req.query;
@@ -17,6 +41,15 @@ export const getAllPCs = async (req, res) => {
     `;
     const queryParams = [];
     let paramCounter = 1;
+
+    /* Applied before anything the caller asked for, and not removable by
+       omitting the filter — the query string narrows this scope, it never
+       widens it. */
+    const scope = cafeOf(req);
+    if (scope !== null) {
+      query += ` AND p.cafe_id = $${paramCounter++}`;
+      queryParams.push(scope);
+    }
 
     if (cafe_id) {
       query += ` AND p.cafe_id = $${paramCounter++}`;
@@ -66,14 +99,16 @@ export const getPCById = async (req, res) => {
     `;
     
     const result = await pool.query(query, [id]);
-    
-    if (result.rows.length === 0) {
+
+    /* A station belonging to another café is reported missing, so the two
+       cases are indistinguishable from outside. */
+    if (result.rows.length === 0 || deniesCafe(req, result.rows[0].cafe_id)) {
       return res.status(404).json({
         success: false,
         message: 'PC not found'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: result.rows[0]
@@ -91,16 +126,37 @@ export const getPCById = async (req, res) => {
 // Create new PC
 export const createPC = async (req, res) => {
   try {
-    const { cafe_id, branch_id, name, ip_address, mac_address, port, is_active } = req.body;
-    
-    // Validate required fields
-    if (!cafe_id || !branch_id || !name || !ip_address || !mac_address) {
+    const {
+      cafe_id, branch_id, name, ip_address, mac_address, port, is_active,
+      category, description
+    } = req.body;
+
+    if (!cafe_id || !branch_id || !name) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: cafe_id, branch_id, name, ip_address, mac_address'
+        message: 'Missing required fields: cafe_id, branch_id, name'
       });
     }
-    
+
+    /*
+     * A station is networked or it is not.
+     *
+     * A gaming PC runs the CafeXP client and is reached over the network, so
+     * it needs an address. A pool table, a dartboard or a console without the
+     * client is still a thing the café sells time on, and has no address at
+     * all — registering one used to mean inventing an IP for it.
+     *
+     * Half an address is the case worth refusing: it would look networked to
+     * every screen that checks, and be unreachable.
+     */
+    const networked = !!(ip_address || mac_address);
+    if (networked && !(ip_address && mac_address)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A networked station needs both an IP address and a MAC address'
+      });
+    }
+
     // Check if cafe exists
     const cafeCheck = await pool.query('SELECT cafe_id FROM cafes WHERE cafe_id = $1', [cafe_id]);
     if (cafeCheck.rows.length === 0) {
@@ -119,32 +175,40 @@ export const createPC = async (req, res) => {
       });
     }
     
-    // Check if IP or MAC address already exists
-    const existingCheck = await pool.query(
-      'SELECT pc_id FROM pcs WHERE ip_address = $1 OR mac_address = $2',
-      [ip_address, mac_address]
-    );
-    if (existingCheck.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'PC with this IP address or MAC address already exists'
-      });
+    /* Only meaningful for a networked station. Two pool tables both having no
+       address is not a clash — it is the normal case. */
+    if (networked) {
+      const existingCheck = await pool.query(
+        'SELECT pc_id FROM pcs WHERE ip_address = $1 OR mac_address = $2',
+        [ip_address, mac_address]
+      );
+      if (existingCheck.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'A station with this IP address or MAC address already exists'
+        });
+      }
     }
-    
+
     const query = `
-      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port,
+                       is_active, category, description)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
-    
+
     const result = await pool.query(query, [
       cafe_id,
       branch_id,
       name,
-      ip_address,
-      mac_address,
-      port || await getSetting('station.default_port', 9090),
-      is_active !== undefined ? is_active : true
+      ip_address || null,
+      mac_address || null,
+      // A station with no address has nothing to connect to, so no port either.
+      networked ? (port || await getSetting('station.default_port', 9090)) : null,
+      is_active !== undefined ? is_active : true,
+      // What kind of play it hosts — decides its prices and its floor grouping.
+      category ? String(category).trim().slice(0, 60) || null : null,
+      description ? String(description).trim().slice(0, 160) || null : null
     ]);
     
     res.status(201).json({
@@ -166,17 +230,20 @@ export const createPC = async (req, res) => {
 export const updatePC = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cafe_id, branch_id, name, ip_address, mac_address, is_active } = req.body;
-    
-    // Check if PC exists
-    const pcCheck = await pool.query('SELECT pc_id FROM pcs WHERE pc_id = $1', [id]);
-    if (pcCheck.rows.length === 0) {
+    const {
+      cafe_id, branch_id, name, ip_address, mac_address, is_active,
+      category, status, description
+    } = req.body;
+
+    // Check if PC exists, and that it is this café's to change
+    const pcCheck = await pool.query('SELECT pc_id, cafe_id FROM pcs WHERE pc_id = $1', [id]);
+    if (pcCheck.rows.length === 0 || deniesCafe(req, pcCheck.rows[0].cafe_id)) {
       return res.status(404).json({
         success: false,
         message: 'PC not found'
       });
     }
-    
+
     // Build dynamic update query
     const updates = [];
     const queryParams = [];
@@ -249,7 +316,37 @@ export const updatePC = async (req, res) => {
       updates.push(`is_active = $${paramCounter++}`);
       queryParams.push(is_active);
     }
-    
+
+    /* What kind of play this station hosts — "PS5", "VR", "Pool". Empty
+       clears it, which makes the station general purpose rather than
+       restricted to one type. */
+    if (category !== undefined) {
+      const clean = category === null ? null : String(category).trim().slice(0, 60);
+      updates.push(`category = $${paramCounter++}`);
+      queryParams.push(clean || null);
+    }
+
+    /* AVAILABLE / MAINTENANCE / INACTIVE. OCCUPIED is not settable: it is
+       whether a session is open, and is derived rather than stored. */
+    if (description !== undefined) {
+      const clean = description === null ? null : String(description).trim().slice(0, 160);
+      updates.push(`description = $${paramCounter++}`);
+      queryParams.push(clean || null);
+    }
+
+    if (status !== undefined) {
+      const allowed = ['AVAILABLE', 'MAINTENANCE', 'INACTIVE'];
+      const next = String(status).toUpperCase();
+      if (!allowed.includes(next)) {
+        return res.status(400).json({
+          success: false,
+          message: `Status must be one of ${allowed.join(', ')}`
+        });
+      }
+      updates.push(`status = $${paramCounter++}`);
+      queryParams.push(next);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -292,8 +389,8 @@ export const deletePC = async (req, res) => {
     const { permanent } = req.query;
     
     // Check if PC exists
-    const pcCheck = await pool.query('SELECT pc_id, name FROM pcs WHERE pc_id = $1', [id]);
-    if (pcCheck.rows.length === 0) {
+    const pcCheck = await pool.query('SELECT pc_id, name, cafe_id FROM pcs WHERE pc_id = $1', [id]);
+    if (pcCheck.rows.length === 0 || deniesCafe(req, pcCheck.rows[0].cafe_id)) {
       return res.status(404).json({
         success: false,
         message: 'PC not found'
@@ -378,13 +475,18 @@ export const deletePC = async (req, res) => {
 export const restorePC = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
+    /* Scoped in the UPDATE itself rather than checked first: a separate read
+       then write leaves a window, and the whole point is that this row is not
+       the caller's to touch. */
+    const scope = cafeOf(req);
     const result = await pool.query(
-      `UPDATE pcs 
-       SET is_active = true, updated_at = CURRENT_TIMESTAMP 
+      `UPDATE pcs
+       SET is_active = true, updated_at = CURRENT_TIMESTAMP
        WHERE pc_id = $1 AND is_active = false
+         ${scope === null ? '' : 'AND cafe_id = $2'}
        RETURNING *`,
-      [id]
+      scope === null ? [id] : [id, scope]
     );
     
     if (result.rows.length === 0) {
@@ -423,15 +525,19 @@ export const getPCsByBranch = async (req, res) => {
   try {
     const { branchId } = req.params;
     
+    /* A branch id belongs to exactly one café, so scoping by café here also
+       stops a branch of somebody else's being read by guessing its number. */
+    const scope = cafeOf(req);
     const query = `
       SELECT p.*, c.name as cafe_name
       FROM pcs p
       LEFT JOIN cafes c ON p.cafe_id = c.cafe_id
       WHERE p.branch_id = $1
+        ${scope === null ? '' : 'AND p.cafe_id = $2'}
       ORDER BY p.name ASC
     `;
-    
-    const result = await pool.query(query, [branchId]);
+
+    const result = await pool.query(query, scope === null ? [branchId] : [branchId, scope]);
     
     res.status(200).json({
       success: true,
@@ -463,7 +569,13 @@ export const getActivePCs = async (req, res) => {
     `;
     const queryParams = [];
     let paramCounter = 1;
-    
+
+    const activeScope = cafeOf(req);
+    if (activeScope !== null) {
+      query += ` AND p.cafe_id = $${paramCounter++}`;
+      queryParams.push(activeScope);
+    }
+
     if (cafe_id) {
       query += ` AND p.cafe_id = $${paramCounter++}`;
       queryParams.push(cafe_id);
@@ -496,6 +608,14 @@ export const getActivePCs = async (req, res) => {
 export const getPCsByCafe = async (req, res) => {
   try {
     const { cafeId } = req.params;
+
+    /* Reading another café's stations answers as though it has none, rather
+       than refusing — a 403 would confirm the café exists and that its id is
+       worth walking. */
+    if (deniesCafe(req, cafeId)) {
+      return res.status(200).json({ success: true, data: [], count: 0 });
+    }
+
     const query = `
       SELECT p.*, b.city as branch_name
       FROM pcs p

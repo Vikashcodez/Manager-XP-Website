@@ -123,17 +123,11 @@ const Navbar = () => {
                 >
                   Login
                 </Link>
+                {/* Signing up and starting a trial are the same act now, so
+                    there is one button for it rather than two links racing to
+                    the same page. */}
                 <Link
                   to="/signup"
-                  className="inline-flex items-center justify-center px-4 py-2 text-[13px] font-medium text-neutral-300 hover:text-red-400 transition-colors"
-                >
-                  Sign up
-                </Link>
-                {/* The one filled button in the header. Starting a CafeXP trial
-                    is what we want a visitor to do, and two competing solid
-                    buttons would make neither of them the answer. */}
-                <Link
-                  to="/start-trial"
                   className="inline-flex items-center justify-center px-4 py-2 text-[13px] font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 active:scale-[0.98] transition-all duration-200"
                 >
                   Start free trial
@@ -236,13 +230,13 @@ const Navbar = () => {
           {!isAuthenticated && (
             <div className="pt-2 space-y-2">
               <Link
-                to="/start-trial"
+                to="/signup"
                 onClick={closeMenus}
                 className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-black bg-white rounded-full border border-white/90 hover:bg-neutral-100 transition-all duration-200"
               >
                 Start free trial
               </Link>
-              <div className="grid grid-cols-2 gap-2">
+              <div>
                 <Link
                   to="/login"
                   onClick={closeMenus}
@@ -250,13 +244,7 @@ const Navbar = () => {
                 >
                   Login
                 </Link>
-                <Link
-                  to="/signup"
-                  onClick={closeMenus}
-                  className="block w-full text-center px-4 py-2.5 text-sm font-medium text-white rounded-full border border-neutral-700 hover:bg-neutral-900 transition-all duration-200"
-                >
-                  Sign up
-                </Link>
+
               </div>
             </div>
           )}

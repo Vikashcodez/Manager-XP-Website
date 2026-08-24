@@ -16,6 +16,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import { getSetting } from '../config/settings.js';
 import { recordTenantAudit, assertOwnership } from '../middleware/tenancy.js';
+import { resolveLocation } from './locations.Controller.js';
 import {
   getSubscription, getUsage, getEntitlements, checkLimit
 } from '../modules/entitlements/entitlements.service.js';
@@ -36,17 +37,36 @@ const slugify = (name) =>
    branch with no trial) is worse than no business at all.
    ========================================================================== */
 const provisionOrganization = async (client, {
-  userId, email, orgName, branchName, city, address, phone, pcCount
+  userId, email, orgName, branchName, phone, pcCount,
+  address1, address2, postalCode, location
 }) => {
+  /* Location arrives already resolved and verified by `resolveLocation` — the
+     ids are stored, and the names are stored beside them so an invoice printed
+     today still reads correctly if a city is later renamed in the master. */
+  const country = location?.country || null;
+  const state = location?.state || null;
+  const city = location?.city || null;
+
   const org = (await client.query(`
-    INSERT INTO organizations (name, slug, email, phone, city, address, status)
-    VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE')
+    INSERT INTO organizations
+      (name, slug, email, phone, address, address_line_1, address_line_2,
+       city, state, country, postal_code, currency, timezone,
+       country_id, state_id, city_id, status)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'INR'),$13,$14,$15,$16,'ACTIVE')
     RETURNING *
   `, [
     orgName,
     // A collision just means a longer slug; it is a URL nicety, not identity.
     slugify(orgName) + '-' + crypto.randomBytes(2).toString('hex'),
-    email || null, phone || null, city || null, address || null
+    email || null, phone || null,
+    address1 || null, address1 || null, address2 || null,
+    city?.name || null, state?.name || null, country?.name || null,
+    postalCode || null,
+    /* Currency and timezone come from the country master, never from the
+       request — a browser-supplied currency the billing run cannot price in
+       would produce invoices nobody can settle. */
+    country?.currency_code || null, country?.timezone || null,
+    country?.id || null, state?.id || null, city?.id || null
   ])).rows[0];
 
   await client.query(`
@@ -69,12 +89,17 @@ const provisionOrganization = async (client, {
      and fails with a far more confusing error than the original. Use the
      columns that exist. */
   const branch = (await client.query(`
-    INSERT INTO branches (organization_id, cafe_id, name, code, city, street, status, is_active)
-    VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE',TRUE)
+    INSERT INTO branches
+      (organization_id, cafe_id, name, code, city, street, state, country, zip_code,
+       address_line_1, address_line_2, country_id, state_id, city_id, status, is_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ACTIVE',TRUE)
     RETURNING *
   `, [
     org.organization_id, cafe.cafe_id,
-    branchName || orgName, 'BR-001', city || null, address || null
+    branchName || orgName, 'BR-001',
+    city?.name || null, address1 || null, state?.name || null, country?.name || null,
+    postalCode || null, address1 || null, address2 || null,
+    country?.id || null, state?.id || null, city?.id || null
   ])).rows[0];
 
   await client.query(`
@@ -157,6 +182,15 @@ export const signup = async (req, res) => {
       });
     }
 
+    /* The location chain is re-read from the master and checked here, before
+       anything is written. A dropdown is a convenience for the person filling
+       the form, never evidence: "India / Telangana / Mumbai" arrives looking
+       exactly like a valid submission and has to be refused. */
+    const location = await resolveLocation(req.body, { required: false });
+    if (location.error) {
+      return res.status(400).json({ success: false, message: location.error });
+    }
+
     await client.query('BEGIN');
 
     const hashed = await bcrypt.hash(password, 10);
@@ -172,8 +206,10 @@ export const signup = async (req, res) => {
       phone,
       orgName,
       branchName,
-      city: req.body?.city ? String(req.body.city).trim() : null,
-      address: req.body?.address ? String(req.body.address).trim() : null,
+      address1: req.body?.address_line_1 ? String(req.body.address_line_1).trim() : null,
+      address2: req.body?.address_line_2 ? String(req.body.address_line_2).trim() : null,
+      postalCode: req.body?.postal_code ? String(req.body.postal_code).trim() : null,
+      location,
       pcCount: req.body?.pc_count
     });
 
@@ -185,13 +221,26 @@ export const signup = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRE || '7d' }
     );
 
-    await recordTenantAudit(
-      { tenant: { userId: user.id, organizationId: org.organization_id }, headers: req.headers, socket: req.socket },
-      { action: 'account.created', resource_type: 'organization', resource_id: org.organization_id,
-        metadata: { organization: orgName, branch: branch.name, trial_days: Number(days) } }
-    );
+    /* `trialDays` comes back from the provisioning helper. It used to be a
+       local called `days`, and the rename was missed here — which threw a
+       ReferenceError AFTER the commit, so every signup created the account and
+       then answered 500. The customer saw a failure, retried, and was told the
+       email was already taken.
 
-    res.status(201).json({
+       The audit is also no longer allowed to take the response down with it:
+       past this point the account exists, and a failed log line must not be
+       reported to the customer as a failed signup. */
+    try {
+      await recordTenantAudit(
+        { tenant: { userId: user.id, organizationId: org.organization_id }, headers: req.headers, socket: req.socket },
+        { action: 'account.created', resource_type: 'organization', resource_id: org.organization_id,
+          metadata: { organization: orgName, branch: branch.name, trial_days: trialDays } }
+      );
+    } catch (auditError) {
+      console.error('Signup succeeded but the audit entry failed:', auditError.message);
+    }
+
+    return res.status(201).json({
       success: true,
       message: `Welcome to CafeXP, ${name.split(' ')[0]}`,
       data: {
@@ -202,7 +251,7 @@ export const signup = async (req, res) => {
         subscription: {
           type: 'TRIAL', status: 'ACTIVE',
           expires_at: subscription.end_date,
-          days_remaining: Number(days)
+          days_remaining: trialDays
         }
       }
     });
@@ -254,6 +303,14 @@ export const createOrganization = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Not found' });
     }
 
+    /* Same check as signup, for the same reason — this endpoint creates a
+       business too, and a location chain is only trustworthy once the server
+       has re-read it. */
+    const location = await resolveLocation(req.body, { required: false });
+    if (location.error) {
+      return res.status(400).json({ success: false, message: location.error });
+    }
+
     await client.query('BEGIN');
     const { org, branch, subscription, trialDays } = await provisionOrganization(client, {
       userId: account.id,
@@ -261,8 +318,10 @@ export const createOrganization = async (req, res) => {
       phone: account.phone_number,
       orgName,
       branchName: String(req.body?.branch_name || '').trim(),
-      city: req.body?.city ? String(req.body.city).trim() : null,
-      address: req.body?.address ? String(req.body.address).trim() : null,
+      address1: req.body?.address_line_1 ? String(req.body.address_line_1).trim() : null,
+      address2: req.body?.address_line_2 ? String(req.body.address_line_2).trim() : null,
+      postalCode: req.body?.postal_code ? String(req.body.postal_code).trim() : null,
+      location,
       pcCount: req.body?.pc_count
     });
     await client.query('COMMIT');

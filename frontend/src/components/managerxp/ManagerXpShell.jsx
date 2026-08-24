@@ -1,10 +1,23 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, LogOut, Menu } from 'lucide-react';
 import { adminApi, adminAuth } from '../../lib/adminApi';
-import { Button } from '../admin/ui';
+import { Button, surface } from '../admin/ui';
+import ShellBackground from '../ShellBackground';
+import logo from '../../assets/whitelogo.png';
 
 /*
  * The ManagerXP admin shell — sidebar, header, and the guard in front of both.
+ *
+ * Dressed to match /login: the same logo, the same black ground with its red
+ * ambient glow and tech grid, the same terminal strip, the same glassy white/10
+ * surfaces. Signing in should feel like walking further into one product rather
+ * than being handed to another.
+ *
+ * It takes the static half of the login background — grid and glow — and leaves
+ * out the particle canvas and the racing streaks. Those are fine behind a
+ * single card someone looks at for ten seconds; behind dense tables an operator
+ * reads all day they are a moving distraction and a canvas animating forever.
  *
  * The navigation is section 56's, in full. Sections whose backend does not
  * exist yet are marked `soon` and say so when opened, rather than being hidden.
@@ -30,8 +43,10 @@ const NAV = [
       { to: '/admin/organizations', label: 'Organizations', can: 'organizations.view' },
       { to: '/admin/branches', label: 'Branches', can: 'branches.view' },
       { to: '/admin/subscriptions', label: 'Subscriptions', can: 'subscriptions.view' },
-      { to: '/admin/payments', label: 'Payments', can: 'payments.view', soon: true },
-      { to: '/admin/invoices', label: 'Invoices', can: 'payments.view', soon: true }
+      { to: '/admin/payments', label: 'Payments', can: 'payments.view' },
+      { to: '/admin/invoices', label: 'Invoices', can: 'payments.view' },
+      { to: '/admin/payment-links', label: 'Payment Links', can: 'payments.view' },
+      { to: '/admin/gateways', label: 'Payment Gateway', can: 'payments.view' }
     ]
   },
   {
@@ -45,8 +60,8 @@ const NAV = [
   {
     label: 'Access',
     items: [
-      { to: '/admin/installations', label: 'Installations', can: 'installations.view', soon: true },
-      { to: '/admin/devices', label: 'Devices / PCs', can: 'devices.view', soon: true }
+      { to: '/admin/installations', label: 'Installations', can: 'installations.view' },
+      { to: '/admin/devices', label: 'Devices / PCs', can: 'devices.view' }
     ]
   },
   {
@@ -63,10 +78,10 @@ const NAV = [
   {
     label: 'System',
     items: [
-      { to: '/admin/admin-users', label: 'Admin Users', can: 'admins.view', soon: true },
-      { to: '/admin/roles', label: 'Roles & Permissions', can: 'admins.view', soon: true },
+      { to: '/admin/admin-users', label: 'Admin Users', can: 'admins.view' },
+      { to: '/admin/roles', label: 'Roles & Permissions', can: 'admins.view' },
       { to: '/admin/audit-logs', label: 'Audit Logs', can: 'audit.view' },
-      { to: '/admin/settings', label: 'Settings', can: 'settings.edit', soon: true }
+      { to: '/admin/settings', label: 'Settings', can: 'settings.edit' }
     ]
   }
 ];
@@ -138,8 +153,9 @@ const ManagerXpShell = ({ children }) => {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black px-4">
-        <div className="max-w-md rounded-2xl border border-neutral-800 bg-neutral-950 p-8 text-center">
+      <div className="relative flex min-h-screen items-center justify-center bg-black px-4">
+        <ShellBackground />
+        <div className={`relative z-10 max-w-md ${surface} p-8 text-center`}>
           <p className="text-sm text-neutral-300">{error}</p>
           <Button className="mt-5" onClick={load}>Try again</Button>
         </div>
@@ -149,25 +165,40 @@ const ManagerXpShell = ({ children }) => {
 
   return (
     <AdminContext.Provider value={value}>
-      <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto flex max-w-[1600px]">
+      <div className="relative min-h-screen bg-black text-white antialiased">
+        <ShellBackground />
+
+        <div className="relative z-10 mx-auto flex max-w-[1600px]">
 
           <aside
-            className={`fixed inset-y-0 left-0 z-40 w-60 shrink-0 overflow-y-auto border-r border-neutral-800
-                        bg-neutral-950 px-3 py-5 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
+            className={`fixed inset-y-0 left-0 z-40 w-60 shrink-0 overflow-y-auto border-r border-white/10
+                        bg-neutral-950/80 px-3 py-5 backdrop-blur-xl transition-transform
+                        lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
                         ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
           >
-            <Link to="/admin" className="flex items-center gap-2 px-2">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-red-500 text-[11px] font-black">MX</span>
-              <span className="text-base font-semibold tracking-tight">ManagerXP</span>
+            <Link to="/admin" className="flex items-center px-2 transition-opacity hover:opacity-80">
+              <img src={logo} alt="ManagerXP" className="h-7 w-auto" />
             </Link>
-            <p className="mt-1 px-2 text-[10px] uppercase tracking-wider text-neutral-600">Control plane</p>
+            <p className="mt-2 px-2 font-mono text-[10px] uppercase tracking-wider text-neutral-600">
+              control_plane
+            </p>
+
+            {/* The way out. Every other page on the site has this; the console
+                had no route back to the public site short of editing the
+                address bar, which is not a thing to make anyone do. */}
+            <Link
+              to="/"
+              className="group mt-4 flex items-center gap-1.5 px-2 font-mono text-[11px] text-neutral-500 transition-colors hover:text-white"
+            >
+              <ArrowLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
+              Back to site
+            </Link>
 
             <nav className="mt-6 space-y-5">
               {nav.map((group, i) => (
                 <div key={group.label || i}>
                   {group.label && (
-                    <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+                    <div className="mb-1.5 px-3 font-mono text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
                       {group.label}
                     </div>
                   )}
@@ -184,15 +215,15 @@ const ManagerXpShell = ({ children }) => {
                           aria-current={active ? 'page' : undefined}
                           className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
                             active
-                              ? 'bg-red-500/10 text-white ring-1 ring-red-500/25'
+                              ? 'border border-red-500/25 bg-gradient-to-r from-red-500/15 to-transparent text-white'
                               : item.soon
-                                ? 'text-neutral-600 hover:bg-neutral-900 hover:text-neutral-400'
-                                : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                                ? 'border border-transparent text-neutral-600 hover:bg-white/[0.04] hover:text-neutral-400'
+                                : 'border border-transparent text-neutral-400 hover:bg-white/[0.04] hover:text-white'
                           }`}
                         >
                           <span>{item.label}</span>
                           {item.soon && (
-                            <span className="rounded bg-neutral-800 px-1 py-0.5 text-[9px] uppercase tracking-wide text-neutral-500">
+                            <span className="rounded border border-white/10 bg-white/[0.06] px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-neutral-500">
                               soon
                             </span>
                           )}
@@ -215,30 +246,39 @@ const ManagerXpShell = ({ children }) => {
           )}
 
           <div className="min-w-0 flex-1">
-            <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-neutral-800 bg-black/85 px-4 py-2.5 backdrop-blur sm:px-6">
+            <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-white/10 bg-black/80 px-4 py-2.5 backdrop-blur-xl sm:px-6">
               <button
                 type="button"
                 onClick={() => setNavOpen(true)}
-                className="rounded-lg border border-neutral-800 px-2.5 py-1.5 text-sm text-neutral-300 lg:hidden"
+                className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-neutral-300 transition-colors hover:text-white lg:hidden"
                 aria-label="Open navigation"
               >
-                ☰
+                <Menu className="h-4 w-4" />
               </button>
+
+              {/* The same three lights as the login card's strip — the visual
+                  cue that says "you are inside ManagerXP". */}
+              <div aria-hidden="true" className="hidden items-center gap-1.5 sm:flex">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              </div>
 
               <Breadcrumbs />
 
               <div className="ml-auto flex items-center gap-3">
                 <div className="hidden text-right sm:block">
                   <div className="text-xs font-medium text-neutral-300">{admin.name}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-neutral-600">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-600">
                     {admin.role_label || admin.role}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={signOut}
-                  className="rounded-lg border border-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-400 transition hover:border-red-500/40 hover:text-white"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-neutral-400 transition-colors hover:border-red-500/40 hover:text-white"
                 >
+                  <LogOut className="h-3.5 w-3.5" />
                   Sign out
                 </button>
               </div>
@@ -255,7 +295,7 @@ const ManagerXpShell = ({ children }) => {
 /* Derived from the path rather than passed down, so a new page gets working
    breadcrumbs without having to remember to declare them. */
 const LABELS = {
-  admin: 'ManagerXP', 'cafe-owners': 'Cafe Owners', organizations: 'Organizations',
+  admin: 'ManagerXP', gateways: 'Payment Gateway', 'payment-links': 'Payment Links', 'cafe-owners': 'Cafe Owners', organizations: 'Organizations',
   packages: 'Package Master', features: 'Feature Master', addons: 'Add-ons',
   'audit-logs': 'Audit Logs', branches: 'Branches', subscriptions: 'Subscriptions',
   payments: 'Payments', invoices: 'Invoices', installations: 'Installations',
@@ -268,7 +308,7 @@ const Breadcrumbs = () => {
   const { pathname } = useLocation();
   const parts = pathname.split('/').filter(Boolean);
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-neutral-500">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 font-mono text-xs text-neutral-500">
       {parts.map((part, i) => {
         const to = '/' + parts.slice(0, i + 1).join('/');
         const last = i === parts.length - 1;

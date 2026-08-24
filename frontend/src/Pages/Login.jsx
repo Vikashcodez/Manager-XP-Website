@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/AuthLayout';
 
@@ -9,12 +9,18 @@ const Login = () => {
   const location = useLocation();
   const { signIn, isLoading } = useAuth();
 
+  /* Signup sends the new account's address through so it is already filled in
+     — the one field somebody has definitely just typed correctly, and asking
+     for it twice in ten seconds is a step that serves nobody. */
   const [form, setForm] = useState({
-    email: '',
+    email: location.state?.email || '',
     password: '',
   });
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  /* Held in state rather than read from location on every render, so it
+     survives a failed sign-in attempt clearing the error beneath it. */
+  const [notice] = useState(location.state?.notice || '');
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -65,6 +71,12 @@ const Login = () => {
       }
     >
       <div aria-live="polite">
+        {notice && !error && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            {notice}
+          </div>
+        )}
         {error && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
