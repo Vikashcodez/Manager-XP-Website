@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import pool from '../config/database.js'; 
+import pool from '../config/database.js';
+import { recordAudit } from '../config/audit.js';
+import { customerStanding, outstandingFor } from '../config/customerTier.js';
 
 function normalizeAddress(address) {
   if (address && typeof address === 'object') {
@@ -225,7 +227,8 @@ export const login = async (req, res) => {
 
 const CUSTOMER_FIELDS = `
   c.customer_id, c.customer_name, c.email, c.phone_number,
-  c.address, c.created_at, c.updated_at
+  c.address, c.created_at, c.updated_at,
+  c.customer_type, c.discount_percent, c.credit_limit, c.tier_note
 `;
 
 const shapeCustomer = (row) => ({
@@ -236,6 +239,20 @@ const shapeCustomer = (row) => ({
   address: row.address,
   created_at: row.created_at,
   updated_at: row.updated_at,
+
+  /* Normal or regular, and what being a regular buys them. A normal
+     customer's figures are held at zero by a database constraint, so the
+     till can read these without first checking the type. */
+  customer_type: row.customer_type || 'NORMAL',
+  is_regular: (row.customer_type || 'NORMAL') === 'REGULAR',
+  discount_percent: Number(row.discount_percent) || 0,
+  credit_limit: Number(row.credit_limit) || 0,
+  can_pay_later: (row.customer_type || 'NORMAL') === 'REGULAR' && Number(row.credit_limit) > 0,
+  tier_note: row.tier_note || null,
+  /* Only present where the caller asked for it — listing every customer's
+     outstanding balance would be a query per row. */
+  outstanding: row.outstanding === undefined ? undefined : Number(row.outstanding),
+
   // Present whenever the wallet row exists; null means no wallet opened yet.
   wallet_balance: row.wallet_balance === null || row.wallet_balance === undefined
     ? null
@@ -255,6 +272,9 @@ const shapeCustomer = (row) => ({
 export const createCustomer = async (req, res) => {
   const client = await pool.connect();
   try {
+    /* From the token, never the request. A café id a client can send is a
+       café id it can send somebody else's. */
+    const cafeId = req.actor?.cafe_id ?? null;
     const name = (req.body?.customer_name || '').trim();
     const phone = (req.body?.phone_number || '').trim();
     const email = (req.body?.email || '').trim().toLowerCase();
@@ -284,8 +304,9 @@ export const createCustomer = async (req, res) => {
     const loginEmail = email || `${phone.replace(/\D/g, '')}@walkin.local`;
 
     const clash = await client.query(
-      'SELECT customer_id FROM customers WHERE email = $1 OR phone_number = $2',
-      [loginEmail, phone]
+      `SELECT customer_id FROM customers
+        WHERE (email = $1 OR phone_number = $2) AND cafe_id IS NOT DISTINCT FROM $3`,
+      [loginEmail, phone, cafeId]
     );
     if (clash.rows.length > 0) {
       return res.status(409).json({
@@ -298,10 +319,10 @@ export const createCustomer = async (req, res) => {
 
     const hashed = await bcrypt.hash(password || Math.random().toString(36).slice(2) + Date.now(), 10);
     const inserted = await client.query(
-      `INSERT INTO customers (customer_name, email, phone_number, password, address)
-       VALUES ($1,$2,$3,$4,$5)
+      `INSERT INTO customers (customer_name, email, phone_number, password, address, cafe_id)
+       VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING ${CUSTOMER_FIELDS.replace(/c\./g, '')}`,
-      [name, loginEmail, phone, hashed, address]
+      [name, loginEmail, phone, hashed, address, cafeId]
     );
     const customer = inserted.rows[0];
 
@@ -353,14 +374,17 @@ export const getCustomers = async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const search = (req.query.search || '').trim();
 
-    const params = [];
-    let where = '';
+    /* Scoped first and unconditionally. A café's customer list is names,
+       phone numbers and addresses of real people; it is never a search
+       filter that can be widened by leaving a parameter off. */
+    const params = [req.actor?.cafe_id ?? null];
+    let where = 'WHERE c.cafe_id IS NOT DISTINCT FROM $1';
 
     if (search) {
       // One box searches name, email and phone — how staff actually look
       // someone up at the counter.
       params.push(`%${search}%`);
-      where = `WHERE c.customer_name ILIKE $1 OR c.email ILIKE $1 OR c.phone_number ILIKE $1`;
+      where += ` AND (c.customer_name ILIKE $2 OR c.email ILIKE $2 OR c.phone_number ILIKE $2)`;
     }
 
     const listParams = [...params, limit, offset];
@@ -406,10 +430,12 @@ export const getCustomerById = async (req, res) => {
               w.currency AS wallet_currency
        FROM customers c
        LEFT JOIN wallets w ON w.customer_id = c.customer_id
-       WHERE c.customer_id = $1`,
-      [id]
+       WHERE c.customer_id = $1 AND c.cafe_id IS NOT DISTINCT FROM $2`,
+      [id, req.actor?.cafe_id ?? null]
     );
 
+    /* Another café's customer reads as absent rather than forbidden — a 403
+       here would confirm which customer ids exist elsewhere. */
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -418,5 +444,129 @@ export const getCustomerById = async (req, res) => {
   } catch (error) {
     console.error('Error fetching customer:', error);
     res.status(500).json({ success: false, message: 'Error fetching customer' });
+  }
+};
+
+/*
+ * PATCH /api/customers/:id/tier
+ *
+ * Promote a customer to a regular, or put them back to normal.
+ *
+ * Kept apart from a general customer update because it is not the same kind
+ * of edit: correcting a phone number is admin, granting somebody a standing
+ * discount and the right to owe the café money is a commercial decision. It
+ * is audited as one, and it needs its own permission rather than riding on
+ * whoever can fix a typo.
+ */
+export const setCustomerTier = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid customer id' });
+    }
+
+    const type = String(req.body?.customer_type || '').toUpperCase();
+    if (!['NORMAL', 'REGULAR'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Type must be NORMAL or REGULAR' });
+    }
+
+    /* Demoting clears the privileges rather than leaving them set but
+       inactive — the database refuses that shape anyway, and a stale 10%
+       reappearing if somebody is re-promoted months later is a surprise
+       nobody asked for. */
+    const discount = type === 'REGULAR' ? Number(req.body?.discount_percent ?? 0) : 0;
+    const credit = type === 'REGULAR' ? Number(req.body?.credit_limit ?? 0) : 0;
+    const note = type === 'REGULAR' && req.body?.tier_note
+      ? String(req.body.tier_note).slice(0, 255) : null;
+
+    if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
+      return res.status(400).json({ success: false, message: 'Discount must be between 0 and 100' });
+    }
+    if (!Number.isFinite(credit) || credit < 0) {
+      return res.status(400).json({ success: false, message: 'A credit limit cannot be negative' });
+    }
+
+    const cafeId = req.actor?.cafe_id ?? null;
+    const before = (await pool.query(
+      `SELECT customer_name, customer_type, discount_percent, credit_limit
+         FROM customers WHERE customer_id = $1 AND cafe_id IS NOT DISTINCT FROM $2`,
+      [id, cafeId]
+    )).rows[0];
+    if (!before) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    /* Dropping a limit below what they already owe is refused rather than
+       silently leaving them over it — the café should settle the tab first,
+       and being told so is more useful than a customer who is mysteriously
+       barred at the till later. */
+    if (type === 'REGULAR' && credit > 0) {
+      const owed = await outstandingFor(pool, id, cafeId);
+      if (owed > credit) {
+        return res.status(409).json({
+          success: false,
+          message: `They already owe ${owed}. Settle that first, or set a limit of at least ${owed}.`
+        });
+      }
+    }
+
+    const updated = await pool.query(
+      `UPDATE customers
+          SET customer_type = $1, discount_percent = $2, credit_limit = $3,
+              tier_note = $4, updated_at = CURRENT_TIMESTAMP
+        WHERE customer_id = $5 AND cafe_id IS NOT DISTINCT FROM $6
+        RETURNING *`,
+      [type, discount, credit, note, id, cafeId]
+    );
+
+    await recordAudit(req, {
+      action: 'customer.tier',
+      category: 'customers',
+      entity: 'customer',
+      entity_id: id,
+      // Granting credit is a financial decision; an owner should see it.
+      sensitive: type === 'REGULAR' && credit > 0,
+      summary: type === 'REGULAR'
+        ? `Made ${before.customer_name} a regular — ${discount}% off, ${credit} credit limit`
+        : `Returned ${before.customer_name} to a normal customer`,
+      meta: {
+        from: { type: before.customer_type, discount: before.discount_percent, credit: before.credit_limit },
+        to: { type, discount, credit }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: type === 'REGULAR' ? 'Customer is now a regular' : 'Customer set back to normal',
+      data: shapeCustomer(updated.rows[0])
+    });
+  } catch (error) {
+    console.error('Error setting customer tier:', error);
+    res.status(500).json({ success: false, message: 'Could not change the customer type' });
+  }
+};
+
+/** GET /api/customers/:id/credit — what they owe and what is left to them. */
+export const getCustomerCredit = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const cafeId = req.actor?.cafe_id ?? null;
+    const standing = await customerStanding(pool, id);
+    const owed = await outstandingFor(pool, id, cafeId);
+    res.status(200).json({
+      success: true,
+      data: {
+        customer_type: standing.type,
+        discount_percent: standing.percent,
+        discount_label: standing.label,
+        credit_limit: standing.creditLimit,
+        outstanding: owed,
+        remaining: Math.max(0, Number((standing.creditLimit - owed).toFixed(2))),
+        can_pay_later: standing.canPayLater && owed < standing.creditLimit
+      }
+    });
+  } catch (error) {
+    console.error('Error reading customer credit:', error);
+    res.status(500).json({ success: false, message: 'Could not read their credit standing' });
   }
 };

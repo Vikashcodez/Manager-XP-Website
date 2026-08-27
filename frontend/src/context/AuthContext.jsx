@@ -192,6 +192,27 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
+   * Finish a "Sign in with Google" round trip.
+   *
+   * The backend has already done the real work — verified the Google identity,
+   * found or made the account, and minted an ordinary owner token — and handed
+   * both back through the callback URL. This just adopts them the same way
+   * `login` does, so a Google session is indistinguishable from a password one
+   * everywhere downstream.
+   */
+  const completeGoogleLogin = (nextToken, rawUser) => {
+    if (!nextToken) throw new Error('No sign-in token was returned');
+    const nextUser = normalizeUser(rawUser);
+    adminAuth.signOut();
+    portalAuth.setToken(nextToken);
+    setUser(nextUser);
+    setToken(nextToken);
+    setKind('owner');
+    setPermissions([]);
+    return nextUser;
+  };
+
+  /**
    * Store sign-in: a café's own staff (cashier, attendant, manager).
    * Their permissions come back with the token and are enforced server-side —
    * what is stored here only decides what the UI bothers to offer.
@@ -316,6 +337,7 @@ export const AuthProvider = ({ children }) => {
       isLoading,
       signIn,
       login,
+      completeGoogleLogin,
       staffLogin,
       register,
       logout,

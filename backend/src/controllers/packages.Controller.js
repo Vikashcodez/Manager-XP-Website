@@ -98,10 +98,11 @@ export const createPackage = async (req, res) => {
       ? String(req.body.status).toUpperCase() : 'ACTIVE';
 
     const result = await pool.query(
-      `INSERT INTO packages (package_name, description, package_type, units, bonus_units,
+      `INSERT INTO packages (cafe_id, package_name, description, package_type, units, bonus_units,
                              price, currency, validity_days, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [parsed.name, req.body?.description || null, parsed.type, parsed.units, parsed.bonus,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [req.actor?.cafe_id ?? null,
+       parsed.name, req.body?.description || null, parsed.type, parsed.units, parsed.bonus,
        parsed.price, currency, parsed.validity, status]
     );
 
@@ -128,7 +129,9 @@ export const listPackages = async (req, res) => {
       params.push(`%${String(req.query.search).trim()}%`);
       filters.push(`p.package_name ILIKE $${params.length}`);
     }
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    /* Always scoped: a package list is a price list. */
+    const where = `WHERE p.cafe_id IS NOT DISTINCT FROM $${params.push(req.actor?.cafe_id ?? null)}` +
+      (filters.length ? ` AND ${filters.join(' AND ')}` : '');
 
     const result = await pool.query(
       `SELECT p.*, COUNT(cp.customer_package_id)::int AS sold_count
@@ -162,9 +165,9 @@ export const updatePackage = async (req, res) => {
        SET package_name = $1, description = $2, package_type = $3, units = $4,
            bonus_units = $5, price = $6, validity_days = $7,
            status = COALESCE($8::varchar, status), updated_at = CURRENT_TIMESTAMP
-       WHERE package_id = $9 RETURNING *`,
+       WHERE package_id = $9 AND cafe_id IS NOT DISTINCT FROM $10 RETURNING *`,
       [parsed.name, req.body?.description || null, parsed.type, parsed.units, parsed.bonus,
-       parsed.price, parsed.validity, status, id]
+       parsed.price, parsed.validity, status, id, req.actor?.cafe_id ?? null]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Package not found' });
@@ -189,8 +192,8 @@ export const setPackageStatus = async (req, res) => {
     }
     const result = await pool.query(
       `UPDATE packages SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE package_id = $2 RETURNING *`,
-      [status, parseInt(req.params.id, 10)]
+       WHERE package_id = $2 AND cafe_id IS NOT DISTINCT FROM $3 RETURNING *`,
+      [status, parseInt(req.params.id, 10), req.actor?.cafe_id ?? null]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Package not found' });
@@ -220,7 +223,8 @@ export const deletePackage = async (req, res) => {
         message: `This package has been sold ${sold.rows[0].count} time(s). Deactivate it instead.`
       });
     }
-    const result = await pool.query('DELETE FROM packages WHERE package_id = $1 RETURNING package_id', [id]);
+    const result = await pool.query(`DELETE FROM packages WHERE package_id = $1 AND cafe_id IS NOT DISTINCT FROM $2
+        RETURNING package_id`, [id, req.actor?.cafe_id ?? null]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Package not found' });
     }
@@ -248,7 +252,8 @@ export const purchasePackage = async (req, res) => {
 
     await client.query('BEGIN');
 
-    const pkg = await client.query('SELECT * FROM packages WHERE package_id = $1', [packageId]);
+    const pkg = await client.query(`SELECT * FROM packages WHERE package_id = $1 AND cafe_id IS NOT DISTINCT FROM $2`,
+      [packageId, req.actor?.cafe_id ?? null]);
     if (pkg.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Package not found' });

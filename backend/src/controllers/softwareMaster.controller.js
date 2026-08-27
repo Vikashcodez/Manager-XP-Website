@@ -5,6 +5,7 @@ import path from 'path';
 import { fileTypeFromFile } from 'file-type';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { categoryJoin, categoryExpr, categoryIsOverridden } from '../config/softwareCategory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -175,21 +176,37 @@ export const getAllSoftware = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
-    // Get total count
+    /*
+     * The published catalogue plus this café's own house activities.
+     *
+     * cafe_id IS NULL is the catalogue ManagerXP publishes and every café
+     * draws from — shared on purpose, and where the admin side maintains the
+     * artwork. A row carrying a cafe_id is somebody's pool table, and only
+     * its owner has any business seeing it.
+     */
+    const cafeId = req.actor?.cafe_id ?? null;
+    const scope = `sm.is_active = true AND (sm.cafe_id IS NULL OR sm.cafe_id = $1)`;
+
     const countResult = await pool.query(
-      'SELECT COUNT(*) FROM software_master WHERE is_active = true'
+      `SELECT COUNT(*) FROM software_master sm WHERE ${scope}`,
+      [cafeId]
     );
     const totalCount = parseInt(countResult.rows[0].count);
-    
-    // Get paginated data
+
+    /* Category resolves through this branch's own filing — see
+       config/softwareCategory.js. cafe_id is echoed back so the console can
+       tell a published title from this branch's own activity. */
     const result = await pool.query(
-      `SELECT software_id, software_name, software_icon, software_video,
-              category, is_house, is_active, created_at, updated_at
-       FROM software_master
-       WHERE is_active = true
-       ORDER BY created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      `SELECT sm.software_id, sm.software_name, sm.software_icon, sm.software_video,
+              ${categoryExpr()} AS category,
+              ${categoryIsOverridden()} AS category_is_local,
+              sm.is_house, sm.is_active, sm.cafe_id, sm.created_at, sm.updated_at
+       FROM software_master sm
+       ${categoryJoin(1)}
+       WHERE ${scope}
+       ORDER BY sm.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [cafeId, limit, offset]
     );
     
     res.status(200).json({
@@ -218,14 +235,22 @@ export const getAllSoftware = async (req, res) => {
  * somebody typed on a game, so the list cannot drift out of step with reality
  * and there is no orphaned "Darts" left behind after the last dartboard goes.
  */
-export const getSoftwareCategories = async (_req, res) => {
+export const getSoftwareCategories = async (req, res) => {
   try {
+    // Same visibility rule as the list — otherwise the category counts quietly
+    // reveal that other cafés exist and roughly what they run.
+    /* Grouped on the *resolved* category, so a title this branch re-filed
+       counts under the branch's own name and not the published one. */
     const result = await pool.query(
-      `SELECT category, COUNT(*)::int AS software_count
-         FROM software_master
-        WHERE is_active = true AND category IS NOT NULL
-        GROUP BY category
-        ORDER BY category ASC`
+      `SELECT ${categoryExpr()} AS category, COUNT(*)::int AS software_count
+         FROM software_master sm
+         ${categoryJoin(1)}
+        WHERE sm.is_active = true
+          AND ${categoryExpr()} IS NOT NULL
+          AND (sm.cafe_id IS NULL OR sm.cafe_id = $1)
+        GROUP BY ${categoryExpr()}
+        ORDER BY 1 ASC`,
+      [req.actor?.cafe_id ?? null]
     );
 
     res.status(200).json({ success: true, data: result.rows });
@@ -263,10 +288,15 @@ export const createHouseActivity = async (req, res) => {
 
     /* A duplicate name would give the till two identical tiles with different
        prices behind them, which is a mis-charge waiting to happen. */
+    /* Only against what this café can see. Checking the whole table would let
+       one café's "Pool Table" block every other café from ever creating one,
+       and would confirm the name is in use somewhere they cannot look. */
+    const cafeId = req.actor?.cafe_id ?? null;
     const clash = await pool.query(
       `SELECT software_id FROM software_master
-        WHERE LOWER(software_name) = LOWER($1) AND is_active = true`,
-      [name]
+        WHERE LOWER(software_name) = LOWER($1) AND is_active = true
+          AND (cafe_id IS NULL OR cafe_id = $2)`,
+      [name, cafeId]
     );
     if (clash.rows.length) {
       return res.status(409).json({
@@ -276,10 +306,10 @@ export const createHouseActivity = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO software_master (software_name, category, is_house)
-       VALUES ($1, $2, TRUE)
+      `INSERT INTO software_master (software_name, category, is_house, cafe_id)
+       VALUES ($1, $2, TRUE, $3)
        RETURNING *`,
-      [name, category]
+      [name, category, cafeId]
     );
 
     res.status(201).json({ success: true, message: 'Activity added', data: result.rows[0] });
@@ -293,8 +323,11 @@ export const createHouseActivity = async (req, res) => {
 export const updateHouseActivity = async (req, res) => {
   try {
     const { id } = req.params;
+    // Scoped in the lookup: another café's activity is simply not there.
     const existing = await pool.query(
-      'SELECT * FROM software_master WHERE software_id = $1', [id]
+      `SELECT * FROM software_master
+        WHERE software_id = $1 AND (cafe_id IS NULL OR cafe_id = $2)`,
+      [id, req.actor?.cafe_id ?? null]
     );
     if (!existing.rows.length) {
       return res.status(404).json({ success: false, message: 'Activity not found' });
@@ -320,9 +353,9 @@ export const updateHouseActivity = async (req, res) => {
     const result = await pool.query(
       `UPDATE software_master
           SET software_name = $1, category = $2, updated_at = CURRENT_TIMESTAMP
-        WHERE software_id = $3
+        WHERE software_id = $3 AND cafe_id IS NOT DISTINCT FROM $4
         RETURNING *`,
-      [name, category, id]
+      [name, category, id, req.actor?.cafe_id ?? null]
     );
 
     res.status(200).json({ success: true, message: 'Activity updated', data: result.rows[0] });
@@ -336,8 +369,11 @@ export const updateHouseActivity = async (req, res) => {
 export const deleteHouseActivity = async (req, res) => {
   try {
     const { id } = req.params;
+    const cafeId = req.actor?.cafe_id ?? null;
     const existing = await pool.query(
-      'SELECT * FROM software_master WHERE software_id = $1', [id]
+      `SELECT * FROM software_master
+        WHERE software_id = $1 AND (cafe_id IS NULL OR cafe_id = $2)`,
+      [id, cafeId]
     );
     if (!existing.rows.length) {
       return res.status(404).json({ success: false, message: 'Activity not found' });
@@ -351,8 +387,8 @@ export const deleteHouseActivity = async (req, res) => {
 
     const result = await pool.query(
       `UPDATE software_master SET is_active = false, updated_at = CURRENT_TIMESTAMP
-        WHERE software_id = $1 RETURNING *`,
-      [id]
+        WHERE software_id = $1 AND cafe_id IS NOT DISTINCT FROM $2 RETURNING *`,
+      [id, cafeId]
     );
     res.status(200).json({ success: true, message: 'Activity retired', data: result.rows[0] });
   } catch (error) {
@@ -374,18 +410,70 @@ export const setSoftwareCategory = async (req, res) => {
     const { id } = req.params;
     const category = cleanCategory(req.body.category);
 
-    const result = await pool.query(
-      `UPDATE software_master
-          SET category = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE software_id = $2 AND is_active = true
-        RETURNING software_id, software_name, category, is_house`,
-      [category, id]
-    );
+    const cafeId = req.actor?.cafe_id ?? null;
 
-    if (!result.rows.length) {
+    const title = await pool.query(
+      `SELECT software_id, software_name, category, is_house, cafe_id
+         FROM software_master
+        WHERE software_id = $1 AND is_active = true
+          AND (cafe_id IS NULL OR cafe_id = $2)`,
+      [id, cafeId]
+    );
+    if (!title.rows.length) {
       return res.status(404).json({ success: false, message: 'Title not found' });
     }
-    res.status(200).json({ success: true, message: 'Category updated', data: result.rows[0] });
+    const row = title.rows[0];
+
+    /*
+     * Where the category is written depends on who owns the title.
+     *
+     * This branch's own activity: straight onto the row, because nobody else
+     * can see it. A published title: into this branch's overrides, because
+     * the row is shared and writing to it re-files the same title on every
+     * other café — which is exactly what this used to do.
+     *
+     * Clearing the category on a published title removes the override rather
+     * than storing a blank, so the branch falls back to the published default
+     * instead of ending up with a title filed under nothing.
+     */
+    if (row.is_house && row.cafe_id !== null) {
+      await pool.query(
+        `UPDATE software_master SET category = $1, updated_at = CURRENT_TIMESTAMP
+          WHERE software_id = $2 AND cafe_id IS NOT DISTINCT FROM $3`,
+        [category, id, cafeId]
+      );
+    } else if (cafeId === null) {
+      return res.status(403).json({
+        success: false,
+        message: 'Sign in to a café to file titles into your own categories'
+      });
+    } else if (category) {
+      await pool.query(
+        `INSERT INTO software_category_overrides (cafe_id, software_id, category, updated_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (cafe_id, software_id)
+         DO UPDATE SET category = EXCLUDED.category, updated_at = CURRENT_TIMESTAMP`,
+        [cafeId, id, category]
+      );
+    } else {
+      await pool.query(
+        `DELETE FROM software_category_overrides WHERE cafe_id = $1 AND software_id = $2`,
+        [cafeId, id]
+      );
+    }
+
+    const fresh = await pool.query(
+      `SELECT sm.software_id, sm.software_name,
+              ${categoryExpr()} AS category,
+              ${categoryIsOverridden()} AS category_is_local,
+              sm.is_house
+         FROM software_master sm
+         ${categoryJoin(2)}
+        WHERE sm.software_id = $1`,
+      [id, cafeId]
+    );
+
+    res.status(200).json({ success: true, message: 'Category updated', data: fresh.rows[0] });
   } catch (error) {
     console.error('Error setting category:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
@@ -398,11 +486,15 @@ export const getSoftwareById = async (req, res) => {
     const { id } = req.params;
     
     const result = await pool.query(
-      `SELECT software_id, software_name, software_icon, software_video,
-              category, is_house, is_active, created_at, updated_at
-       FROM software_master
-       WHERE software_id = $1 AND is_active = true`,
-      [id]
+      `SELECT sm.software_id, sm.software_name, sm.software_icon, sm.software_video,
+              ${categoryExpr()} AS category,
+              ${categoryIsOverridden()} AS category_is_local,
+              sm.is_house, sm.is_active, sm.cafe_id, sm.created_at, sm.updated_at
+       FROM software_master sm
+       ${categoryJoin(2)}
+       WHERE sm.software_id = $1 AND sm.is_active = true
+         AND (sm.cafe_id IS NULL OR sm.cafe_id = $2)`,
+      [id, req.actor?.cafe_id ?? null]
     );
     
     if (result.rows.length === 0) {

@@ -87,7 +87,8 @@ export const getSubscription = async (organizationId) => {
     SELECT s.*,
            p.code AS plan_code, p.name AS plan_name, p.is_freetrial,
            p.max_pcs AS plan_max_pcs, p.max_branches AS plan_max_branches,
-           p.max_users AS plan_max_users, p.max_installations AS plan_max_installations
+           p.max_users AS plan_max_users, p.max_installations AS plan_max_installations,
+           p.station_limits AS plan_station_limits
     FROM subscriptions s
     LEFT JOIN subscription_plans p ON p.sub_id = s.sub_id
     WHERE s.organization_id = $1
@@ -155,8 +156,33 @@ export const getSubscription = async (organizationId) => {
       max_pcs:           limit(sub.max_pcs,           sub.plan_max_pcs,           maxPcs,           addonGrants.pcs),
       max_users:         limit(sub.max_users,         sub.plan_max_users,         maxUsers,         addonGrants.users),
       max_installations: limit(sub.max_installations, sub.plan_max_installations, maxInstallations, addonGrants.installations)
-    }
+    },
+    /* Per-type station ceilings. A whole-map override on the subscription
+       replaces the plan's map (not a per-key merge) — so a customer given a
+       custom set gets exactly that set, with no plan keys leaking back in. An
+       absent/empty map means no type is capped beyond max_pcs. */
+    station_limits: normalizeStationLimits(sub.station_limits ?? sub.plan_station_limits)
   };
+};
+
+/*
+ * Coerce a stored station_limits value into a clean { CATEGORY: positiveInt }
+ * map. Guards the enforcement path against a hand-edited row, a stringified
+ * JSON, or stray non-numeric/zero entries — a zero or a negative is dropped
+ * rather than treated as "cap of zero", which would lock a café out of a whole
+ * station type by accident.
+ */
+export const normalizeStationLimits = (raw) => {
+  let obj = raw;
+  if (typeof raw === 'string') { try { obj = JSON.parse(raw); } catch { obj = null; } }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const out = {};
+  for (const [key, val] of Object.entries(obj)) {
+    const name = String(key).trim();
+    const n = Math.floor(Number(val));
+    if (name && Number.isFinite(n) && n > 0) out[name] = n;
+  }
+  return out;
 };
 
 /* ==========================================================================
@@ -416,6 +442,51 @@ export const checkLimit = async (organizationId, kind) => {
   }
 
   return { ok: true, used: map.used, max: map.max };
+};
+
+/**
+ * Is there room for one more station of a given type?
+ *
+ * The per-type cap sits on top of the overall max_pcs (which its own callers
+ * still enforce). A type with no entry in station_limits is uncapped here and
+ * bounded only by that total, so this returns ok for it. `excludePcId` lets a
+ * category change on an existing station not count itself.
+ *
+ * Returns the same refusal shape as checkLimit so a caller can answer with a
+ * sentence naming the type and the number.
+ */
+export const checkStationLimit = async (organizationId, category, excludePcId = null) => {
+  const name = String(category || '').trim();
+  if (!name) return { ok: true };
+
+  const subscription = await getSubscription(organizationId);
+  if (!subscription) return { ok: false, message: 'This account has no active subscription' };
+
+  const max = subscription.station_limits[name];
+  if (max == null) return { ok: true };     // this type is not capped
+
+  /* Active gaming PCs of this type, this organization. Counted at the moment
+     of the check under the same rules getUsage counts the overall total. */
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS used FROM pcs
+      WHERE organization_id = $1 AND is_active AND device_type = 'GAMING_PC'
+        AND category = $2 AND ($3::int IS NULL OR pc_id <> $3::int)`,
+    [organizationId, name, excludePcId]
+  );
+  const used = rows[0].used;
+
+  if (used >= max) {
+    return {
+      ok: false,
+      reason: 'station_limit_reached',
+      message: `You have reached your limit of ${max} ${name} station${max === 1 ? '' : 's'} on this plan. ` +
+        'Upgrade your subscription or purchase additional capacity.',
+      category: name,
+      used,
+      max
+    };
+  }
+  return { ok: true, category: name, used, max };
 };
 
 /**

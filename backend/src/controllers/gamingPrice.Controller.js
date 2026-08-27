@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { categoryJoin, categoryExpr } from '../config/softwareCategory.js';
 
 /*
  * Gaming Price Master — one price per game + session pair.
@@ -11,11 +12,33 @@ import pool from '../config/database.js';
 
 const STATUSES = ['ACTIVE', 'INACTIVE'];
 
-const SELECT_PRICE = `
+/*
+ * Whose prices these are.
+ *
+ * Taken from the authenticated token, never from the request body — a café id
+ * a client can set is a café id an attacker can set, and here that would mean
+ * reading or rewriting a competitor's rate card.
+ *
+ * A price belonging to another café is reported as simply absent rather than
+ * refused, so this endpoint cannot be used to confirm what another café has
+ * configured.
+ */
+const cafeOf = (req) => req.actor?.cafe_id ?? null;
+
+/*
+ * The price row plus its display joins.
+ *
+ * Takes the parameter position holding the café id, because callers build
+ * their parameter lists differently — a lookup leads with the ids it was
+ * given, a list leads with the café. Passing the index rather than assuming
+ * $1 is what lets the branch's own category filing resolve correctly in every
+ * one of them instead of only the two that happened to put it first.
+ */
+const selectPrice = (cafeParamIndex) => `
   SELECT gp.*,
          sm.software_name,
          sm.software_icon,
-         sm.category             AS software_category,
+         ${categoryExpr()}       AS software_category,
          sm.is_active            AS software_active,
          s.session_name,
          s.duration_type,
@@ -25,6 +48,7 @@ const SELECT_PRICE = `
   FROM gaming_prices gp
   JOIN software_master sm ON sm.software_id = gp.software_id
   JOIN session_master  s  ON s.id = gp.session_master_id
+  ${categoryJoin(cafeParamIndex)}
 `;
 
 const shape = (row) => ({
@@ -59,10 +83,15 @@ const shape = (row) => ({
  * Both references must exist and be active — a price against a retired game or
  * a withdrawn session would never be sellable.
  */
-const checkReferences = async (client, softwareId, sessionId) => {
+const checkReferences = async (client, softwareId, sessionId, cafeId) => {
+  /* Scoped to what this café can actually see. Pricing another café's house
+     activity would create a row referencing something its owner can neither
+     find nor edit, so an out-of-scope reference is "not found", not an error
+     that hints the row exists elsewhere. */
   const software = await client.query(
-    'SELECT software_id, software_name, is_active FROM software_master WHERE software_id = $1',
-    [softwareId]
+    `SELECT software_id, software_name, is_active FROM software_master sm
+      WHERE software_id = $1 AND (sm.cafe_id IS NULL OR sm.cafe_id = $2)`,
+    [softwareId, cafeId]
   );
   if (software.rows.length === 0) return { error: 'Game not found', status: 404 };
   if (software.rows[0].is_active === false) {
@@ -70,8 +99,9 @@ const checkReferences = async (client, softwareId, sessionId) => {
   }
 
   const session = await client.query(
-    'SELECT id, session_name, status FROM session_master WHERE id = $1',
-    [sessionId]
+    `SELECT id, session_name, status FROM session_master s
+      WHERE id = $1 AND (s.cafe_id IS NULL OR s.cafe_id = $2)`,
+    [sessionId, cafeId]
   );
   if (session.rows.length === 0) return { error: 'Session not found', status: 404 };
   if (session.rows[0].status !== 'ACTIVE') {
@@ -107,7 +137,8 @@ export const createPrice = async (req, res) => {
     const parsed = parsePrice(req.body?.price);
     if (parsed.error) return res.status(400).json({ success: false, message: parsed.error });
 
-    const refs = await checkReferences(client, softwareId, sessionId);
+    const cafeId = cafeOf(req);
+    const refs = await checkReferences(client, softwareId, sessionId, cafeId);
     if (refs.error) return res.status(refs.status).json({ success: false, message: refs.error });
 
     const currency = (req.body?.currency || 'INR').toUpperCase().slice(0, 8);
@@ -116,12 +147,12 @@ export const createPrice = async (req, res) => {
       : 'ACTIVE';
 
     const inserted = await client.query(
-      `INSERT INTO gaming_prices (software_id, session_master_id, price, currency, status)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [softwareId, sessionId, parsed.price, currency, status]
+      `INSERT INTO gaming_prices (cafe_id, software_id, session_master_id, price, currency, status)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [cafeId, softwareId, sessionId, parsed.price, currency, status]
     );
 
-    const full = await client.query(`${SELECT_PRICE} WHERE gp.id = $1`, [inserted.rows[0].id]);
+    const full = await client.query(`${selectPrice(2)} WHERE gp.id = $1`, [inserted.rows[0].id, cafeId]);
     res.status(201).json({ success: true, message: 'Price saved', data: shape(full.rows[0]) });
   } catch (error) {
     if (error.code === '23505') {
@@ -143,8 +174,11 @@ export const listPrices = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+    /* First filter, always applied: only this café's prices. Not optional and
+       not driven by a query parameter, so there is no request that widens it. */
     const filters = [];
-    const params = [];
+    const params = [cafeOf(req)];
+    filters.push(`gp.cafe_id IS NOT DISTINCT FROM $1`);
 
     if (req.query.software_id) {
       params.push(parseInt(req.query.software_id, 10));
@@ -163,11 +197,11 @@ export const listPrices = async (req, res) => {
       filters.push(`(sm.software_name ILIKE $${params.length} OR s.session_name ILIKE $${params.length})`);
     }
 
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const where = `WHERE ${filters.join(' AND ')}`;
     const listParams = [...params, limit, offset];
 
     const result = await pool.query(
-      `${SELECT_PRICE} ${where}
+      `${selectPrice(1)} ${where}
        ORDER BY sm.software_name ASC,
          CASE WHEN s.duration_minutes IS NULL THEN 1 ELSE 0 END,
          s.duration_minutes ASC
@@ -209,8 +243,10 @@ export const lookupPrice = async (req, res) => {
     }
 
     const result = await pool.query(
-      `${SELECT_PRICE} WHERE gp.software_id = $1 AND gp.session_master_id = $2`,
-      [softwareId, sessionId]
+      `${selectPrice(3)}
+        WHERE gp.software_id = $1 AND gp.session_master_id = $2
+          AND gp.cafe_id IS NOT DISTINCT FROM $3`,
+      [softwareId, sessionId, cafeOf(req)]
     );
 
     if (result.rows.length === 0) {
@@ -234,7 +270,10 @@ export const getPriceById = async (req, res) => {
     if (!Number.isInteger(id)) {
       return res.status(400).json({ success: false, message: 'Invalid price id' });
     }
-    const result = await pool.query(`${SELECT_PRICE} WHERE gp.id = $1`, [id]);
+    const result = await pool.query(
+      `${selectPrice(2)} WHERE gp.id = $1 AND gp.cafe_id IS NOT DISTINCT FROM $2`,
+      [id, cafeOf(req)]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Price not found' });
     }
@@ -254,7 +293,11 @@ export const updatePrice = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid price id' });
     }
 
-    const existing = await client.query('SELECT * FROM gaming_prices WHERE id = $1', [id]);
+    const cafeId = cafeOf(req);
+    const existing = await client.query(
+      'SELECT * FROM gaming_prices WHERE id = $1 AND cafe_id IS NOT DISTINCT FROM $2',
+      [id, cafeId]
+    );
     if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Price not found' });
     }
@@ -270,7 +313,7 @@ export const updatePrice = async (req, res) => {
 
     // Only re-check the masters when the pair actually moves.
     if (Number(softwareId) !== current.software_id || Number(sessionId) !== current.session_master_id) {
-      const refs = await checkReferences(client, Number(softwareId), Number(sessionId));
+      const refs = await checkReferences(client, Number(softwareId), Number(sessionId), cafeId);
       if (refs.error) return res.status(refs.status).json({ success: false, message: refs.error });
     }
 
@@ -283,11 +326,11 @@ export const updatePrice = async (req, res) => {
       `UPDATE gaming_prices
        SET software_id = $1, session_master_id = $2, price = $3, currency = $4,
            status = $5, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6`,
-      [Number(softwareId), Number(sessionId), parsed.price, currency, status, id]
+       WHERE id = $6 AND cafe_id IS NOT DISTINCT FROM $7`,
+      [Number(softwareId), Number(sessionId), parsed.price, currency, status, id, cafeId]
     );
 
-    const full = await client.query(`${SELECT_PRICE} WHERE gp.id = $1`, [id]);
+    const full = await client.query(`${selectPrice(2)} WHERE gp.id = $1`, [id, cafeId]);
     res.status(200).json({ success: true, message: 'Price updated', data: shape(full.rows[0]) });
   } catch (error) {
     if (error.code === '23505') {
@@ -314,14 +357,14 @@ export const setPriceStatus = async (req, res) => {
 
     const updated = await pool.query(
       `UPDATE gaming_prices SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 RETURNING id`,
-      [status, id]
+       WHERE id = $2 AND cafe_id IS NOT DISTINCT FROM $3 RETURNING id`,
+      [status, id, cafeOf(req)]
     );
     if (updated.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Price not found' });
     }
 
-    const full = await pool.query(`${SELECT_PRICE} WHERE gp.id = $1`, [id]);
+    const full = await pool.query(`${selectPrice(2)} WHERE gp.id = $1`, [id, cafeId]);
     res.status(200).json({
       success: true,
       message: status === 'ACTIVE' ? 'Price activated' : 'Price deactivated',
@@ -337,7 +380,10 @@ export const setPriceStatus = async (req, res) => {
 export const deletePrice = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const result = await pool.query('DELETE FROM gaming_prices WHERE id = $1 RETURNING id', [id]);
+    const result = await pool.query(
+      'DELETE FROM gaming_prices WHERE id = $1 AND cafe_id IS NOT DISTINCT FROM $2 RETURNING id',
+      [id, cafeOf(req)]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Price not found' });
     }
@@ -354,15 +400,25 @@ export const deletePrice = async (req, res) => {
  */
 export const priceMatrix = async (req, res) => {
   try {
+    // The shared catalogue plus this café's own additions — never a neighbour's.
+    const cafeId = cafeOf(req);
     const games = await pool.query(
       `SELECT software_id, software_name, software_icon
-       FROM software_master WHERE is_active = TRUE ORDER BY software_name ASC`
+       FROM software_master sm
+       WHERE is_active = TRUE AND (sm.cafe_id IS NULL OR sm.cafe_id = $1)
+       ORDER BY software_name ASC`,
+      [cafeId]
     );
     const sessions = await pool.query(
-      `SELECT * FROM session_master WHERE status = 'ACTIVE'
-       ORDER BY CASE WHEN duration_minutes IS NULL THEN 1 ELSE 0 END, duration_minutes ASC`
+      `SELECT * FROM session_master s
+       WHERE status = 'ACTIVE' AND (s.cafe_id IS NULL OR s.cafe_id = $1)
+       ORDER BY CASE WHEN duration_minutes IS NULL THEN 1 ELSE 0 END, duration_minutes ASC`,
+      [cafeId]
     );
-    const prices = await pool.query(`${SELECT_PRICE} WHERE gp.status = 'ACTIVE'`);
+    const prices = await pool.query(
+      `${selectPrice(1)} WHERE gp.status = 'ACTIVE' AND gp.cafe_id IS NOT DISTINCT FROM $1`,
+      [cafeId]
+    );
 
     res.status(200).json({
       success: true,

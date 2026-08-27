@@ -138,14 +138,33 @@ export const createPcSoftware = async (req, res) => {
     
     // Check if PC exists before inserting
     const pcCheck = await pool.query(
-      'SELECT pc_id FROM pcs WHERE pc_id = $1',
+      'SELECT pc_id, name, ip_address FROM pcs WHERE pc_id = $1',
       [pc_id]
     );
-    
+
     if (pcCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: `PC with ID ${pc_id} not found in database`
+      });
+    }
+
+    /*
+     * Software belongs to stations that run the client agent.
+     *
+     * A station registered without an IP address is something the café sells
+     * time on but never talks to — a pool table, a console, a VR rig. There
+     * is no agent to launch an executable and no filesystem to hold a path,
+     * so a row here could never do anything except mislead whoever read it.
+     *
+     * Enforced on the server as well as hidden in the console, because the
+     * console is not the only thing that can call this.
+     */
+    if (!pcCheck.rows[0].ip_address) {
+      return res.status(409).json({
+        success: false,
+        message: `${pcCheck.rows[0].name} has no network address, so it cannot run software. ` +
+                 `Stations like pool tables and consoles are sold by the hour instead.`
       });
     }
     

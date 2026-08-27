@@ -485,6 +485,6 @@ export const initializeCatalogue = async (client) => {
       ('trial.plan_code', 'TRIAL', 'string', 'trial', 'Package code a new trial is issued against'),
       ('entitlements.offline_grace_hours', '72', 'number', 'entitlements',
        'How long CafeXP keeps running on its last successful authorisation')
-    ON CONFLICT (setting_key) DO NOTHING
+    ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
   `);
 };

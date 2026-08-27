@@ -5,11 +5,12 @@ import {
   createPermission, deletePermission
 } from '../controllers/staff.Controller.js';
 import { requireStaff, requireAuth, requirePermission } from '../middleware/authGuards.js';
+import { loginLimiter } from '../middleware/rateLimit.js';
 
 const staffRouter = express.Router();
 
 // Public: staff sign in here.
-staffRouter.post('/login', staffLogin);
+staffRouter.post('/login', loginLimiter, staffLogin);
 
 // Any authenticated principal can ask what it is allowed to do — the admin UI
 // uses this to hide what the signed-in person cannot use.

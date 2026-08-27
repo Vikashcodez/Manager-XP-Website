@@ -37,17 +37,42 @@ const GROUPS = [
   { key: 'admin', label: 'Admin security', lede: 'Sign-in limits for ManagerXP administrators.' }
 ];
 
-const shape = (row) => ({
-  key: row.setting_key,
-  value: row.is_secret ? null : row.setting_value,
-  is_secret: row.is_secret,
-  /* For a secret the only fact worth returning: whether one is stored. */
-  is_set: row.is_secret ? !!row.setting_value : row.setting_value !== null,
-  type: row.value_type,
-  category: row.category,
-  description: row.description,
-  updated_at: row.updated_at
-});
+/*
+ * Mail settings that `.env` can override on this deployment.
+ *
+ * The mailbox this instance actually sends from — ManagerXP's own — lives in
+ * `.env`, not in this table; see mailer.js. Editing the row here would look
+ * as though it changed something and change nothing, which is worse than the
+ * field simply being absent, so the settings screen is told which keys that
+ * applies to and greys them out with an explanation instead.
+ */
+const ENV_OVERRIDE = {
+  'mail.smtp_host': 'SMTP_HOST',
+  'mail.smtp_port': 'SMTP_PORT',
+  'mail.smtp_user': 'SMTP_USER',
+  'mail.smtp_password': 'SMTP_PASSWORD',
+  'mail.smtp_secure': 'SMTP_SECURE',
+  'mail.from_address': 'MAIL_FROM_ADDRESS',
+  'mail.from_name': 'MAIL_FROM_NAME'
+};
+
+const shape = (row) => {
+  const envVar = ENV_OVERRIDE[row.setting_key];
+  const lockedByEnv = !!envVar && process.env[envVar] !== undefined && process.env[envVar] !== '';
+  return {
+    key: row.setting_key,
+    value: row.is_secret ? null : row.setting_value,
+    is_secret: row.is_secret,
+    /* For a secret the only fact worth returning: whether one is stored. */
+    is_set: row.is_secret ? !!row.setting_value : row.setting_value !== null,
+    type: row.value_type,
+    category: row.category,
+    description: row.description,
+    updated_at: row.updated_at,
+    locked_by_env: lockedByEnv,
+    locked_env_var: lockedByEnv ? envVar : null
+  };
+};
 
 /** Reject a value that does not match its declared type. */
 const validate = (value, type) => {
@@ -122,6 +147,17 @@ export const updatePlatformSettings = async (req, res) => {
       const existing = (await client.query(
         `SELECT * FROM app_settings WHERE setting_key = $1 AND scope = 'platform'`, [key])).rows[0];
       if (!existing) { errors.push(`${key} is not a platform setting`); continue; }
+
+      /* Refused rather than silently accepted-and-ignored. Writing the row
+         and having `.env` win anyway is the confusing outcome this exists to
+         avoid — an admin who saves a new SMTP password here should be told
+         it did not take, not shown a green toast for a change that never
+         reaches the mailbox. */
+      const envVar = ENV_OVERRIDE[key];
+      if (envVar && process.env[envVar] !== undefined && process.env[envVar] !== '') {
+        errors.push(`${key} is set via the server's ${envVar} environment variable and cannot be changed here`);
+        continue;
+      }
 
       /* An empty string against a secret means "leave it alone". Blanking the
          SMTP password by saving a form that never showed it is precisely the

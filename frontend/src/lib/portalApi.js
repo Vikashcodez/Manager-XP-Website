@@ -36,7 +36,9 @@ export const portalAuth = {
 
 async function request(path, options = {}) {
   const headers = {
-    'Content-Type': 'application/json',
+    // A FormData body sets its own multipart boundary; a JSON content-type
+    // header on top of one makes the server unable to parse either.
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {})
   };
 
@@ -100,7 +102,56 @@ export const portalApi = {
 
   users: () => request('/users', { noBranch: true }).then((b) => b.data),
   inviteUser: (payload) =>
-    request('/users/invite', { method: 'POST', body: JSON.stringify(payload), noBranch: true }).then((b) => b.data)
+    request('/users/invite', { method: 'POST', body: JSON.stringify(payload), noBranch: true }).then((b) => b.data),
+
+  /* Support. Tickets belong to the business, so every one of these is scoped by
+     the organization header the request helper already sends.
+
+     `files` — a File[] from an <input type="file"> — switches the body to
+     FormData when present. Sent as JSON otherwise, unchanged from before. */
+  tickets: () => request('/support/tickets', { noBranch: true }).then((b) => b.data),
+  ticket: (id) => request(`/support/tickets/${id}`, { noBranch: true }).then((b) => b.data),
+  createTicket: ({ files, ...payload }) => {
+    if (!files || !files.length) {
+      return request('/support/tickets', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data);
+    }
+    const fd = new FormData();
+    Object.entries(payload).forEach(([k, v]) => fd.append(k, v));
+    files.forEach((f) => fd.append('files', f));
+    return request('/support/tickets', { method: 'POST', body: fd }).then((b) => b.data);
+  },
+  replyTicket: (id, message, files) => {
+    if (!files || !files.length) {
+      return request(`/support/tickets/${id}/reply`, {
+        method: 'POST', body: JSON.stringify({ message }), noBranch: true
+      }).then((b) => b.data);
+    }
+    const fd = new FormData();
+    fd.append('message', message);
+    files.forEach((f) => fd.append('files', f));
+    return request(`/support/tickets/${id}/reply`, { method: 'POST', body: fd, noBranch: true }).then((b) => b.data);
+  },
+  closeTicket: (id) =>
+    request(`/support/tickets/${id}/close`, { method: 'POST', noBranch: true }).then((b) => b.data),
+
+  /*
+   * The file itself, as a Blob.
+   *
+   * Not a plain URL: every other call in this app authenticates with a Bearer
+   * header, and a bare `<img src="...">` cannot send one. Putting the session
+   * token in the URL instead would work, but it is worse practice than it
+   * needs to be here — it can end up in browser history or a proxy's access
+   * log, and stays valid for as long as the whole session does. Fetching with
+   * the header we already have and handing the browser a short-lived
+   * `blob:` URL keeps the same authentication story everywhere.
+   */
+  attachmentBlob: (id) =>
+    fetch(`${API_BASE_URL}/api/portal/support/attachments/${id}`, {
+      headers: { Authorization: `Bearer ${portalAuth.token()}` }
+    }).then((res) => {
+      if (!res.ok) throw new Error('Could not fetch that file');
+      return res.blob();
+    })
 };
 
 /* ── formatting, shared so every page agrees ── */

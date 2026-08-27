@@ -352,7 +352,7 @@ export const initializeTenancy = async (client) => {
       ('trial.max_users',     '10',  'number', 'trial', 'Staff accounts a trial account may invite'),
       ('installation.offline_grace_hours', '72', 'number', 'system',
        'How long an installation keeps working without reaching the server')
-    ON CONFLICT (setting_key) DO NOTHING
+    ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
   `);
 
   /* ======================================================================

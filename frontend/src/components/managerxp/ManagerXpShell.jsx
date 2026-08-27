@@ -71,7 +71,7 @@ const NAV = [
   {
     label: 'Support',
     items: [
-      { to: '/admin/support', label: 'Support Tickets', can: 'support.manage', soon: true },
+      { to: '/admin/support', label: 'Support Tickets', can: 'support.manage' },
       { to: '/admin/announcements', label: 'Announcements', can: 'support.manage', soon: true }
     ]
   },

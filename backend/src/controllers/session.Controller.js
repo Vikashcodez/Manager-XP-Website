@@ -1,8 +1,9 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
-import { createBillForSession } from './billing.Controller.js';
+import { createBillForSession, recalculate } from './billing.Controller.js';
 import { resolveGamingPrice, amountForSeconds } from '../config/sessionPricing.js';
+import { activeMembershipDiscount } from '../config/membershipPricing.js';
 
 /*
  * Play sessions.
@@ -46,6 +47,8 @@ const shape = (row) => {
     ? (row.billable_seconds || 0)
     : elapsedSeconds(row);
   const plannedSeconds = row.planned_minutes ? row.planned_minutes * 60 : null;
+  const running = amountForSeconds(row, elapsed);
+  const walletBalance = num(row.wallet_balance);
 
   return {
     /* The price this session was sold at, as captured when it started. A later
@@ -54,6 +57,23 @@ const shape = (row) => {
     pricing_unit: row.pricing_unit || 'HOUR',
     flat_amount: num(row.flat_amount),
     price_label: row.price_label || null,
+    /* One block's price and length. A BLOCK session can be extended by another
+       of these — the station shows an Extend affordance when this is set, and
+       adding one is a bill line, not a wallet debit (settled at end). */
+    block_unit_amount: num(row.block_unit_amount),
+    block_unit_minutes: row.block_unit_minutes || null,
+    can_extend: (row.pricing_unit === 'BLOCK') && row.block_unit_minutes > 0,
+    /* What the customer's own gaming rate actually is, discount included —
+       not a separate figure the UI has to compute by re-reading the plan. */
+    membership_discount_percent: Number(row.membership_discount_percent) || 0,
+    membership_label: row.membership_label || null,
+    /* The time-of-day window this session was priced under, as it was at
+       start. Shown so staff can answer "why is this one ₹500" without
+       having to reconstruct which rules were live an hour ago. */
+    pricing_rule_id: row.pricing_rule_id || null,
+    pricing_rule_label: row.pricing_rule_label || null,
+    base_rate_per_hour: num(row.base_rate_per_hour),
+    base_flat_amount: num(row.base_flat_amount),
     category: row.pc_category || null,
     cancelled_by: row.cancelled_by || null,
     cancelled_at: row.cancelled_at || null,
@@ -77,13 +97,20 @@ const shape = (row) => {
     /* What the session would cost if it ended right now — produced by the same
        function that bills it, so the running figure and the final charge can
        never disagree about the arithmetic. */
-    running_amount: amountForSeconds(row, elapsed),
+    running_amount: running,
     amount_charged: num(row.amount_charged),
     payment_status: row.payment_status,
     end_reason: row.end_reason,
     started_by: row.started_by,
     ended_by: row.ended_by,
-    wallet_balance: num(row.wallet_balance)
+    wallet_balance: walletBalance,
+    /* The wallet cannot cover what this session already owes. Only meaningful
+       for a registered customer settling from a wallet — a guest pays at the
+       counter, so "low balance" is not a state they can be in. The game is
+       never stopped for this; it is what the admin floor flags so staff can
+       ask the customer to top up, and what an unpaid close is expected after. */
+    low_balance: !!row.customer_id && walletBalance !== null
+      && running > walletBalance && (row.status === 'active' || row.status === 'paused')
   };
 };
 
@@ -128,7 +155,7 @@ export const startSession = async (req, res) => {
       });
     }
 
-    const minutes = planned_minutes === null || planned_minutes === undefined || planned_minutes === ''
+    let minutes = planned_minutes === null || planned_minutes === undefined || planned_minutes === ''
       ? null
       : parseInt(planned_minutes, 10);
     if (minutes !== null && (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440)) {
@@ -171,12 +198,22 @@ export const startSession = async (req, res) => {
     let pricing;
     if (gaming_price_id !== undefined && gaming_price_id !== null && gaming_price_id !== '') {
       const resolved = await resolveGamingPrice(client, gaming_price_id, {
-        stationCategory: station.category
+        stationCategory: station.category,
+        // The café decides its own peak and happy hours, so which windows are
+        // even considered is scoped to the token's café, never the request's.
+        cafeId: req.actor?.cafe_id ?? null
       });
       if (resolved.error) {
         return res.status(400).json({ success: false, message: resolved.error });
       }
       pricing = resolved.snapshot;
+      /* A fixed block defines its own length. Whatever duration the screen
+         sent alongside the price, the paid-for block is what the customer
+         gets, so the countdown and the charge cannot describe different spans
+         of time. */
+      if (pricing.pricing_unit === 'BLOCK' && pricing.block_minutes) {
+        minutes = pricing.block_minutes;
+      }
     } else {
       const rate = rate_per_hour === undefined || rate_per_hour === null || rate_per_hour === ''
         ? await defaultRatePerHour()
@@ -201,6 +238,11 @@ export const startSession = async (req, res) => {
       }
     }
 
+    /* Snapshotted alongside the price, for the same reason: a membership
+       bought after this session already started must not discount time that
+       has already passed, and one cancelled mid-session must not raise it. */
+    const membership = await activeMembershipDiscount(client, customerId);
+
     const open = await client.query(
       `SELECT session_id FROM sessions WHERE pc_id = $1 AND status = ANY($2)`,
       [pcId, OPEN_STATUSES]
@@ -217,8 +259,11 @@ export const startSession = async (req, res) => {
       `INSERT INTO sessions
          (cafe_id, pc_id, customer_id, guest_name, guest_phone,
           planned_minutes, rate_per_hour, started_by,
-          gaming_price_id, pricing_unit, flat_amount, price_label)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          gaming_price_id, pricing_unit, flat_amount, price_label,
+          membership_discount_percent, membership_label,
+          pricing_rule_id, pricing_rule_label, base_rate_per_hour, base_flat_amount,
+          block_unit_amount, block_unit_minutes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING session_id`,
       [
         cafe_id || station.cafe_id || null,
@@ -232,7 +277,17 @@ export const startSession = async (req, res) => {
         pricing.gaming_price_id,
         pricing.pricing_unit,
         pricing.flat_amount,
-        pricing.price_label
+        pricing.price_label,
+        membership.percent,
+        membership.label,
+        pricing.pricing_rule_id ?? null,
+        pricing.pricing_rule_label ?? null,
+        pricing.base_rate_per_hour ?? null,
+        pricing.base_flat_amount ?? null,
+        /* Only a block has a unit to extend by; everything else extends by
+           bare minutes with no charge, exactly as before. */
+        pricing.pricing_unit === 'BLOCK' ? pricing.flat_amount : null,
+        pricing.pricing_unit === 'BLOCK' ? (pricing.block_minutes ?? minutes) : null
       ]
     );
 
@@ -245,7 +300,10 @@ export const startSession = async (req, res) => {
       entity_id: session.session_id,
       summary: `Started a session on ${session.pc_name || 'a station'} for ` +
         `${session.customer_name || session.guest_name || 'a guest'}` +
-        (minutes ? ` — ${minutes} minutes` : ' — open-ended') + ` at ${rate}/hr`,
+        (minutes ? ` — ${minutes} minutes` : ' — open-ended') +
+        (pricing.pricing_unit === 'BLOCK'
+          ? ` · ${pricing.flat_amount} fixed`
+          : ` at ${rate}/hr`),
       meta: {
         pc_id: pcId,
         customer_id: customerId,
@@ -431,11 +489,56 @@ export const resumeSession = (req, res) => mutate(req, res, async (client, row) 
   return { message: 'Session resumed' };
 }, 'resume');
 
-// POST /api/sessions/:id/extend  { minutes }
+/*
+ * POST /api/sessions/:id/extend
+ *
+ * Two shapes, one endpoint:
+ *
+ *   A BLOCK session extends by whole blocks — `{ blocks: 1 }`. Each block adds
+ *   its own length to the clock and its own price to the bill, at the rate the
+ *   session was originally sold at. Nothing is charged now: the extra rides on
+ *   the same bill and is settled when the session ends, so a short wallet never
+ *   blocks the extension — it just means more to settle later. This is what
+ *   lets a player at the station add time themselves without staff, and what
+ *   keeps the game running when the balance is low.
+ *
+ *   Any other session (open-ended counter play, or a pre-block HOUR session)
+ *   extends by bare `{ minutes }`, with no charge, exactly as it always did.
+ */
 export const extendSession = (req, res) => mutate(req, res, async (client, row, request) => {
   if (row.status === 'ended') {
     return { error: 'That session has already ended', status: 409 };
   }
+
+  if (row.pricing_unit === 'BLOCK') {
+    const unitMinutes = parseInt(row.block_unit_minutes, 10);
+    const unitAmount = Number(row.block_unit_amount);
+    if (!Number.isInteger(unitMinutes) || unitMinutes < 1 || !Number.isFinite(unitAmount)) {
+      return { error: 'This session has no block to extend by', status: 409 };
+    }
+    /* Default to one block. A count keeps the door open for "+2 hours" without
+       a second round trip, but the station only ever sends one at a time. */
+    const blocks = request.body?.blocks === undefined ? 1 : parseInt(request.body.blocks, 10);
+    if (!Number.isInteger(blocks) || blocks < 1 || blocks > 24) {
+      return { error: 'Extend by between 1 and 24 blocks' };
+    }
+
+    const addMinutes = unitMinutes * blocks;
+    const addAmount = Number((unitAmount * blocks).toFixed(2));
+
+    await client.query(
+      `UPDATE sessions
+          SET planned_minutes = planned_minutes + $1,
+              flat_amount = COALESCE(flat_amount, 0) + $2,
+              updated_at = CURRENT_TIMESTAMP
+        WHERE session_id = $3`,
+      [addMinutes, addAmount, row.session_id]
+    );
+    return {
+      message: `Added ${blocks} block${blocks === 1 ? '' : 's'} — ${addMinutes} min, ${addAmount} on the bill`
+    };
+  }
+
   const minutes = parseInt(request.body?.minutes, 10);
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
     return { error: 'Extend by between 1 and 1440 minutes' };
@@ -580,7 +683,8 @@ export const endSession = async (req, res) => {
         guest_name: row.guest_name,
         pc_name: pcName,
         amount: amount,
-        billable_seconds: billableSeconds
+        billable_seconds: billableSeconds,
+        membership_label: row.membership_label
       }, req.actor?.label);
 
       // If the wallet already covered it, record that against the bill so it
@@ -595,12 +699,22 @@ export const endSession = async (req, res) => {
             `Session #${row.session_id}`, walletTransactionId, req.actor?.label || null
           ]
         );
-        await client.query(
-          `UPDATE bills SET paid_amount = $1, status = 'PAID',
-                            settled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-           WHERE bill_id = $2`,
-          [amount, billId]
-        );
+        /*
+         * Recalculate rather than force PAID.
+         *
+         * createBillForSession joins the session's existing bill when one is
+         * already open — food ordered mid-session via "save for later" lands
+         * there before the gaming line does. This wallet debit only ever
+         * covers the gaming amount, so writing paid_amount = amount and
+         * status = 'PAID' directly (the old code) clobbered whatever was
+         * already paid and marked the whole bill settled even when unpaid
+         * food was still sitting on it — the wallet paid for the table time,
+         * not the burger. Recalculate derives paid_amount from the sum of
+         * every payment row and only calls it PAID once that covers the
+         * bill's actual total, so a bill with outstanding food correctly
+         * lands PARTIAL instead.
+         */
+        await recalculate(client, billId);
       }
     }
 

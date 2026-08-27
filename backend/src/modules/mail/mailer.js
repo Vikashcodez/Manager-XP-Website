@@ -13,11 +13,60 @@
  * can be retried or read out over the phone.
  *
  * Configuration comes from settings, not from constants, so an operator can
- * point it at their own SMTP without a deploy.
+ * point it at their own SMTP without a deploy — with one exception, below.
  */
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import pool from '../../config/database.js';
 import { getSetting } from '../../config/settings.js';
+
+/*
+ * The ManagerXP mark that heads every message.
+ *
+ * Attached and referenced by Content-ID rather than embedded as a data: URI —
+ * Gmail and Outlook both refuse to render data: images, so an inlined logo
+ * would show as a broken box in the two clients most customers use. A CID
+ * attachment renders everywhere and needs no public URL to host it.
+ *
+ * Read once at startup: it is a 37KB file that never changes between sends.
+ */
+const LOGO_CID = 'managerxp-logo';
+const LOGO_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'logo.png');
+let logoBuffer = null;
+try {
+  logoBuffer = fs.readFileSync(LOGO_PATH);
+} catch (error) {
+  // A missing logo must never stop mail going out — the alt text carries it.
+  console.warn('Mail logo not found, sending without it:', error.message);
+}
+
+/** The logo attachment, or nothing when the file is unavailable. */
+const logoAttachment = () => (logoBuffer
+  ? [{ filename: 'managerxp.png', content: logoBuffer, cid: LOGO_CID, contentDisposition: 'inline' }]
+  : []);
+
+/*
+ * The credential itself comes from the environment, everything else from
+ * settings.
+ *
+ * A mailbox password sitting in a database column is one dump or one bug in
+ * a settings-listing endpoint away from leaking; `.env` is not shipped
+ * anywhere the database is, and it is where a credential is expected to be.
+ *
+ * `SMTP_PASSWORD` wins when it is set. The stored setting is kept as a
+ * fallback rather than deleted, so a café that configures its own SMTP
+ * through the admin screen — which is the whole reason this reads from
+ * settings at all — keeps working without an environment variable of its
+ * own. Only ManagerXP's own outbound mailbox needs to live in `.env`; a
+ * café's does not have a `.env` to put it in.
+ */
+const resolveSecret = async (envVar, settingKey, fallback) => {
+  const fromEnv = process.env[envVar];
+  if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
+  return getSetting(settingKey, fallback);
+};
 
 let cached = null;
 let cachedKey = '';
@@ -30,11 +79,11 @@ let cachedKey = '';
  */
 const getTransport = async () => {
   const [host, port, user, pass, secure] = await Promise.all([
-    getSetting('mail.smtp_host', ''),
-    getSetting('mail.smtp_port', 587),
-    getSetting('mail.smtp_user', ''),
-    getSetting('mail.smtp_password', ''),
-    getSetting('mail.smtp_secure', false)
+    resolveSecret('SMTP_HOST', 'mail.smtp_host', ''),
+    resolveSecret('SMTP_PORT', 'mail.smtp_port', 587),
+    resolveSecret('SMTP_USER', 'mail.smtp_user', ''),
+    resolveSecret('SMTP_PASSWORD', 'mail.smtp_password', ''),
+    resolveSecret('SMTP_SECURE', 'mail.smtp_secure', false)
   ]);
 
   if (!host) return null;
@@ -115,14 +164,16 @@ export const sendMail = async ({
     };
   }
 
-  const from = await getSetting('mail.from_address', 'no-reply@managerxp.com');
-  const fromName = await getSetting('mail.from_name', 'ManagerXP');
+  const from = await resolveSecret('MAIL_FROM_ADDRESS', 'mail.from_address', 'no-reply@managerxp.com');
+  const fromName = await resolveSecret('MAIL_FROM_NAME', 'mail.from_name', 'ManagerXP');
 
   try {
     const info = await transport.sendMail({
       from: `"${fromName}" <${from}>`,
       to: toName ? `"${toName}" <${to}>` : to,
-      subject, html, text
+      subject, html, text,
+      // The header logo every template references by cid.
+      attachments: logoAttachment()
     });
     const row = await record({
       to, toName, subject, html, text, kind, relatedType, relatedId, organizationId,
@@ -144,7 +195,7 @@ export const sendMail = async ({
 };
 
 /** Whether email is usable at all — for the UI to say so before trying. */
-export const mailConfigured = async () => !!(await getSetting('mail.smtp_host', ''));
+export const mailConfigured = async () => !!(await resolveSecret('SMTP_HOST', 'mail.smtp_host', ''));
 
 /* ==========================================================================
    TEMPLATES
@@ -158,8 +209,9 @@ const shell = (title, body) => `
 <div style="background:#0a0a0a;padding:32px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid #262626;border-radius:14px;overflow:hidden">
     <div style="padding:20px 24px;border-bottom:1px solid #262626">
-      <span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:#ef4444;color:#fff;border-radius:7px;font-weight:800;font-size:11px">MX</span>
-      <span style="color:#fff;font-weight:600;margin-left:8px;font-size:15px">ManagerXP</span>
+      <img src="cid:${LOGO_CID}" width="26" height="26" alt="ManagerXP"
+           style="display:inline-block;vertical-align:middle;width:26px;height:26px;border:0">
+      <span style="color:#fff;font-weight:600;margin-left:8px;font-size:15px;vertical-align:middle">ManagerXP</span>
     </div>
     <div style="padding:24px">
       <h1 style="margin:0 0 12px;color:#fff;font-size:17px;font-weight:600">${title}</h1>
@@ -232,6 +284,79 @@ export const invoicePaymentLinkEmail = ({ invoice, link, url, organizationName }
     ``,
     `ManagerXP will never ask for your card details by email or phone.`
   ].filter(Boolean).join('\n');
+
+  return { subject, html: shell(subject, body), text };
+};
+
+/*
+ * Password reset OTP — for a café owner or a customer.
+ *
+ * A code, not a link. The people this goes to are often mid-shift at a
+ * station or on a shared kiosk, where clicking through a link is more
+ * friction than typing six digits into the app they already have open.
+ */
+export const passwordResetOtpEmail = ({ name, code, minutes }) => {
+  const subject = `${code} is your ManagerXP password reset code`;
+  const body = `
+    <p style="margin:0 0 20px;color:#a3a3a3;font-size:14px;line-height:1.6">
+      Hello${name ? ` ${name}` : ''},<br>
+      Use this code to reset your password. It expires in ${minutes} minutes.
+    </p>
+    <div style="background:#0a0a0a;border:1px solid #262626;border-radius:10px;
+                padding:20px;text-align:center;margin:0 0 20px">
+      <span style="color:#fff;font-size:32px;font-weight:700;letter-spacing:8px;font-family:monospace">
+        ${code}
+      </span>
+    </div>
+    <p style="margin:0;color:#666;font-size:12px;line-height:1.6">
+      If you did not ask to reset your password, you can ignore this message —
+      your password has not been changed. Never share this code with anyone,
+      including someone claiming to be from ManagerXP.
+    </p>`;
+
+  const text = [
+    `Your ManagerXP password reset code: ${code}`,
+    ``,
+    `This code expires in ${minutes} minutes.`,
+    `If you did not ask to reset your password, you can ignore this message.`
+  ].join('\n');
+
+  return { subject, html: shell(subject, body), text };
+};
+
+/**
+ * The code that confirms a new account's email address really belongs to
+ * whoever just signed up.
+ *
+ * Same shape as the reset code on purpose: someone who has seen one recognises
+ * the other, and a familiar-looking security email is one people read rather
+ * than delete.
+ */
+export const emailVerificationOtpEmail = ({ name, code, minutes }) => {
+  const subject = `${code} is your ManagerXP verification code`;
+  const body = `
+    <p style="margin:0 0 20px;color:#a3a3a3;font-size:14px;line-height:1.6">
+      Welcome${name ? ` ${name}` : ''},<br>
+      Enter this code in ManagerXP to confirm this email address. It expires in ${minutes} minutes.
+    </p>
+    <div style="background:#0a0a0a;border:1px solid #262626;border-radius:10px;
+                padding:20px;text-align:center;margin:0 0 20px">
+      <span style="color:#fff;font-size:32px;font-weight:700;letter-spacing:8px;font-family:monospace">
+        ${code}
+      </span>
+    </div>
+    <p style="margin:0;color:#666;font-size:12px;line-height:1.6">
+      If you did not create a ManagerXP account, you can ignore this message and
+      nothing further will happen. Never share this code with anyone, including
+      someone claiming to be from ManagerXP.
+    </p>`;
+
+  const text = [
+    `Your ManagerXP verification code: ${code}`,
+    ``,
+    `This code expires in ${minutes} minutes.`,
+    `If you did not create a ManagerXP account, you can ignore this message.`
+  ].join('\n');
 
   return { subject, html: shell(subject, body), text };
 };

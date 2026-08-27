@@ -56,10 +56,15 @@ const shapeProduct = (row) => {
   };
 };
 
-const SELECT_PRODUCT = `
+/* Takes the parameter position holding the café id, because callers build
+   their parameter lists differently. Every read of this table is one café's
+   shelf — a product list is a price list, and a competitor's price list is
+   not something to hand out. */
+const selectProduct = (cafeParam) => `
   SELECT p.*, c.category_name, c.kind
   FROM products p
   LEFT JOIN product_categories c ON c.category_id = p.category_id
+  WHERE p.cafe_id IS NOT DISTINCT FROM $${cafeParam}
 `;
 
 /* ==========================================================================
@@ -84,6 +89,7 @@ export const listCategories = async (req, res) => {
       `SELECT c.*, COUNT(p.product_id)::int AS product_count
        FROM product_categories c
        LEFT JOIN products p ON p.category_id = c.category_id AND p.status = 'ACTIVE'
+         AND p.cafe_id IS NOT DISTINCT FROM c.cafe_id
        ${where}
        GROUP BY c.category_id
        ORDER BY c.sort_order ASC, c.category_name ASC`,
@@ -106,9 +112,9 @@ export const createCategory = async (req, res) => {
       ? String(req.body.kind).toUpperCase() : 'FNB';
 
     const result = await pool.query(
-      `INSERT INTO product_categories (category_name, kind, sort_order)
-       VALUES ($1,$2,$3) RETURNING *`,
-      [name, kind, parseInt(req.body?.sort_order, 10) || 0]
+      `INSERT INTO product_categories (category_name, kind, sort_order, cafe_id)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [name, kind, parseInt(req.body?.sort_order, 10) || 0, req.actor?.cafe_id ?? null]
     );
     res.status(201).json({ success: true, message: 'Category created', data: shapeCategory(result.rows[0]) });
   } catch (error) {
@@ -157,7 +163,9 @@ export const updateCategory = async (req, res) => {
 export const deleteCategory = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const used = await pool.query('SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1', [id]);
+    const used = await pool.query(`SELECT COUNT(*)::int AS count FROM products
+        WHERE category_id = $1 AND cafe_id IS NOT DISTINCT FROM $2`,
+      [id, req.actor?.cafe_id ?? null]);
     if (used.rows[0].count > 0) {
       return res.status(409).json({
         success: false,
@@ -165,7 +173,9 @@ export const deleteCategory = async (req, res) => {
       });
     }
     const result = await pool.query(
-      'DELETE FROM product_categories WHERE category_id = $1 RETURNING category_id', [id]
+      `DELETE FROM product_categories
+        WHERE category_id = $1 AND cafe_id IS NOT DISTINCT FROM $2 RETURNING category_id`,
+      [id, req.actor?.cafe_id ?? null]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Category not found' });
@@ -217,7 +227,9 @@ const validateProduct = (body) => {
 export const listProducts = async (req, res) => {
   try {
     const filters = [];
-    const params = [];
+    /* $1 is always the café — selectProduct's WHERE reads it, and the
+       optional filters below append from $2 onwards. */
+    const params = [req.actor?.cafe_id ?? null];
 
     if (req.query.category_id) {
       params.push(parseInt(req.query.category_id, 10));
@@ -239,9 +251,9 @@ export const listProducts = async (req, res) => {
       filters.push(`p.track_stock = TRUE AND p.stock_quantity <= p.low_stock_threshold`);
     }
 
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const where = filters.length ? `AND ${filters.join(' AND ')}` : '';
     const result = await pool.query(
-      `${SELECT_PRODUCT} ${where} ORDER BY c.sort_order ASC NULLS LAST, p.product_name ASC`,
+      `${selectProduct(1)} ${where} ORDER BY c.sort_order ASC NULLS LAST, p.product_name ASC`,
       params
     );
 
@@ -262,14 +274,29 @@ export const customerMenu = async (req, res) => {
     const kind = KINDS.includes(String(req.query.kind || '').toUpperCase())
       ? String(req.query.kind).toUpperCase() : 'FNB';
 
+    /*
+     * Which café's menu.
+     *
+     * A staff token carries the café. A customer's does not — they belong to
+     * a café through their own record, which is where this looks. Somebody
+     * with neither sees nothing rather than everything: an empty menu is a
+     * confusing screen, but another café's menu is a leak.
+     */
+    let menuCafeId = req.actor?.cafe_id ?? null;
+    if (menuCafeId === null && req.actor?.customer_id) {
+      const owner = await pool.query(
+        'SELECT cafe_id FROM customers WHERE customer_id = $1', [req.actor.customer_id]);
+      menuCafeId = owner.rows[0]?.cafe_id ?? null;
+    }
+
     const result = await pool.query(
-      `${SELECT_PRODUCT}
-       WHERE p.status = 'ACTIVE' AND p.is_available = TRUE
+      `${selectProduct(1)}
+         AND p.status = 'ACTIVE' AND p.is_available = TRUE
          AND (p.track_stock = FALSE OR p.stock_quantity > 0)
-         AND (c.kind = $1 OR c.kind IS NULL)
+         AND (c.kind = $2 OR c.kind IS NULL)
          AND (c.status = 'ACTIVE' OR c.category_id IS NULL)
        ORDER BY c.sort_order ASC NULLS LAST, p.product_name ASC`,
-      [kind]
+      [menuCafeId, kind]
     );
 
     const grouped = {};
@@ -305,13 +332,14 @@ export const createProduct = async (req, res) => {
     const inserted = await client.query(
       `INSERT INTO products (category_id, product_name, sku, description, image_url,
                              price, cost_price, tax_percent, currency, track_stock,
-                             stock_quantity, low_stock_threshold, is_available)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING product_id`,
+                             stock_quantity, low_stock_threshold, is_available, cafe_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING product_id`,
       [
         req.body?.category_id || null, parsed.name, parsed.sku,
         req.body?.description || null, req.body?.image_url || null,
         parsed.price, parsed.cost, parsed.tax, currency, parsed.trackStock,
-        parsed.trackStock ? money(openingStock) : 0, parsed.threshold, parsed.isAvailable
+        parsed.trackStock ? money(openingStock) : 0, parsed.threshold, parsed.isAvailable,
+        req.actor?.cafe_id ?? null
       ]
     );
     const productId = inserted.rows[0].product_id;
@@ -327,7 +355,7 @@ export const createProduct = async (req, res) => {
 
     await client.query('COMMIT');
 
-    const full = await client.query(`${SELECT_PRODUCT} WHERE p.product_id = $1`, [productId]);
+    const full = await client.query(`${selectProduct(2)} AND p.product_id = $1`, [productId, req.actor?.cafe_id ?? null]);
     res.status(201).json({ success: true, message: 'Product created', data: shapeProduct(full.rows[0]) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -358,19 +386,21 @@ export const updateProduct = async (req, res) => {
            price = $6, cost_price = $7, tax_percent = $8, track_stock = $9,
            low_stock_threshold = $10, is_available = $11,
            status = COALESCE($12::varchar, status), updated_at = CURRENT_TIMESTAMP
-       WHERE product_id = $13 RETURNING product_id`,
+       WHERE product_id = $13 AND cafe_id IS NOT DISTINCT FROM $14
+       RETURNING product_id`,
       [
         req.body?.category_id || null, parsed.name, parsed.sku,
         req.body?.description || null, req.body?.image_url || null,
         parsed.price, parsed.cost, parsed.tax, parsed.trackStock,
-        parsed.threshold, parsed.isAvailable, status, parseInt(req.params.id, 10)
+        parsed.threshold, parsed.isAvailable, status, parseInt(req.params.id, 10),
+        req.actor?.cafe_id ?? null
       ]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    const full = await pool.query(`${SELECT_PRODUCT} WHERE p.product_id = $1`, [result.rows[0].product_id]);
+    const full = await pool.query(`${selectProduct(2)} AND p.product_id = $1`, [result.rows[0].product_id, req.actor?.cafe_id ?? null]);
     res.status(200).json({ success: true, message: 'Product updated', data: shapeProduct(full.rows[0]) });
   } catch (error) {
     if (error.code === '23505') {
@@ -387,13 +417,13 @@ export const setAvailability = async (req, res) => {
     const available = !!req.body?.is_available;
     const result = await pool.query(
       `UPDATE products SET is_available = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE product_id = $2 RETURNING product_id`,
-      [available, parseInt(req.params.id, 10)]
+       WHERE product_id = $2 AND cafe_id IS NOT DISTINCT FROM $3 RETURNING product_id`,
+      [available, parseInt(req.params.id, 10), req.actor?.cafe_id ?? null]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
-    const full = await pool.query(`${SELECT_PRODUCT} WHERE p.product_id = $1`, [result.rows[0].product_id]);
+    const full = await pool.query(`${selectProduct(2)} AND p.product_id = $1`, [result.rows[0].product_id, req.actor?.cafe_id ?? null]);
     res.status(200).json({
       success: true,
       message: available ? 'Product is now on the menu' : 'Product hidden from the menu',
@@ -419,7 +449,8 @@ export const deleteProduct = async (req, res) => {
         message: `This product appears on ${ordered.rows[0].count} order(s). Deactivate it instead.`
       });
     }
-    const result = await pool.query('DELETE FROM products WHERE product_id = $1 RETURNING product_id', [id]);
+    const result = await pool.query(`DELETE FROM products WHERE product_id = $1 AND cafe_id IS NOT DISTINCT FROM $2
+        RETURNING product_id`, [id, req.actor?.cafe_id ?? null]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -503,7 +534,7 @@ export const adjustStock = async (req, res) => {
 
     await client.query('COMMIT');
 
-    const full = await client.query(`${SELECT_PRODUCT} WHERE p.product_id = $1`, [productId]);
+    const full = await client.query(`${selectProduct(2)} AND p.product_id = $1`, [productId, req.actor?.cafe_id ?? null]);
     res.status(200).json({
       success: true,
       message: `Stock ${direction === 'in' ? 'added' : 'removed'}`,

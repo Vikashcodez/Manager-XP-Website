@@ -68,10 +68,13 @@ export const createSession = async (req, res) => {
       ? String(req.body.status).toUpperCase()
       : 'ACTIVE';
 
+    /* Owned by the café that created it. The stock lengths shipped with the
+       platform carry no cafe_id and stay shared, so a café adding "Night Pass"
+       gains one without every other café inheriting it. */
     const result = await pool.query(
-      `INSERT INTO session_master (session_name, duration_type, duration, duration_minutes, status)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [parsed.name, parsed.type, parsed.duration, parsed.minutes, status]
+      `INSERT INTO session_master (session_name, duration_type, duration, duration_minutes, status, cafe_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [parsed.name, parsed.type, parsed.duration, parsed.minutes, status, req.actor?.cafe_id ?? null]
     );
 
     res.status(201).json({
@@ -94,8 +97,10 @@ export const listSessions = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+    // Always scoped: the shared lengths plus this café's own.
     const filters = [];
-    const params = [];
+    const params = [req.actor?.cafe_id ?? null];
+    filters.push(`(s.cafe_id IS NULL OR s.cafe_id = $1)`);
 
     if (req.query.status) {
       params.push(String(req.query.status).toUpperCase());
@@ -105,14 +110,17 @@ export const listSessions = async (req, res) => {
       params.push(`%${String(req.query.search).trim()}%`);
       filters.push(`s.session_name ILIKE $${params.length}`);
     }
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const where = `WHERE ${filters.join(' AND ')}`;
     const listParams = [...params, limit, offset];
 
-    // price_count tells the UI whether deleting would take prices with it.
+    /* price_count tells the UI whether deleting would take prices with it —
+       counting only this café's prices, so the warning reflects what this
+       owner would actually lose. */
     const result = await pool.query(
       `SELECT s.*, COUNT(gp.id)::int AS price_count
        FROM session_master s
-       LEFT JOIN gaming_prices gp ON gp.session_master_id = s.id
+       LEFT JOIN gaming_prices gp
+         ON gp.session_master_id = s.id AND gp.cafe_id IS NOT DISTINCT FROM $1
        ${where}
        GROUP BY s.id
        ORDER BY
@@ -146,7 +154,10 @@ export const getSessionById = async (req, res) => {
     if (!Number.isInteger(id)) {
       return res.status(400).json({ success: false, message: 'Invalid session id' });
     }
-    const result = await pool.query('SELECT * FROM session_master WHERE id = $1', [id]);
+    const result = await pool.query(
+      'SELECT * FROM session_master WHERE id = $1 AND (cafe_id IS NULL OR cafe_id = $2)',
+      [id, req.actor?.cafe_id ?? null]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }
@@ -165,9 +176,22 @@ export const updateSession = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid session id' });
     }
 
-    const existing = await pool.query('SELECT id FROM session_master WHERE id = $1', [id]);
+    const cafeId = req.actor?.cafe_id ?? null;
+    const existing = await pool.query(
+      'SELECT id, cafe_id FROM session_master WHERE id = $1 AND (cafe_id IS NULL OR cafe_id = $2)',
+      [id, cafeId]
+    );
     if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+    /* A stock length is shared by every café, so editing one here would rename
+       it on all of them. Refusing outright is safe to explain: the row is
+       already visible to everyone, so saying it exists reveals nothing. */
+    if (existing.rows[0].cafe_id === null) {
+      return res.status(403).json({
+        success: false,
+        message: 'That is a standard session length shared by every café. Create your own to change it.'
+      });
     }
 
     const parsed = validate(req.body || {});
@@ -181,8 +205,8 @@ export const updateSession = async (req, res) => {
       `UPDATE session_master
        SET session_name = $1, duration_type = $2, duration = $3, duration_minutes = $4,
            status = COALESCE($5, status), updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6 RETURNING *`,
-      [parsed.name, parsed.type, parsed.duration, parsed.minutes, status || null, id]
+       WHERE id = $6 AND cafe_id = $7 RETURNING *`,
+      [parsed.name, parsed.type, parsed.duration, parsed.minutes, status || null, id, cafeId]
     );
 
     res.status(200).json({ success: true, message: 'Session updated', data: shape(result.rows[0]) });
@@ -204,10 +228,11 @@ export const setSessionStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Status must be ACTIVE or INACTIVE' });
     }
 
+    // Own rows only — deactivating a shared length would withdraw it platform-wide.
     const result = await pool.query(
       `UPDATE session_master SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 RETURNING *`,
-      [status, id]
+       WHERE id = $2 AND cafe_id = $3 RETURNING *`,
+      [status, id, req.actor?.cafe_id ?? null]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Session not found' });
@@ -231,9 +256,11 @@ export const deleteSession = async (req, res) => {
 
     // Deleting would cascade to its prices, so say so rather than silently
     // taking them. `force=true` is the deliberate override.
+    const cafeId = req.actor?.cafe_id ?? null;
     const priced = await pool.query(
-      'SELECT COUNT(*)::int AS count FROM gaming_prices WHERE session_master_id = $1',
-      [id]
+      `SELECT COUNT(*)::int AS count FROM gaming_prices
+        WHERE session_master_id = $1 AND cafe_id IS NOT DISTINCT FROM $2`,
+      [id, cafeId]
     );
     if (priced.rows[0].count > 0 && req.query.force !== 'true') {
       return res.status(409).json({
@@ -243,7 +270,13 @@ export const deleteSession = async (req, res) => {
       });
     }
 
-    const result = await pool.query('DELETE FROM session_master WHERE id = $1 RETURNING id', [id]);
+    /* Own rows only. Deleting a shared length would cascade into every café's
+       prices at once — the single most destructive thing this endpoint could
+       be made to do. */
+    const result = await pool.query(
+      'DELETE FROM session_master WHERE id = $1 AND cafe_id = $2 RETURNING id',
+      [id, cafeId]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }

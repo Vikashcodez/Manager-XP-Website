@@ -365,6 +365,6 @@ export const initializeAdmin = async (client) => {
       ('admin.session_hours',      '8',  'number', 'admin', 'How long an admin session lasts'),
       ('usage.warn_threshold',     '80', 'number', 'usage',  'Percent of a limit at which the console warns'),
       ('subscription.grace_days',  '7',  'number', 'billing','Days a lapsed subscription keeps working')
-    ON CONFLICT (setting_key) DO NOTHING
+    ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
   `);
 };

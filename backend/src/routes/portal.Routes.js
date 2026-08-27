@@ -7,6 +7,11 @@ import {
   listUsers, inviteUser, acceptInvite
 } from '../controllers/portal.Controller.js';
 import { requirePortalUser, withOrganization, withBranch, requireOwner } from '../middleware/tenancy.js';
+import {
+  portalListTickets, portalCreateTicket, portalGetTicket, portalReply, portalCloseTicket,
+  portalGetAttachment
+} from '../controllers/support.Controller.js';
+import { supportUpload, handleUploadErrors } from '../middleware/supportUpload.js';
 
 const router = express.Router();
 
@@ -55,5 +60,22 @@ router.post('/installations/:installationId/revoke', withOrganization(), require
 
 router.get('/users', withOrganization(), listUsers);
 router.post('/users/invite', withOrganization(), requireOwner, inviteUser);
+
+/* Support. Scoped to the business, not to the person who typed it — a café
+   with two owners and a manager needs all of them to be able to follow up.
+   `allowSuspended` on purpose: a customer whose account is suspended over an
+   unpaid invoice is exactly who most needs to reach support. */
+router.get('/support/tickets', withOrganization({ allowSuspended: true }), portalListTickets);
+/* `supportUpload` only engages for multipart bodies — a plain JSON ticket with
+   no screenshot passes straight through it untouched. */
+router.post('/support/tickets', withOrganization({ allowSuspended: true }), withBranch(),
+  supportUpload.array('files', 5), handleUploadErrors, portalCreateTicket);
+router.get('/support/tickets/:id', withOrganization({ allowSuspended: true }), portalGetTicket);
+router.post('/support/tickets/:id/reply', withOrganization({ allowSuspended: true }),
+  supportUpload.array('files', 5), handleUploadErrors, portalReply);
+router.post('/support/tickets/:id/close', withOrganization({ allowSuspended: true }), portalCloseTicket);
+/* Files are handed out here, never from a static folder — the handler checks
+   the file belongs to this café before a byte is sent. */
+router.get('/support/attachments/:id', withOrganization({ allowSuspended: true }), portalGetAttachment);
 
 export default router;

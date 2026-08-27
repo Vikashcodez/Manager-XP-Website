@@ -26,6 +26,24 @@ const ACTIONS = {
   signout: { label: 'Sign out', summary: 'signed out of', disruptive: true },
   'restart-client': { label: 'Restart CafeXP client', summary: 'restarted the client app on', disruptive: false },
 
+  /*
+   * Moving the client window out of the way, and putting it back.
+   *
+   * The client runs as a kiosk: a customer cannot minimise it, exit full
+   * screen or close it, which is the point. Staff still need to reach the
+   * Windows desktop on a station occasionally — to install a game, to fix a
+   * driver — so the console can do for them what the machine itself refuses.
+   *
+   * Not disruptive: neither touches the session, the billing or anything
+   * running. They move a window.
+   */
+  'minimize-client': {
+    label: 'Minimise CafeXP client', summary: 'minimised the client app on', disruptive: false
+  },
+  'restore-client': {
+    label: 'Restore CafeXP client', summary: 'restored the client app on', disruptive: false
+  },
+
   /* Powering on is the one action that never reaches the client — the machine
      is off. The console sends a Wake-on-LAN packet on the café LAN instead.
      It is authorised and audited here like the rest, so "who turned this on"

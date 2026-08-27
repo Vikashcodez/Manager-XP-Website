@@ -43,15 +43,20 @@ const shapeOrder = (row, items = []) => ({
   }))
 });
 
-const SELECT_ORDER = `
+/* Takes the parameter position holding the café id — see products for why
+   the index is passed rather than assumed. An order is a customer's name
+   against a station and a bill; it belongs to one café only. */
+const selectOrder = (cafeParam) => `
   SELECT o.*, c.customer_name, b.bill_number
   FROM orders o
   LEFT JOIN customers c ON c.customer_id = o.customer_id
   LEFT JOIN bills b ON b.bill_id = o.bill_id
+  WHERE o.cafe_id IS NOT DISTINCT FROM $${cafeParam}
 `;
 
-const loadOrder = async (client, orderId) => {
-  const order = await client.query(`${SELECT_ORDER} WHERE o.order_id = $1`, [orderId]);
+const loadOrder = async (client, orderId, cafeId = null) => {
+  const order = await client.query(
+    `${selectOrder(2)} AND o.order_id = $1`, [orderId, cafeId]);
   if (order.rows.length === 0) return null;
   const items = await client.query(
     'SELECT * FROM order_items WHERE order_id = $1 ORDER BY order_item_id ASC', [orderId]
@@ -83,7 +88,7 @@ export const placeOrder = async (req, res) => {
     await client.query('BEGIN');
 
     const customer = await client.query(
-      'SELECT customer_id, customer_name FROM customers WHERE customer_id = $1', [customerId]
+      'SELECT customer_id, customer_name, cafe_id FROM customers WHERE customer_id = $1', [customerId]
     );
     if (customer.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -94,16 +99,21 @@ export const placeOrder = async (req, res) => {
     const seq = await client.query(`SELECT nextval('order_number_seq') AS n`);
     const orderNumber = 'ORD-' + seq.rows[0].n;
 
+    /* The café placing the order: the staff token's, or the customer's own
+       when a customer orders from a station. */
+    const orderCafe = req.actor?.cafe_id ?? customer.rows[0]?.cafe_id ?? null;
+
     const inserted = await client.query(
-      `INSERT INTO orders (order_number, customer_id, session_id, pc_name, currency, note, placed_by)
-       VALUES ($1::varchar,$2::int,$3::int,$4::varchar,$5::varchar,$6::text,$7::varchar)
+      `INSERT INTO orders (order_number, customer_id, session_id, pc_name, currency, note, placed_by, cafe_id)
+       VALUES ($1::varchar,$2::int,$3::int,$4::varchar,$5::varchar,$6::text,$7::varchar,$8::int)
        RETURNING order_id`,
       [
         orderNumber, customerId,
         req.body?.session_id ? parseInt(req.body.session_id, 10) : null,
         req.body?.pc_name || null, currency,
         req.body?.note || null,
-        req.actor?.label || null
+        req.actor?.label || null,
+        orderCafe
       ]
     );
     const orderId = inserted.rows[0].order_id;
@@ -231,7 +241,7 @@ export const placeOrder = async (req, res) => {
       message: paymentStatus === 'PAID'
         ? 'Order placed and paid from your wallet'
         : 'Order placed — pay when it arrives',
-      data: await loadOrder(client, orderId)
+      data: await loadOrder(client, orderId, orderCafe)
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -249,7 +259,8 @@ export const placeOrder = async (req, res) => {
 export const listOrders = async (req, res) => {
   try {
     const filters = [];
-    const params = [];
+    // $1 is the café — selectOrder's WHERE reads it; filters append from $2.
+    const params = [req.actor?.cafe_id ?? null];
 
     if (req.query.status) {
       params.push(String(req.query.status).toUpperCase().split(','));
@@ -264,9 +275,9 @@ export const listOrders = async (req, res) => {
       filters.push(`o.status = ANY($${params.length})`);
     }
 
-    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const where = filters.length ? `AND ${filters.join(' AND ')}` : '';
     const orders = await pool.query(
-      `${SELECT_ORDER} ${where} ORDER BY o.created_at DESC LIMIT 100`, params
+      `${selectOrder(1)} ${where} ORDER BY o.created_at DESC LIMIT 100`, params
     );
 
     // One extra query for all items beats one per order.
@@ -303,9 +314,15 @@ export const listCustomerOrders = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only view your own orders' });
     }
 
+    /* Scoped to the café the customer belongs to, so a staff token from one
+       café cannot read another's order history through a customer id. */
+    const owner = await client.query(
+      'SELECT cafe_id FROM customers WHERE customer_id = $1', [customerId]);
+    const orderCafeId = req.actor?.cafe_id ?? owner.rows[0]?.cafe_id ?? null;
+
     const orders = await client.query(
-      `${SELECT_ORDER} WHERE o.customer_id = $1 ORDER BY o.created_at DESC LIMIT 25`,
-      [customerId]
+      `${selectOrder(2)} AND o.customer_id = $1 ORDER BY o.created_at DESC LIMIT 25`,
+      [customerId, orderCafeId]
     );
     const ids = orders.rows.map((o) => o.order_id);
     let itemsByOrder = {};
@@ -377,7 +394,7 @@ export const setOrderStatus = async (req, res) => {
     res.status(200).json({
       success: true,
       message: status === 'CANCELLED' ? 'Order cancelled and stock returned' : `Order marked ${status.toLowerCase()}`,
-      data: await loadOrder(client, id)
+      data: await loadOrder(client, id, req.actor?.cafe_id ?? null)
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

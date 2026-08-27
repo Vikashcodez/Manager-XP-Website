@@ -1,6 +1,9 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { resolveCode } from './discounts.Controller.js';
+import { activeMembershipDiscount, applyMembershipDiscount } from '../config/membershipPricing.js';
+import { customerStanding, checkCredit, outstandingFor } from '../config/customerTier.js';
+import { loadRules, pickRule, applyRule, describeRule } from '../config/pricingRules.js';
 import { getSetting } from '../config/settings.js';
 
 /*
@@ -16,6 +19,73 @@ const PAYMENT_METHODS = ['wallet', 'cash', 'card', 'upi', 'other'];
 const ITEM_TYPES = ['gaming', 'fnb', 'shop', 'other'];
 
 const money = (v) => Number(Number(v || 0).toFixed(2));
+
+/*
+ * What one line on the bill actually costs, right now.
+ *
+ * Two separate things can move a listed price, and the order they apply in is
+ * a real decision rather than an accident:
+ *
+ *   1. the pricing window — peak, off-peak, weekend, happy hour. This is the
+ *      café charging a different price at this hour; it changes what the item
+ *      *is worth*.
+ *   2. the member's discount — a benefit taken off whatever the price happens
+ *      to be.
+ *
+ * Window first, then membership, because that is what the two things mean: a
+ * Gold member during happy hour gets their 10% off the happy-hour price, not
+ * off a price nobody is charging. It is also the order the session engine
+ * already used, so a bill and a session agree.
+ *
+ * This exists because the windows were reaching sessions and nothing else.
+ * Gaming started under happy hour was discounted correctly, while a Coke rung
+ * up two feet away at the same moment was not — the till never consulted the
+ * rules at all.
+ */
+const priceLine = (listedPrice, { itemType, rules, when, membership }) => {
+  const base = money(listedPrice);
+
+  const rule = pickRule(rules || [], {
+    when: when || new Date(),
+    /* No game or station category is passed for a till line: a manually rung
+       gaming item carries no software id, so a window narrowed to one title
+       genuinely cannot be matched here and must not be guessed at. Café-wide
+       and per-kind windows — the common case — match normally. */
+    itemType: String(itemType || 'other').toUpperCase()
+  });
+
+  const afterRule = rule ? applyRule(base, rule) : base;
+
+  /*
+   * The customer's own discount — whichever of their two is better.
+   *
+   * A membership's perk is gaming-only, as it always was: it is sold as a
+   * discount on play. A regular's is the whole bill, because being a regular
+   * is a relationship with the café rather than a product bought against one
+   * kind of line. `customerStanding` has already picked between them, so the
+   * only decision left here is what the winning one is allowed to touch.
+   */
+  const percent = Number(membership?.percent) || 0;
+  const appliesHere = membership?.source === 'TIER' || itemType === 'gaming';
+  const discountPercent = appliesHere ? percent : 0;
+  const final = discountPercent > 0
+    ? applyMembershipDiscount(afterRule, discountPercent)
+    : afterRule;
+
+  const notes = [];
+  if (rule && afterRule !== base) notes.push(describeRule(rule));
+  if (discountPercent > 0) notes.push(`${membership.label} -${discountPercent}%`);
+
+  return { unitPrice: money(final), rule, notes };
+};
+
+/** Append what changed the price, without letting the column overflow. */
+const labelLine = (description, notes) => {
+  const text = String(description || '');
+  if (!notes.length) return text.slice(0, 255);
+  const suffix = ` (${notes.join(', ')})`;
+  return `${text.slice(0, 255 - suffix.length)}${suffix}`;
+};
 
 const shapeBill = (row, items = [], payments = []) => ({
   bill_id: row.bill_id,
@@ -105,7 +175,7 @@ const nextBillNumber = async (client) => {
  * Recalculate a bill from its items and payments, and move its status.
  * Called after anything that could change the arithmetic.
  */
-const recalculate = async (client, billId) => {
+export const recalculate = async (client, billId) => {
   const bill = await client.query('SELECT * FROM bills WHERE bill_id = $1 FOR UPDATE', [billId]);
   if (bill.rows.length === 0) return null;
   const row = bill.rows[0];
@@ -152,9 +222,13 @@ const recalculate = async (client, billId) => {
    * treatment, and the alternative overcharges the customer on money they did
    * not pay.
    */
-  const taxEnabled = String(await getSetting('billing.tax_enabled', 'false')) === 'true';
-  const taxPercent = Number(await getSetting('billing.tax_percent', 0)) || 0;
-  const taxInclusive = String(await getSetting('billing.tax_inclusive', 'false')) === 'true';
+  /* Read for the bill's own café. Tax registration is per business, so one
+     café turning GST on must not start charging it on another's bills — and
+     `row` is the bill itself, which carries the café that raised it. */
+  const taxCafe = row.cafe_id ?? null;
+  const taxEnabled = String(await getSetting('billing.tax_enabled', 'false', taxCafe)) === 'true';
+  const taxPercent = Number(await getSetting('billing.tax_percent', 0, taxCafe)) || 0;
+  const taxInclusive = String(await getSetting('billing.tax_inclusive', 'false', taxCafe)) === 'true';
 
   const taxable = Math.max(0, subtotal - discount);
   let tax;
@@ -326,80 +400,174 @@ export const createBill = async (req, res) => {
     await client.query('BEGIN');
 
     const currency = await getSetting('wallet.currency', 'XP');
-    const billNumber = await nextBillNumber(client);
 
     /*
-     * Derive the café rather than storing NULL when the caller omits it.
+     * A ticket tied to a session joins that session's bill if one already
+     * exists, rather than trying to raise a second one.
      *
-     * This used to be `cafe_id || null`, so every bill raised from the counter
-     * or by a closing session — neither of which passes one — belonged to no
-     * café at all. Any tenant-scoped read then skipped them silently, which is
-     * invisible on a single-café install and data loss on a second one.
-     *
-     * Order of preference: what the caller said, the session's café, the
-     * station's café, then the café on the authenticated token.
+     * A café can order food while a session is still running — that ticket is
+     * meant to sit open until the visit ends, not force payment on the spot.
+     * The database allows exactly one live bill per session
+     * (`idx_bills_one_live_per_session`), so a second trip to the till for
+     * the same session — another snack, then the gaming charge when the
+     * session ends — used to hit that constraint and be flatly refused. Now
+     * it lands on the same growing bill, which is the whole point of "add it
+     * now, settle everything later".
      */
-    let resolvedCafeId = cafe_id || null;
-    if (!resolvedCafeId && session_id) {
-      const fromSession = await client.query(
-        `SELECT COALESCE(s.cafe_id, p.cafe_id) AS cafe_id
-         FROM sessions s LEFT JOIN pcs p ON p.pc_id = s.pc_id
-         WHERE s.session_id = $1`,
+    let billId = null;
+    let joinedExisting = false;
+    if (session_id) {
+      const existing = await client.query(
+        `SELECT bill_id FROM bills WHERE session_id = $1 AND status <> 'VOID' FOR UPDATE`,
         [session_id]
       );
-      resolvedCafeId = fromSession.rows[0]?.cafe_id || null;
+      if (existing.rows.length) { billId = existing.rows[0].bill_id; joinedExisting = true; }
     }
-    if (!resolvedCafeId) resolvedCafeId = req.actor?.cafe_id || null;
 
-    const inserted = await client.query(
-      `INSERT INTO bills (bill_number, cafe_id, customer_id, guest_name, guest_phone,
-                          contact_channel, session_id, currency, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING bill_id`,
-      [
-        billNumber,
-        resolvedCafeId,
-        customer_id || null,
-        customer_id ? null : String(guest_name).slice(0, 255),
-        /* Kept for a registered customer too. They may ask for the receipt on
-           a different number from the one on their account, and the bill
-           should record where it was actually sent. */
-        guest_phone ? String(guest_phone).trim().slice(0, 32) : null,
-        ['whatsapp', 'sms', 'none'].includes(contact_channel) ? contact_channel : null,
-        session_id || null,
-        currency,
-        notes || null,
-        req.actor?.label || null
-      ]
-    );
-    const billId = inserted.rows[0].bill_id;
+    if (!billId) {
+      /*
+       * Derive the café rather than storing NULL when the caller omits it.
+       *
+       * This used to be `cafe_id || null`, so every bill raised from the
+       * counter or by a closing session — neither of which passes one —
+       * belonged to no café at all. Any tenant-scoped read then skipped them
+       * silently, which is invisible on a single-café install and data loss
+       * on a second one.
+       *
+       * Order of preference: what the caller said, the session's café, the
+       * station's café, then the café on the authenticated token.
+       */
+      let resolvedCafeId = cafe_id || null;
+      if (!resolvedCafeId && session_id) {
+        const fromSession = await client.query(
+          `SELECT COALESCE(s.cafe_id, p.cafe_id) AS cafe_id
+           FROM sessions s LEFT JOIN pcs p ON p.pc_id = s.pc_id
+           WHERE s.session_id = $1`,
+          [session_id]
+        );
+        resolvedCafeId = fromSession.rows[0]?.cafe_id || null;
+      }
+      if (!resolvedCafeId) resolvedCafeId = req.actor?.cafe_id || null;
+
+      const billNumber = await nextBillNumber(client);
+      const inserted = await client.query(
+        `INSERT INTO bills (bill_number, cafe_id, customer_id, guest_name, guest_phone,
+                            contact_channel, session_id, currency, notes, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING bill_id`,
+        [
+          billNumber,
+          resolvedCafeId,
+          customer_id || null,
+          customer_id ? null : String(guest_name).slice(0, 255),
+          /* Kept for a registered customer too. They may ask for the receipt
+             on a different number from the one on their account, and the
+             bill should record where it was actually sent. */
+          guest_phone ? String(guest_phone).trim().slice(0, 32) : null,
+          ['whatsapp', 'sms', 'none'].includes(contact_channel) ? contact_channel : null,
+          session_id || null,
+          currency,
+          notes || null,
+          req.actor?.label || null
+        ]
+      );
+      billId = inserted.rows[0].bill_id;
+    }
+    /* Joining an existing bill only ever adds lines to it — its customer,
+       notes and contact details are left exactly as they were, the same way
+       adding a line through `addItem` below never rewrites bill-level
+       fields. A second trip to the till is "add this too", not "replace
+       what I said the first time". */
+
+    /* A gaming line bought straight from the till, with no session either
+       side of it — there is no start-to-end window to snapshot across, so the
+       member's discount is simply whatever it is right now. Looked up once
+       for the whole ticket rather than per line: a customer does not hold two
+       memberships, and re-querying per line would only invite the two to
+       disagree if a plan changed between them. */
+    const membership = customer_id
+      ? await customerStanding(client, customer_id)
+      : { percent: 0, label: null };
+
+    /*
+     * Read once for the whole ticket, at one moment. Re-reading per line
+     * would let a window opening mid-transaction price the first half of a
+     * ticket differently from the second.
+     *
+     * Taken from the bill's own café rather than a local variable, because
+     * that is settled either way by this point — whether this call created
+     * the bill or joined one that was already open for the session.
+     */
+    const billCafe = (await client.query(
+      'SELECT cafe_id FROM bills WHERE bill_id = $1', [billId]
+    )).rows[0]?.cafe_id || null;
+    const rules = await loadRules(client, billCafe);
+    const pricedAt = new Date();
 
     for (const item of (Array.isArray(items) ? items : [])) {
       const quantity = Number(item.quantity || 1);
-      const unitPrice = Number(item.unit_price || 0);
+      const listedPrice = Number(item.unit_price || 0);
       if (!item.description || !Number.isFinite(quantity) || quantity <= 0 ||
-          !Number.isFinite(unitPrice) || unitPrice < 0) {
+          !Number.isFinite(listedPrice) || listedPrice < 0) {
         await client.query('ROLLBACK');
         return res.status(400).json({ success: false, message: 'Every line needs a description, a positive quantity and a price of zero or more' });
       }
+
+      const resolvedType = ITEM_TYPES.includes(item.item_type) ? item.item_type : 'other';
+      const priced = priceLine(listedPrice, {
+        itemType: resolvedType, rules, when: pricedAt, membership
+      });
+      const unitPrice = priced.unitPrice;
+      const description = labelLine(item.description, priced.notes);
+
       await client.query(
         `INSERT INTO bill_items (bill_id, item_type, reference_id, description, quantity, unit_price, amount)
          VALUES ($1,$2,$3,$4,$5,$6,$7)`,
         [
           billId,
-          ITEM_TYPES.includes(item.item_type) ? item.item_type : 'other',
+          resolvedType,
           item.reference_id || null,
-          String(item.description).slice(0, 255),
+          description,
           quantity,
-          money(unitPrice),
+          unitPrice,
           money(quantity * unitPrice)
         ]
       );
     }
 
     await recalculate(client, billId);
+
+    /*
+     * Whether this ticket may be left unpaid.
+     *
+     * Computed here, inside the transaction, so the figure the till is told
+     * matches the bill that was just written. It is advice rather than a
+     * refusal: raising the bill is what records what the customer took, and
+     * blocking that would leave the café with stock gone and nothing on
+     * paper. The till uses this to decide whether to offer "pay later" or to
+     * insist on payment now.
+     */
+    const bill = await loadBill(client, billId);
+    let credit = null;
+    if (customer_id) {
+      const verdict = await checkCredit(client, customer_id, bill.balance_due, billCafe, billId);
+      credit = {
+        can_pay_later: verdict.ok,
+        reason: verdict.reason || null,
+        message: verdict.message || null,
+        outstanding: verdict.owed ?? null,
+        credit_limit: verdict.limit ?? null,
+        remaining: verdict.remaining ?? null
+      };
+    }
+
     await client.query('COMMIT');
 
-    res.status(201).json({ success: true, message: 'Bill created', data: await loadBill(client, billId) });
+    res.status(201).json({
+      success: true,
+      message: joinedExisting ? 'Added to the open bill' : 'Bill created',
+      data: bill,
+      credit
+    });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     if (error.code === '23505') {
@@ -413,41 +581,75 @@ export const createBill = async (req, res) => {
 };
 
 /**
- * Raise a bill for a finished session. Used by the session controller, so it
- * takes an existing client and runs inside that transaction.
+ * Raise a bill for a finished session — or, more often now, join one that
+ * already exists.
+ *
+ * A café can order food while still playing, and that ticket is meant to sit
+ * open until the visit is over, not force payment on the spot. It settles as
+ * one bill with the gaming time, which means the gaming charge and an
+ * already-open food order are racing for the same session's bill: whichever
+ * happens first — a snack ordered mid-session, or the session ending —
+ * creates the bill, and the other has to join it rather than collide with it.
+ *
+ * `idx_bills_one_live_per_session` is the database's own rule that a session
+ * has exactly one live bill. This used to run straight into that rule the
+ * moment food had already been billed to a session: the INSERT below threw,
+ * and ending a session that had anything on its tab failed outright — the
+ * one moment a café least wants billing to break.
+ *
+ * Used by the session controller, so it takes an existing client and runs
+ * inside that transaction.
  */
 export const createBillForSession = async (client, session, actorLabel) => {
   const currency = await getSetting('wallet.currency', 'XP');
-  const billNumber = await nextBillNumber(client);
   const amount = money(session.amount);
 
-  // Casts are explicit: several of these arrive as null, and Postgres cannot
-  // infer a type for a bare null parameter.
-  const inserted = await client.query(
-    `INSERT INTO bills (bill_number, cafe_id, customer_id, guest_name, session_id,
-                        currency, created_by)
-     VALUES ($1::varchar, $2::int, $3::int, $4::varchar, $5::int, $6::varchar, $7::varchar)
-     RETURNING bill_id`,
-    [
-      billNumber,
-      session.cafe_id || null,
-      session.customer_id || null,
-      session.customer_id ? null : session.guest_name,
-      session.session_id,
-      currency,
-      actorLabel || null
-    ]
+  const existing = await client.query(
+    `SELECT bill_id FROM bills WHERE session_id = $1 AND status <> 'VOID' FOR UPDATE`,
+    [session.session_id]
   );
-  const billId = inserted.rows[0].bill_id;
+
+  let billId;
+  if (existing.rows.length) {
+    billId = existing.rows[0].bill_id;
+  } else {
+    const billNumber = await nextBillNumber(client);
+    // Casts are explicit: several of these arrive as null, and Postgres
+    // cannot infer a type for a bare null parameter.
+    const inserted = await client.query(
+      `INSERT INTO bills (bill_number, cafe_id, customer_id, guest_name, session_id,
+                          currency, created_by)
+       VALUES ($1::varchar, $2::int, $3::int, $4::varchar, $5::int, $6::varchar, $7::varchar)
+       RETURNING bill_id`,
+      [
+        billNumber,
+        session.cafe_id || null,
+        session.customer_id || null,
+        session.customer_id ? null : session.guest_name,
+        session.session_id,
+        currency,
+        actorLabel || null
+      ]
+    );
+    billId = inserted.rows[0].bill_id;
+  }
 
   const minutes = Math.max(1, Math.round(session.billable_seconds / 60));
+  /* The membership discount is already inside `amount` — it was applied by
+     amountForSeconds from the session's own snapshot before this was ever
+     called. This is only the receipt line saying why the figure is what it
+     is, not a second place the discount gets applied. */
+  const description = session.membership_label
+    ? `Gaming — ${minutes} min on ${session.pc_name || 'station'} (${session.membership_label} member)`
+    : `Gaming — ${minutes} min on ${session.pc_name || 'station'}`;
+
   await client.query(
     `INSERT INTO bill_items (bill_id, item_type, reference_id, description, quantity, unit_price, amount)
      VALUES ($1::int, 'gaming', $2::int, $3::varchar, 1, $4::numeric, $4::numeric)`,
     [
       billId,
       session.session_id,
-      `Gaming — ${minutes} min on ${session.pc_name || 'station'}`,
+      description,
       amount
     ]
   );
@@ -615,6 +817,24 @@ export const addItem = async (req, res) => {
     }
 
     const resolvedType = ITEM_TYPES.includes(item_type) ? item_type : 'other';
+    const isGaming = resolvedType === 'gaming';
+
+    /* Same rule as the till: a gaming line added to an open bill (typically
+       from the Gaming Price picker in the Add Item dialog) gets the bill's
+       own customer's standing discount, if they have one. */
+    const membership = isGaming && found.bill.customer_id
+      ? await customerStanding(client, found.bill.customer_id)
+      : { percent: 0, label: null };
+
+    /* And the same windows. A snack added to a running tab during happy hour
+       has to be priced the same as one rung up on a fresh ticket at that
+       moment — otherwise the discount depends on which button staff pressed. */
+    const rules = await loadRules(client, found.bill.cafe_id);
+    const priced = priceLine(price, {
+      itemType: resolvedType, rules, when: new Date(), membership
+    });
+    const unitPrice = priced.unitPrice;
+    const finalDescription = labelLine(description, priced.notes);
 
     await client.query(
       `INSERT INTO bill_items (bill_id, item_type, reference_id, description, quantity, unit_price, amount)
@@ -623,8 +843,8 @@ export const addItem = async (req, res) => {
         id,
         resolvedType,
         reference_id || null,
-        String(description).slice(0, 255),
-        qty, money(price), money(qty * price)
+        finalDescription,
+        qty, unitPrice, money(qty * unitPrice)
       ]
     );
 

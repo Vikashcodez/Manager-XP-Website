@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
+import { issueVerificationCode } from './emailVerification.Controller.js';
 
 // Register user
 export const register = async (req, res) => {
@@ -55,19 +56,27 @@ export const register = async (req, res) => {
 
     user.cafe_id = cafeResult.rows.length > 0 ? cafeResult.rows[0].cafe_id : null;
 
-    // Generate token
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE }
-    );
+    /*
+     * The address is not trusted yet. A code goes out now and the account
+     * cannot be signed into until it comes back — see `login` below.
+     *
+     * No token is issued here, deliberately: handing out a session at the same
+     * moment we claim the address is unproven would make the verification
+     * decorative.
+     */
+    const verification = await issueVerificationCode(user);
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: verification.sent
+        ? `Account created. We sent a six-digit code to ${user.email} — enter it to finish signing up.`
+        : `Account created, but the verification email could not be sent (${verification.message}). Try “Resend code”.`,
       data: {
         user,
-        token
+        // What the frontend keys off to show the code screen instead of a dashboard.
+        verification_required: true,
+        verification_sent: verification.sent,
+        email: user.email
       }
     });
 
@@ -105,7 +114,7 @@ export const login = async (req, res) => {
 
     // Regular user login
     const result = await pool.query(
-      'SELECT id, email, phone_number, name, address, password, role FROM users WHERE email = $1',
+      'SELECT id, email, phone_number, name, address, password, role, email_verified FROM users WHERE email = $1',
       [email]
     );
 
@@ -130,6 +139,23 @@ export const login = async (req, res) => {
 
     // Remove password from response
     delete user.password;
+
+    /*
+     * An address that has never been confirmed cannot open a session.
+     *
+     * Checked after the password so this cannot be used to discover which
+     * addresses are registered — only somebody who already knows the password
+     * learns that the account is pending. The response says exactly what to do
+     * and the frontend reads `verification_required` to open the code screen,
+     * rather than showing a dead end.
+     */
+    if (user.email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Verify your email address to finish setting up this account. Check your inbox for the six-digit code.',
+        data: { verification_required: true, email: user.email }
+      });
+    }
 
     /*
      * The café this account is scoped to.

@@ -4,3 +4,5 @@ node_modules/
 dist/
 build/
 *.log
+# Support ticket attachments — customer files, never in git.
+storage/

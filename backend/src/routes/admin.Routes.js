@@ -49,6 +49,11 @@ import {
   listLoginEvents, listRoles, setRolePermissions, createRole
 } from '../controllers/adminUsers.Controller.js';
 import { requireAdmin, requirePermission } from '../middleware/adminAuth.js';
+import { loginLimiter, resetLimiter } from '../middleware/rateLimit.js';
+import {
+  adminListTickets, adminGetTicket, adminReply, adminUpdateTicket, adminGetAttachment
+} from '../controllers/support.Controller.js';
+import { supportUpload, handleUploadErrors } from '../middleware/supportUpload.js';
 
 const router = express.Router();
 
@@ -59,9 +64,12 @@ const router = express.Router();
    live inside the controller, on the database row, so restarting the process
    does not reset an attacker's allowance.
    ========================================================================== */
-router.post('/auth/login', login);
-router.post('/auth/forgot-password', forgotPassword);
-router.post('/auth/reset-password', resetPassword);
+/* The controller already enforces a per-account lockout on the database row;
+   these IP limiters sit in front of it as defence in depth — a distributed or
+   enumeration attempt is turned away before it reaches the account logic. */
+router.post('/auth/login', loginLimiter, login);
+router.post('/auth/forgot-password', resetLimiter, forgotPassword);
+router.post('/auth/reset-password', resetLimiter, resetPassword);
 
 /* ========================================================================== */
 router.use(requireAdmin);
@@ -160,6 +168,17 @@ router.post('/addons', requirePermission('addons.edit'), createAddon);
    who can do what is dmins.manage. The controller adds the refusals that
    permissions cannot express — self-lockout, last super admin, and granting
    authority you do not hold. */
+/* Support tickets. One permission covers the desk: somebody who answers
+   customers needs to read every ticket and reply to it, and splitting "read"
+   from "reply" would only produce a support agent who can see a problem and
+   not respond to it. */
+router.get('/support/tickets', requirePermission('support.manage'), adminListTickets);
+router.get('/support/tickets/:id', requirePermission('support.manage'), adminGetTicket);
+router.post('/support/tickets/:id/reply', requirePermission('support.manage'),
+  supportUpload.array('files', 5), handleUploadErrors, adminReply);
+router.patch('/support/tickets/:id', requirePermission('support.manage'), adminUpdateTicket);
+router.get('/support/attachments/:id', requirePermission('support.manage'), adminGetAttachment);
+
 router.get('/admin-users', requirePermission('admins.view'), listAdminUsers);
 router.post('/admin-users', requirePermission('admins.manage'), createAdminUser);
 router.patch('/admin-users/:id', requirePermission('admins.manage'), updateAdminUser);

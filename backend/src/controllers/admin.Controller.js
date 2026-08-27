@@ -15,7 +15,8 @@
 import pool from '../config/database.js';
 import { recordAdminAudit } from '../middleware/adminAuth.js';
 import {
-  getSubscription, getUsage, getEntitlements, listModules, listFeatures
+  getSubscription, getUsage, getEntitlements, listModules, listFeatures,
+  normalizeStationLimits
 } from '../modules/entitlements/entitlements.service.js';
 
 /* ==========================================================================
@@ -480,6 +481,7 @@ export const listPackages = async (req, res) => {
     const { rows } = await pool.query(`
       SELECT p.sub_id AS plan_id, p.code, p.name, p.description, p.status,
              p.max_branches, p.max_pcs, p.max_users, p.max_managers, p.max_installations,
+             p.station_limits,
              p.is_freetrial, p.is_public, p.sort_order, p.no_of_days,
              COALESCE(json_agg(DISTINCT jsonb_build_object(
                'billing_period', pp.billing_period, 'currency', pp.currency, 'price', pp.price
@@ -539,7 +541,8 @@ export const getPackage = async (req, res) => {
 
 const PLAN_FIELDS = [
   'name', 'description', 'status', 'max_branches', 'max_pcs', 'max_users',
-  'max_managers', 'max_installations', 'no_of_days', 'sort_order', 'is_public'
+  'max_managers', 'max_installations', 'no_of_days', 'sort_order', 'is_public',
+  'station_limits'
 ];
 
 /** POST /api/admin/packages */
@@ -602,6 +605,14 @@ export const updatePackage = async (req, res) => {
     const id = Number(req.params.id);
     const before = (await pool.query('SELECT * FROM subscription_plans WHERE sub_id = $1', [id])).rows[0];
     if (!before) return res.status(404).json({ success: false, message: 'Not found' });
+
+    /* The per-type map is cleaned before it is stored — zeros, negatives and
+       non-numeric entries are dropped rather than saved, so a stray "0" can
+       never become a cap that locks a café out of a whole station type.
+       Serialised here so the generic writer below stores valid jsonb. */
+    if (req.body.station_limits !== undefined) {
+      req.body.station_limits = JSON.stringify(normalizeStationLimits(req.body.station_limits));
+    }
 
     const sets = [];
     const params = [id];

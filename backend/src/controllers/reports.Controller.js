@@ -35,6 +35,29 @@ const range = (req) => {
 const badRange = (res) =>
   res.status(400).json({ success: false, message: 'Give a valid from and to date' });
 
+/*
+ * `finance` and `games` below are scoped to `req.actor.cafe_id`, unlike the
+ * six reports above them. Those were written before this install carried
+ * more than one café and were never revisited — every query above reads
+ * `bills`/`sessions`/`orders`/`customers` with no café filter at all, so a
+ * café's staff can currently see another café's revenue and top spenders.
+ * `customers` itself has no `cafe_id` column to filter by, which is a
+ * schema gap, not a query bug, and is well beyond what a reporting feature
+ * should silently rewrite. It is called out here rather than fixed here.
+ *
+ * Both new endpoints avoid adding to that hole: neither joins `customers`
+ * for anything but a display name already reached through a café-scoped
+ * `sessions` row.
+ */
+const requireCafe = (req, res) => {
+  const cafeId = req.actor?.cafe_id;
+  if (!cafeId) {
+    res.status(403).json({ success: false, message: 'This account is not tied to a café' });
+    return null;
+  }
+  return cafeId;
+};
+
 /* ==========================================================================
    SUMMARY
    ========================================================================== */
@@ -425,6 +448,176 @@ export const products = async (req, res) => {
     });
   } catch (error) {
     console.error('Error building product report:', error);
+    res.status(500).json({ success: false, message: 'Error building the report' });
+  }
+};
+
+/* ==========================================================================
+   FINANCE — revenue against expenses
+   ========================================================================== */
+/*
+ * GET /api/reports/finance?from=&to=&bucket=day|week|month
+ *
+ * The comparison a "how are we doing" question actually needs: what came in
+ * against what went out, bucketed the same way `revenue()` already is, and
+ * gap-filled the same way — a quiet day is a zero, not a missing point that
+ * would make a line chart jump.
+ */
+export const finance = async (req, res) => {
+  try {
+    const cafeId = requireCafe(req, res);
+    if (!cafeId) return;
+    const window = range(req);
+    if (!window) return badRange(res);
+
+    const bucket = ['day', 'week', 'month'].includes(req.query.bucket)
+      ? req.query.bucket
+      : 'day';
+
+    const result = await pool.query(
+      `WITH span AS (
+         SELECT generate_series(
+           date_trunc($4, $2::timestamptz),
+           date_trunc($4, $3::timestamptz),
+           ('1 ' || $4)::interval
+         ) AS at
+       ),
+       billed AS (
+         SELECT date_trunc($4, created_at) AS at, SUM(total) AS revenue
+           FROM bills WHERE cafe_id = $1 AND created_at BETWEEN $2 AND $3
+          GROUP BY 1
+       ),
+       spent AS (
+         SELECT date_trunc($4, expense_date::timestamptz) AS at, SUM(amount) AS expenses
+           FROM expenses
+          WHERE cafe_id = $1 AND status = 'ACTIVE'
+            AND expense_date BETWEEN $2::date AND $3::date
+          GROUP BY 1
+       )
+       SELECT span.at,
+              COALESCE(billed.revenue, 0)  AS revenue,
+              COALESCE(spent.expenses, 0)  AS expenses
+         FROM span
+         LEFT JOIN billed ON billed.at = span.at
+         LEFT JOIN spent  ON spent.at  = span.at
+        ORDER BY span.at`,
+      [cafeId, window.from, window.to, bucket]
+    );
+
+    const totalRevenue = result.rows.reduce((s, r) => s + num(r.revenue), 0);
+    const totalExpenses = result.rows.reduce((s, r) => s + num(r.expenses), 0);
+
+    res.status(200).json({
+      success: true,
+      window: { ...window, bucket },
+      data: {
+        points: result.rows.map((r) => ({
+          at: r.at,
+          revenue: num(r.revenue),
+          expenses: num(r.expenses),
+          profit: Number((num(r.revenue) - num(r.expenses)).toFixed(2))
+        })),
+        total_revenue: Number(totalRevenue.toFixed(2)),
+        total_expenses: Number(totalExpenses.toFixed(2)),
+        profit: Number((totalRevenue - totalExpenses).toFixed(2))
+      }
+    });
+  } catch (error) {
+    console.error('Error building finance report:', error);
+    res.status(500).json({ success: false, message: 'Error building the report' });
+  }
+};
+
+/* ==========================================================================
+   GAMES — which customer played which game
+   ========================================================================== */
+/*
+ * GET /api/reports/games?from=&to=&limit=
+ *
+ * One row per game and per customer who played it, so a game's popularity
+ * and who is actually paying for it are the same table rather than two
+ * reports someone has to cross-reference by hand.
+ *
+ * Only sessions with a `gaming_price_id` are included — a session priced
+ * before that column existed, or one billed at a plain hourly rate with no
+ * catalogue entry, has no game to attribute the time to. It still counts in
+ * every other report; it simply cannot appear in a report about which game
+ * was played.
+ *
+ * Revenue here is `amount_charged` on the session itself, the same source
+ * `stations()` and `customers()` above already use for a per-entity figure —
+ * not the bill, which may bundle food and drink alongside the gaming line.
+ */
+export const games = async (req, res) => {
+  try {
+    const cafeId = requireCafe(req, res);
+    if (!cafeId) return;
+    const window = range(req);
+    if (!window) return badRange(res);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+
+    const result = await pool.query(
+      `SELECT sm.software_id, sm.software_name, sm.category,
+              s.customer_id,
+              COALESCE(c.customer_name, s.guest_name, 'Guest') AS customer_name,
+              (s.customer_id IS NULL) AS is_guest,
+              COUNT(*)::int                          AS sessions,
+              COALESCE(SUM(s.billable_seconds), 0)   AS play_seconds,
+              COALESCE(SUM(s.amount_charged), 0)     AS revenue
+         FROM sessions s
+         JOIN gaming_prices gp   ON gp.id = s.gaming_price_id
+         JOIN software_master sm ON sm.software_id = gp.software_id
+         LEFT JOIN customers c   ON c.customer_id = s.customer_id
+        WHERE s.cafe_id = $1 AND s.status = 'ended'
+          AND s.started_at BETWEEN $2 AND $3
+        GROUP BY sm.software_id, sm.software_name, sm.category,
+                 s.customer_id, c.customer_name, s.guest_name
+        ORDER BY sm.software_name, revenue DESC
+        LIMIT $4`,
+      [cafeId, window.from, window.to, limit]
+    );
+
+    // The same rows, rolled up per game, so the screen can lead with "what
+    // was popular" and let "who played it" be the thing you open.
+    const byGame = new Map();
+    result.rows.forEach((r) => {
+      const key = r.software_id;
+      if (!byGame.has(key)) {
+        byGame.set(key, {
+          software_id: r.software_id,
+          software_name: r.software_name,
+          category: r.category,
+          sessions: 0,
+          play_hours: 0,
+          revenue: 0
+        });
+      }
+      const g = byGame.get(key);
+      g.sessions += r.sessions;
+      g.play_hours = Number((g.play_hours + num(r.play_seconds) / 3600).toFixed(2));
+      g.revenue = Number((g.revenue + num(r.revenue)).toFixed(2));
+    });
+
+    res.status(200).json({
+      success: true,
+      window,
+      data: {
+        games: Array.from(byGame.values()).sort((a, b) => b.revenue - a.revenue),
+        rows: result.rows.map((r) => ({
+          software_id: r.software_id,
+          software_name: r.software_name,
+          category: r.category,
+          customer_id: r.customer_id,
+          customer_name: r.customer_name,
+          is_guest: r.is_guest,
+          sessions: r.sessions,
+          play_hours: Number((num(r.play_seconds) / 3600).toFixed(2)),
+          revenue: num(r.revenue)
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error building games report:', error);
     res.status(500).json({ success: false, message: 'Error building the report' });
   }
 };

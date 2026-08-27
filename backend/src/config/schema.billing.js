@@ -328,7 +328,7 @@ export const initializeBilling = async (client) => {
       ('mail.smtp_password', '', 'string', 'mail', 'SMTP password'),
       ('mail.from_address', 'no-reply@managerxp.com', 'string', 'mail', 'Address outbound email is sent from'),
       ('mail.from_name', 'ManagerXP', 'string', 'mail', 'Display name on outbound email')
-    ON CONFLICT (setting_key) DO NOTHING
+    ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
   `);
 
   /* Repeated after the seed, because on a first boot the rows above did not

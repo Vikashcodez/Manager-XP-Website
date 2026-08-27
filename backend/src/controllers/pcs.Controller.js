@@ -1,6 +1,7 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
+import { checkStationLimit } from '../modules/entitlements/entitlements.service.js';
 
 // Get all PCs with optional filtering
 /*
@@ -236,13 +237,15 @@ export const updatePC = async (req, res) => {
     } = req.body;
 
     // Check if PC exists, and that it is this café's to change
-    const pcCheck = await pool.query('SELECT pc_id, cafe_id FROM pcs WHERE pc_id = $1', [id]);
+    const pcCheck = await pool.query(
+      'SELECT pc_id, cafe_id, organization_id, category FROM pcs WHERE pc_id = $1', [id]);
     if (pcCheck.rows.length === 0 || deniesCafe(req, pcCheck.rows[0].cafe_id)) {
       return res.status(404).json({
         success: false,
         message: 'PC not found'
       });
     }
+    const existingPc = pcCheck.rows[0];
 
     // Build dynamic update query
     const updates = [];
@@ -322,6 +325,19 @@ export const updatePC = async (req, res) => {
        restricted to one type. */
     if (category !== undefined) {
       const clean = category === null ? null : String(category).trim().slice(0, 60);
+
+      /* A per-type cap on the plan is enforced here, where a station is given
+         its type. Only when actually moving *to* a type — clearing it, or
+         leaving it unchanged, is never blocked — and the station itself is
+         excluded from the count so re-saving the same type is a no-op. The
+         overall max_pcs cap is enforced separately at registration. */
+      if (clean && clean !== existingPc.category && existingPc.organization_id) {
+        const room = await checkStationLimit(existingPc.organization_id, clean, Number(id));
+        if (!room.ok) {
+          return res.status(409).json({ success: false, message: room.message, data: room });
+        }
+      }
+
       updates.push(`category = $${paramCounter++}`);
       queryParams.push(clean || null);
     }

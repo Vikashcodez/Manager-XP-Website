@@ -18,6 +18,24 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  /* Where the browser goes to start a Google sign-in — the backend endpoint,
+     which redirects on to Google's consent screen. */
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const googleUrl = `${API_BASE}/api/auth/google`;
+
+  /* A failed Google sign-in comes back to /login?error=<code>. Turn the code
+     into something a person can read; anything unmapped gets a safe generic. */
+  const googleError = (() => {
+    const code = new URLSearchParams(location.search).get('error');
+    if (!code) return '';
+    return {
+      google_not_configured: 'Google sign-in is not set up on this server yet.',
+      google_denied: 'Google sign-in was cancelled.',
+      google_email_unverified: 'That Google account has no verified email, so it cannot be used to sign in.',
+      google_state_invalid: 'That Google sign-in link has expired. Please try again.'
+    }[code] || 'Google sign-in could not be completed. Please try again.';
+  })();
   /* Held in state rather than read from location on every render, so it
      survives a failed sign-in attempt clearing the error beneath it. */
   const [notice] = useState(location.state?.notice || '');
@@ -77,10 +95,10 @@ const Login = () => {
             {notice}
           </div>
         )}
-        {error && (
+        {(error || googleError) && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            {error}
+            {error || googleError}
           </div>
         )}
       </div>
@@ -104,9 +122,17 @@ const Login = () => {
         </div>
 
         <div>
-          <label htmlFor="password" className={authLabelClasses}>
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className={authLabelClasses}>
+              Password
+            </label>
+            <Link
+              to="/forgot-password"
+              className="text-xs text-neutral-500 hover:text-red-400 underline underline-offset-4 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <input
               id="password"
@@ -153,6 +179,28 @@ const Login = () => {
           )}
         </button>
       </form>
+
+      {/* Google sign-in. A plain link, not a fetch: OAuth is a full-page
+          navigation to Google and back, so the browser must actually leave. */}
+      <div className="relative my-5 flex items-center">
+        <div className="flex-grow border-t border-white/10" />
+        <span className="mx-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">or</span>
+        <div className="flex-grow border-t border-white/10" />
+      </div>
+      <a
+        href={googleUrl}
+        className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.03]
+                   py-2.5 text-sm font-semibold text-neutral-200 transition-colors
+                   hover:border-white/20 hover:bg-white/[0.06] active:scale-[0.99]"
+      >
+        <svg className="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5h-1.9V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.6 6.1 29.1 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.6 6.1 29.1 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5 0 9.5-1.9 12.9-5l-6-5c-2 1.4-4.5 2.2-6.9 2.2-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6 5C40.9 36.7 44 31 44 24c0-1.3-.1-2.3-.4-3.5z"/>
+        </svg>
+        Continue with Google
+      </a>
     </AuthLayout>
   );
 };

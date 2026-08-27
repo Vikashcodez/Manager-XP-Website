@@ -205,4 +205,22 @@ html {
     outline-offset: 2px;
     border-radius: 2px;
   }
+
+  /*
+     Every <select> on the site is styled with white text for the dark theme,
+     which the browser also applies to its native option-list popup — a popup
+     it otherwise renders with its own light background. That leaves white
+     text on white with no way to read it. `color-scheme: dark` tells the
+     browser to draw that popup in dark colors instead; the explicit
+     background/color on <option> is the fallback for engines that ignore
+     color-scheme on a per-element basis.
+  */
+  select {
+    color-scheme: dark;
+  }
+
+  select option {
+    background-color: #171717;
+    color: #fff;
+  }
 }

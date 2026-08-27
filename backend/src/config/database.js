@@ -5,6 +5,16 @@ import { initializeCatalogue } from './schema.catalogue.js';
 import { initializeAdmin } from './schema.admin.js';
 import { initializeBilling } from './schema.billing.js';
 import { initializeLocations } from './schema.locations.js';
+import { initializeExpenses } from './schema.expenses.js';
+import { initializePricingRules } from './schema.pricingRules.js';
+import { initializeCatalogueTenancy } from './schema.catalogueTenancy.js';
+import { initializeAccountReset } from './schema.accountReset.js';
+import { initializeCafeScoping } from './schema.cafeScoping.js';
+import { initializeSettingsScoping } from './schema.settingsScoping.js';
+import { initializeCustomerTiers } from './schema.customerTiers.js';
+import { initializeSoftwareCategories } from './schema.softwareCategories.js';
+import { initializeGames } from './schema.games.js';
+import { initializeSupport } from './schema.support.js';
 
 const { Pool } = pg;
 
@@ -35,6 +45,50 @@ export const initializeDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    /*
+     * Email verification for new accounts.
+     *
+     * A code is emailed on sign-up and the address is not trusted until it
+     * comes back. Only the hash of the code is stored, it expires, and attempts
+     * are counted — the same discipline the password-reset OTP uses.
+     *
+     * The two-step default is deliberate: adding the column with DEFAULT TRUE
+     * marks every account that already existed as verified, then the default
+     * flips to FALSE for everyone who signs up from now on. Adding it as FALSE
+     * would have locked out every existing customer on the next deploy.
+     */
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS verify_otp_hash VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS verify_otp_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS verify_otp_attempts SMALLINT NOT NULL DEFAULT 0
+    `);
+    await client.query(`ALTER TABLE users ALTER COLUMN email_verified SET DEFAULT FALSE`);
+
+    /* "Sign in with Google". A Google account is linked to a users row by its
+       stable subject id, and the profile picture is kept so the app can show
+       it. auth_provider records how the row was first created — a password
+       account and a Google one are both just users rows, but knowing which is
+       which is what lets "you signed up with Google, use that button" be an
+       accurate message rather than a guess. A Google-created row still has a
+       password column (NOT NULL): it is filled with a random unusable hash,
+       the same pattern admin_users uses, so nobody can sign into it with a
+       password nobody set. */
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS google_id VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+        ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(16) NOT NULL DEFAULT 'local'
+    `);
+    /* Partial unique index, not a UNIQUE column: every password account has a
+       NULL google_id, and a UNIQUE column would still let those coexist, but a
+       partial index states the intent — at most one row per Google identity. */
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id
+        ON users (google_id) WHERE google_id IS NOT NULL
     `);
 
     // subscription plans table
@@ -304,7 +358,21 @@ export const initializeDatabase = async () => {
         ADD COLUMN IF NOT EXISTS flat_amount NUMERIC(10,2),
         ADD COLUMN IF NOT EXISTS price_label VARCHAR(255),
         ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP
+        ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP,
+        -- A membership's "% off gaming" perk, snapshotted the same way the
+        -- gaming price itself is: at start, never touched again. A membership
+        -- that lapses or is cancelled mid-session must not reach back and
+        -- raise the price on someone already playing under the old terms.
+        ADD COLUMN IF NOT EXISTS membership_discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS membership_label VARCHAR(80),
+        -- One block's price and length, for a BLOCK session. flat_amount and
+        -- planned_minutes hold the running totals and grow with every
+        -- extension, so the size of a single "add another block" cannot be
+        -- read back from them once the first extension has landed. These two
+        -- keep the unit fixed at the price it was sold at — an extension is
+        -- always another block at the original terms, never today's price.
+        ADD COLUMN IF NOT EXISTS block_unit_amount NUMERIC(10,2),
+        ADD COLUMN IF NOT EXISTS block_unit_minutes INTEGER
     `);
 
     /* 'cancelled' joins the existing statuses. A session started by mistake is
@@ -430,6 +498,27 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    /*
+     * Per-café shape, applied before anything seeds a default.
+     *
+     * The seeds below all use `ON CONFLICT (setting_key) WHERE cafe_id IS
+     * NULL`, which needs the partial index to already exist — so this cannot
+     * wait for the tenancy migrations at the end of this function. The
+     * foreign key to cafes is added there instead, once that table exists.
+     */
+    await client.query(`
+      ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS cafe_id INTEGER
+    `);
+    await client.query(`ALTER TABLE app_settings DROP CONSTRAINT IF EXISTS app_settings_pkey`);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_app_settings_default
+        ON app_settings (setting_key) WHERE cafe_id IS NULL
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_app_settings_cafe
+        ON app_settings (setting_key, cafe_id) WHERE cafe_id IS NOT NULL
+    `);
+
     // Seed the defaults. ON CONFLICT DO NOTHING means an operator's edits are
     // never overwritten by a restart.
     await client.query(`
@@ -455,7 +544,7 @@ export const initializeDatabase = async () => {
          'How the Floor page arranges stations: grid, rows, zones or list'),
         ('floor.card_size',               'normal','string','floor',
          'Station card size on the Floor page: compact, normal or large')
-      ON CONFLICT (setting_key) DO NOTHING
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     console.log('✅ Settings table created/verified');
@@ -1079,7 +1168,7 @@ export const initializeDatabase = async () => {
          'Temperature in Celsius at which a station is flagged'),
         ('telemetry.stale_seconds',  '90',  'number', 'telemetry',
          'Seconds without a sample after which a station is treated as not reporting')
-      ON CONFLICT (setting_key) DO NOTHING
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     await client.query(`
@@ -1479,7 +1568,7 @@ export const initializeDatabase = async () => {
       INSERT INTO app_settings (setting_key, setting_value, value_type, category, description) VALUES
         ('topup.cash_enabled', 'true', 'boolean', 'wallet',
          'Let customers request a cash top-up for staff to approve at the counter')
-      ON CONFLICT (setting_key) DO NOTHING
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     /*
@@ -1546,7 +1635,7 @@ export const initializeDatabase = async () => {
          'Coins credited per unit of currency paid'),
         ('topup.presets',      '100,250,500,1000', 'string', 'wallet',
          'Quick-pick top-up amounts shown on the station')
-      ON CONFLICT (setting_key) DO NOTHING
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     await client.query(`
@@ -1607,6 +1696,20 @@ export const initializeDatabase = async () => {
     `).catch(() => { /* constraint already present */ });
     await client.query(`
       ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS setup_fee NUMERIC(12,2) NOT NULL DEFAULT 0
+    `);
+
+    /* Per-station-type ceilings, on top of the single max_pcs total.
+       A JSON map of { "<category>": <max> } — e.g. {"PS5": 4, "Pool": 2}.
+       The categories are the café-defined station types (PS5, Pool, VR, Dart,
+       …), so this is a free map rather than fixed columns: a type nobody caps
+       simply is not a key here and is bounded only by max_pcs. Lives on the
+       plan as the default; a subscription can override it per customer, the
+       same way max_pcs does. */
+    await client.query(`
+      ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS station_limits JSONB
+    `);
+    await client.query(`
+      ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS station_limits JSONB
     `);
 
     /*
@@ -1928,7 +2031,7 @@ export const initializeDatabase = async () => {
          'When to apply a staged console update: start_of_day, end_of_day or manual'),
         ('updates.server_apply_at',   '04:00', 'string', 'system',
          'Time of day the console applies its own staged update (HH:MM)')
-      ON CONFLICT (setting_key) DO NOTHING
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     /* The old key, superseded by the per-component modes above. Left in place
@@ -2162,8 +2265,42 @@ export const initializeDatabase = async () => {
         ('billing.receipt_show', 'logo,address,phone,tax_number,cashier,customer,footer', 'string', 'billing',
          'Which optional blocks the receipt prints'),
         ('billing.receipt_header_note','', 'string', 'billing',
-         'Optional line under the café name, e.g. a tagline')
-      ON CONFLICT (setting_key) DO NOTHING
+         'Optional line under the café name, e.g. a tagline'),
+
+        /* The ManagerXP mark under the café's own footer.
+           A separate key rather than another entry in receipt_show, because
+           that column already exists on every install with its own value —
+           adding a name to the default list would not switch it on for
+           anybody who had ever opened the editor. This defaults to true on
+           its own terms, and turning it off is one click. */
+        ('billing.receipt_powered_by','true', 'boolean', 'billing',
+         'Print the small "Powered by ManagerXP" line at the foot of receipts'),
+
+        /* The PIN that unlocks a station's kiosk from the keyboard.
+           Blank means the Ctrl+Alt+Shift+Q escape hatch is refused outright —
+           safe by default, because a station that ships with a known PIN is
+           a station every customer can unlock. Set one in Settings to enable
+           it. Staff can always minimise a client from the console instead,
+           which needs no PIN because it is already an authenticated action. */
+        ('client.staff_unlock_pin','', 'string', 'client',
+         'Four-digit PIN staff type after Ctrl+Alt+Shift+Q to unlock a station kiosk'),
+
+        /* What happens on a station when a session ends.
+
+           The three that are on by default are housekeeping: the game stops,
+           CafeXP forgets the customer, the machine goes back on the floor.
+
+           The two that are off by default touch the customer's own launcher
+           accounts. Signing a launcher out is what stops the next customer
+           inheriting the last one's Steam or Riot login — it is the point of
+           the feature — but it also clears saved credentials on that machine,
+           so it is switched on deliberately per launcher rather than assumed.
+           The signout field is a per-launcher map, e.g. Steam true, Riot true. */
+        ('session.cleanup',
+         '{"close_game":true,"close_launcher":false,"clear_session":true,"return_available":true,"signout":{}}',
+         'json', 'client',
+         'What a station does when a session ends: close the game, close or sign out of launchers, free the PC')
+      ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 
     console.log('✅ Refund tables created/verified');
@@ -2190,7 +2327,45 @@ export const initializeDatabase = async () => {
        matching, and its columns hang off tables created above. */
     await initializeLocations(client);
 
+    // Expenses reference cafes only, so any point after tenancy is safe —
+    // placed last simply because it is the newest addition.
+    await initializeExpenses(client);
+
+    /* Pricing rules reference cafes and software_master, and add columns to
+       sessions — all of which exist by this point. */
+    await initializePricingRules(client);
+
+    /* Last: it backfills using sessions and pcs, so every table it reads to
+       decide ownership must already exist and be populated. */
+    await initializeCatalogueTenancy(client);
+
+    // References software_master and cafes, both settled by now.
+    await initializeSoftwareCategories(client);
+
+    // Adds columns to users and customers, both created at the top of this function.
+    await initializeAccountReset(client);
+
+    /* Last of the tenancy work: it traces ownership through bills, sessions
+       and stations, so every one of those must already be in place. */
+    await initializeCafeScoping(client);
+
+    /* Settings last: it drops app_settings' primary key, so anything that
+       seeds a setting must already have run. */
+    await initializeSettingsScoping(client);
+
+    // Adds columns to customers, which by now carries its cafe_id.
+    await initializeCustomerTiers(client);
+
     console.log('✅ Platform billing tables created/verified');
+
+    /* Game library depends on cafes (for the seed's café) and pcs (for
+       pc_games), both created above, so it runs here near the end. */
+    await initializeGames(client);
+    console.log('✅ Game library created/verified');
+
+    /* Depends on organizations, branches, users and admin_users. */
+    await initializeSupport(client);
+    console.log('✅ Support tickets created/verified');
 
 
 

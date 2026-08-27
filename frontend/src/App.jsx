@@ -15,6 +15,8 @@ const About = lazy(() => import('./Pages/About'))
 const Contact = lazy(() => import('./Pages/Contact'))
 const BookDemoPage = lazy(() => import('./Pages/BookDemo'))
 const Login = lazy(() => import('./Pages/Login'))
+const ForgotPassword = lazy(() => import('./Pages/ForgotPassword'))
+const GoogleCallback = lazy(() => import('./Pages/GoogleCallback'))
 
 const StoreLogin = lazy(() => import('./Pages/StoreLogin'))
 
@@ -52,6 +54,7 @@ const PortalHelp = fromSimple('Help')
 // audience claim, its own chunk.
 const ManagerXpShell = lazy(() => import('./components/managerxp/ManagerXpShell'))
 const MxDashboard = lazy(() => import('./Pages/managerxp/Dashboard'))
+const MxSupport = lazy(() => import('./Pages/managerxp/Support'))
 const MxOrganizations = lazy(() => import('./Pages/managerxp/Organizations'))
 const MxOrganizationDetail = lazy(() => import('./Pages/managerxp/OrganizationDetail'))
 const fromPackages = (name) =>
@@ -86,7 +89,8 @@ const fromTeam = (name) =>
   lazy(() => import('./Pages/managerxp/Team').then((m) => ({ default: m[name] })))
 const MxAdminUsers = fromTeam('AdminUsers')
 const MxRoles = fromTeam('Roles')
-const PortalSupport = fromSimple('Support')
+// Support is a real ticketing surface now, not one of the Simple placeholders.
+const PortalSupport = lazy(() => import('./Pages/portal/Support'))
 const PortalProfile = fromSimple('Profile')
 const PortalSecurity = fromSimple('Security')
 
@@ -119,8 +123,8 @@ const AppLayout = () => {
   const location = useLocation()
   // Signed-in and auth surfaces carry their own chrome, so the marketing
   // navbar and footer would only get in the way.
-  const hideNavAndFooter = ['/login', '/signup', '/gamingxp-login', '/store-login', '/store',
-    '/start-trial', '/accept-invite']
+  const hideNavAndFooter = ['/login', '/signup', '/cafexp-login', '/gamingxp-login', '/store-login', '/store',
+    '/start-trial', '/accept-invite', '/auth/google']
     .includes(location.pathname)
     || location.pathname.startsWith('/pay/')
     // The dashboard and the admin console have their own sidebar and header;
@@ -144,11 +148,23 @@ const AppLayout = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/demo" element={<BookDemoPage/>} />
           <Route path="/login" element={<Login />} />
+          {/* Where the browser returns from a Google sign-in — reads the token
+              the backend put in the URL fragment and adopts the session. */}
+          <Route path="/auth/google" element={<GoogleCallback />} />
+          {/* One reset door for both a café owner and a customer — the
+              backend works out which table (or both) the email belongs to,
+              so there is no reason for two separate pages here either. */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           {/* One signup page. "Start free trial" and "Sign up" are the same
               act — an account always comes with a business and a trial — so
               /start-trial redirects here rather than being a second form. */}
           <Route path="/signup" element={<Signup />} />
-          <Route path="/gamingxp-login" element={<GamerXpLogin />} />
+          <Route path="/cafexp-login" element={<GamerXpLogin />} />
+          {/* The old path, kept as a redirect. A café console that has not
+              been updated still opens this, and so does anything anybody
+              bookmarked — neither should land on a 404 because the route was
+              renamed. */}
+          <Route path="/gamingxp-login" element={<Navigate to="/cafexp-login" replace />} />
 
           {/* CafeXP sign-up and invitations: public, because the person using
               them does not have an account yet. */}
@@ -266,7 +282,7 @@ const AppLayout = () => {
             <Route path="installations" element={<MxInstallations />} />
             <Route path="devices" element={<MxDevices />} />
             <Route path="software" element={<MxSoftware />} />
-            <Route path="support" element={<MxNotBuilt title="Support Tickets" what="Ticketing is not built yet." />} />
+            <Route path="support" element={<MxSupport />} />
             <Route path="announcements" element={<MxNotBuilt title="Announcements" what="Announcements are not built yet." />} />
             <Route path="admin-users" element={<MxAdminUsers />} />
             <Route path="roles" element={<MxRoles />} />

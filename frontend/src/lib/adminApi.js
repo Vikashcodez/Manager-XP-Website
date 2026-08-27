@@ -40,7 +40,12 @@ export const adminAuth = {
 };
 
 async function request(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  const headers = {
+    // A FormData body carries its own multipart boundary; forcing JSON on top
+    // of it would leave the server unable to parse either.
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(options.headers || {})
+  };
   if (adminAuth.token()) headers.Authorization = `Bearer ${adminAuth.token()}`;
 
   const res = await fetch(`${API_BASE_URL}/api/admin${path}`, { ...options, headers });
@@ -195,7 +200,36 @@ export const adminApi = {
   testEmail: (to) =>
     request('/settings/test-email', { method: 'POST', body: JSON.stringify({ to }) }),
 
-  audit: (params) => request(`/audit${qs(params)}`).then((b) => b.data)
+  audit: (params) => request(`/audit${qs(params)}`).then((b) => b.data),
+
+  /* Support desk. These see every café's tickets, and only these can read or
+     write an internal note. */
+  tickets: (params) => request(`/support/tickets${qs(params)}`).then((b) => b.data),
+  ticket: (id) => request(`/support/tickets/${id}`).then((b) => b.data),
+  replyTicket: (id, message, internal = false, files) => {
+    if (!files || !files.length) {
+      return request(`/support/tickets/${id}/reply`, {
+        method: 'POST', body: JSON.stringify({ message, internal })
+      }).then((b) => b.data);
+    }
+    const fd = new FormData();
+    fd.append('message', message);
+    fd.append('internal', String(internal));
+    files.forEach((f) => fd.append('files', f));
+    return request(`/support/tickets/${id}/reply`, { method: 'POST', body: fd }).then((b) => b.data);
+  },
+  updateTicket: (id, patch) =>
+    request(`/support/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }).then((b) => b.data),
+
+  /* See portalApi.attachmentBlob — same reasoning: fetch with the header we
+     already authenticate every other call with, never a token in a URL. */
+  attachmentBlob: (id) =>
+    fetch(`${API_BASE_URL}/api/admin/support/attachments/${id}`, {
+      headers: { Authorization: `Bearer ${adminAuth.token()}` }
+    }).then((res) => {
+      if (!res.ok) throw new Error('Could not fetch that file');
+      return res.blob();
+    })
 };
 
 /* ──────────────────────────────────────────────────────────────────────────

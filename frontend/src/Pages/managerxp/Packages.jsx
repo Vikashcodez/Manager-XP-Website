@@ -108,6 +108,11 @@ export const PackageList = () => {
                 <td className="px-4 py-2.5 text-[11px] text-neutral-400">
                   {p.max_pcs} PCs · {p.max_branches} branch{p.max_branches === 1 ? '' : 'es'}
                   {p.max_users ? ` · ${p.max_users} users` : ''}
+                  {p.station_limits && Object.keys(p.station_limits).length > 0 && (
+                    <span className="block text-neutral-500">
+                      {Object.entries(p.station_limits).map(([c, n]) => `${c} ${n}`).join(' · ')}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   <Pill tone={p.features_on > 0 ? 'good' : 'warn'}>{p.features_on} on</Pill>
@@ -141,6 +146,8 @@ export const PackageEditor = () => {
   const [general, setGeneral] = useState({});
   const [prices, setPrices] = useState({});
   const [features, setFeatures] = useState({});
+  // Per-station-type caps, edited as rows so a type can be added or removed.
+  const [stationLimits, setStationLimits] = useState([]);
 
   const mayEdit = adminAuth.can('packages.edit');
 
@@ -152,6 +159,8 @@ export const PackageEditor = () => {
       setFeatures(Object.fromEntries(
         d.modules.flatMap((m) => m.features.map((f) => [f.feature_key, f.enabled]))
       ));
+      setStationLimits(Object.entries(d.plan.station_limits || {})
+        .map(([category, max]) => ({ category, max: String(max) })));
       setError(null);
     }).catch((e) => setError(e.message));
   }, [id]);
@@ -166,11 +175,35 @@ export const PackageEditor = () => {
 
   const featureCount = Object.values(features).filter(Boolean).length;
 
+  /* Per-type caps as editable rows. Empty rows and non-positive numbers are
+     dropped when building the object to save, matching what the server stores. */
+  const addLimitRow = () => setStationLimits((r) => [...r, { category: '', max: '' }]);
+  const setLimitRow = (i, key, v) =>
+    setStationLimits((r) => r.map((row, j) => (j === i ? { ...row, [key]: v } : row)));
+  const removeLimitRow = (i) => setStationLimits((r) => r.filter((_, j) => j !== i));
+  const stationLimitsObject = () => {
+    const o = {};
+    stationLimits.forEach(({ category, max }) => {
+      const name = String(category).trim();
+      const n = Math.floor(Number(max));
+      if (name && Number.isFinite(n) && n > 0) o[name] = n;
+    });
+    return o;
+  };
+
   const save = async () => {
     setSaving(true);
     setNotice(null);
     try {
-      if (Object.keys(general).length) await adminApi.updatePackage(id, general);
+      const nextLimits = stationLimitsObject();
+      const limitsChanged =
+        JSON.stringify(nextLimits) !== JSON.stringify(plan.station_limits || {});
+      if (Object.keys(general).length || limitsChanged) {
+        await adminApi.updatePackage(id, {
+          ...general,
+          ...(limitsChanged ? { station_limits: nextLimits } : {})
+        });
+      }
       await adminApi.setPackageFeatures(id, features);
       await adminApi.setPackagePrices(id,
         CYCLES.map(([period]) => ({ billing_period: period, price: Number(prices[period]) || 0 })));
@@ -256,6 +289,40 @@ export const PackageEditor = () => {
                      onChange={setG(key)} disabled={!mayEdit} />
             </Field>
           ))}
+        </div>
+      </Panel>
+
+      <Panel
+        title="Station type limits"
+        description="Optional caps per station type, on top of the overall Gaming PCs total above. A type with no cap here is limited only by that total. A café is blocked from setting more stations of a type than its cap."
+      >
+        <datalist id="pe-station-types">
+          {['PC', 'PS5', 'Xbox', 'VR', 'Pool', 'Dart'].map((c) => <option key={c} value={c} />)}
+        </datalist>
+        <div className="space-y-2">
+          {stationLimits.length === 0 && (
+            <p className="text-sm text-neutral-500">No per-type caps. Add one to limit a specific station type.</p>
+          )}
+          {stationLimits.map((row, i) => (
+            <div key={i} className="grid grid-cols-[1fr_8rem_auto] items-end gap-2">
+              <Field label={i === 0 ? 'Station type' : ''} id={`pe-sl-cat-${i}`}>
+                <Input id={`pe-sl-cat-${i}`} list="pe-station-types" placeholder="e.g. PS5"
+                       value={row.category} disabled={!mayEdit}
+                       onChange={(e) => setLimitRow(i, 'category', e.target.value)} />
+              </Field>
+              <Field label={i === 0 ? 'Max stations' : ''} id={`pe-sl-max-${i}`}>
+                <Input id={`pe-sl-max-${i}`} type="number" min="1" placeholder="e.g. 4"
+                       value={row.max} disabled={!mayEdit}
+                       onChange={(e) => setLimitRow(i, 'max', e.target.value)} />
+              </Field>
+              {mayEdit && (
+                <Button variant="ghost" type="button" onClick={() => removeLimitRow(i)}>Remove</Button>
+              )}
+            </div>
+          ))}
+          {mayEdit && (
+            <Button variant="ghost" type="button" onClick={addLimitRow}>+ Add a station type</Button>
+          )}
         </div>
       </Panel>
 

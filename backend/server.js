@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import './src/config/env.js';
@@ -27,6 +28,9 @@ import floorZonesRouter from './src/routes/floorZones.Routes.js';
 import telemetryRouter from './src/routes/telemetry.Routes.js';
 import auditRouter from './src/routes/audit.Routes.js';
 import reportsRouter from './src/routes/reports.Routes.js';
+import expensesRouter from './src/routes/expenses.Routes.js';
+import pricingRulesRouter from './src/routes/pricingRules.Routes.js';
+import accountResetRouter from './src/routes/accountReset.Routes.js';
 import stationPowerRouter from './src/routes/stationPower.Routes.js';
 import discountsRouter from './src/routes/discounts.Routes.js';
 import aiRouter from './src/modules/ai/ai.routes.js';
@@ -40,6 +44,7 @@ import adminRouter from './src/routes/admin.Routes.js';
 import entitlementsRouter from './src/routes/entitlements.Routes.js';
 import installationsRouter from './src/routes/installations.Routes.js';
 import locationsRouter from './src/routes/locations.Routes.js';
+import gamesRouter from './src/routes/games.Routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +53,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+/*
+ * Security headers. Tuned for a JSON API that lives on a different origin from
+ * the website and the desktop apps:
+ *   - No Content-Security-Policy: this server returns JSON and static uploads,
+ *     not HTML, so a CSP here governs nothing and its defaults would only risk
+ *     blocking the uploaded images the frontend embeds.
+ *   - Cross-origin resource policy is opened up for the same reason — the
+ *     frontend on another port loads avatars and logos served from /uploads,
+ *     which the default 'same-origin' would refuse.
+ * What remains is the useful, non-breaking set: nosniff, frameguard, no
+ * referrer leakage, and the rest of helmet's header hardening.
+ */
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors());
 
 /*
@@ -58,8 +81,13 @@ app.use(cors());
  */
 app.use('/api/payments', paymentsWebhookRouter);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+/* An explicit ceiling on request bodies. The old default was already 100kb,
+   but stating it makes the limit a decision rather than a default, and 1mb
+   leaves generous room for the largest legitimate payload here (a software
+   list, a settings blob) while refusing a body sent only to exhaust memory.
+   Uploads do not pass through here — they go through multer. */
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
 
 // Routes
@@ -86,6 +114,9 @@ app.use('/api/floor-zones', floorZonesRouter);
 app.use('/api/telemetry', telemetryRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/expenses', expensesRouter);
+app.use('/api/pricing-rules', pricingRulesRouter);
+app.use('/api/account', accountResetRouter);
 app.use('/api/stations', stationPowerRouter);
 app.use('/api/discounts', discountsRouter);
 app.use('/api/ai', aiRouter);
@@ -99,6 +130,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/entitlements', entitlementsRouter);
 app.use('/api/installations', installationsRouter);
 app.use('/api/locations', locationsRouter);
+app.use('/api/games', gamesRouter);
 
 // Health check route
 app.get('/health', (req, res) => {

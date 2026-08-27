@@ -5,7 +5,9 @@ import {
   stations,
   hours,
   customers,
-  products
+  products,
+  finance,
+  games
 } from '../controllers/reports.Controller.js';
 import { requirePermission } from '../middleware/authGuards.js';
 
@@ -19,5 +21,7 @@ reportsRouter.get('/stations', canRead, stations);
 reportsRouter.get('/hours', canRead, hours);
 reportsRouter.get('/customers', canRead, customers);
 reportsRouter.get('/products', canRead, products);
+reportsRouter.get('/finance', canRead, finance);
+reportsRouter.get('/games', canRead, games);
 
 export default reportsRouter;

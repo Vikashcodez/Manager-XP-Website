@@ -1,6 +1,6 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
-import { invalidate, getAllSettings } from '../config/settings.js';
+import { invalidate, getAllSettings, setSetting } from '../config/settings.js';
 
 /*
  * Settings — the values that used to be constants in the controllers.
@@ -20,9 +20,25 @@ const shape = (row) => ({
 
 /** Reject values that do not match the key's declared type. */
 const validateValue = (value, type) => {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined) {
     return { error: 'A value is required' };
   }
+
+  /*
+   * An empty string is a value, for a text setting.
+   *
+   * Blank used to be refused for everything, which meant no text setting
+   * could ever be cleared once written — an address typed by mistake, a tax
+   * number for a registration that lapsed, or the station unlock PIN, where
+   * blank is the entire meaning of "nobody may use the keyboard hatch".
+   *
+   * Still refused for the typed settings, where blank is not a value at all:
+   * an empty number is not zero and an empty boolean is not false.
+   */
+  if (value === '' && type !== 'string') {
+    return { error: 'A value is required' };
+  }
+
   const str = String(value);
 
   if (type === 'number') {
@@ -55,17 +71,31 @@ const CAFE_SCOPE = `scope = 'cafe'`;
 
 export const listSettings = async (req, res) => {
   try {
-    const params = [];
-    let where = `WHERE ${CAFE_SCOPE}`;
+    /*
+     * This café's own value where it has one, the platform default otherwise.
+     *
+     * DISTINCT ON with the café's rows sorted first picks the override when
+     * it exists and falls through to the default when it does not, in one
+     * pass — so a café that has never opened this screen still sees a full,
+     * sensible set rather than an empty one.
+     */
+    const cafeId = req.actor?.cafe_id ?? null;
+    const params = [cafeId];
+    let where = `WHERE ${CAFE_SCOPE} AND (cafe_id IS NULL OR cafe_id = $1)`;
     if (req.query.category) {
       params.push(String(req.query.category));
-      where += ` AND category = $1`;
+      where += ` AND category = $2`;
     }
 
     const result = await pool.query(
-      `SELECT * FROM app_settings ${where} ORDER BY category ASC, setting_key ASC`,
+      `SELECT DISTINCT ON (setting_key) *
+         FROM app_settings ${where}
+        ORDER BY setting_key ASC, (cafe_id IS NULL) ASC`,
       params
     );
+    result.rows.sort((a, b) =>
+      (a.category || '').localeCompare(b.category || '') ||
+      a.setting_key.localeCompare(b.setting_key));
 
     // Grouped by category so a settings screen can render sections directly.
     const grouped = {};
@@ -88,8 +118,10 @@ export const listSettings = async (req, res) => {
 export const getSettingByKey = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
-      [req.params.key]
+      `SELECT * FROM app_settings
+        WHERE setting_key = $1 AND ${CAFE_SCOPE} AND (cafe_id IS NULL OR cafe_id = $2)
+        ORDER BY (cafe_id IS NULL) ASC LIMIT 1`,
+      [req.params.key, req.actor?.cafe_id ?? null]
     );
     /* A platform key answers the same as a missing one. Saying "that exists
        but is not yours" tells a caller which keys are worth probing for. */
@@ -107,9 +139,15 @@ export const getSettingByKey = async (req, res) => {
 export const updateSetting = async (req, res) => {
   try {
     const key = req.params.key;
+    const cafeId = req.actor?.cafe_id ?? null;
+    /* The value in force for this café — its own row if it has one, the
+       default otherwise. That is what the audit trail should record as the
+       "from", and its type is what the new value is validated against. */
     const existing = await pool.query(
-      `SELECT * FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
-      [key]
+      `SELECT * FROM app_settings
+        WHERE setting_key = $1 AND ${CAFE_SCOPE} AND (cafe_id IS NULL OR cafe_id = $2)
+        ORDER BY (cafe_id IS NULL) ASC LIMIT 1`,
+      [key, cafeId]
     );
     if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Setting not found' });
@@ -118,15 +156,10 @@ export const updateSetting = async (req, res) => {
     const parsed = validateValue(req.body?.value, existing.rows[0].value_type);
     if (parsed.error) return res.status(400).json({ success: false, message: parsed.error });
 
-    const result = await pool.query(
-      `UPDATE app_settings
-       SET setting_value = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE setting_key = $2
-       RETURNING *`,
-      [parsed.value, key]
-    );
-
-    invalidate();   // next read comes from the database, not the stale cache
+    /* Written through setSetting so a café gets its own row rather than
+       editing the default every other café reads. */
+    const saved = await setSetting(key, parsed.value, cafeId);
+    const result = { rows: [saved || existing.rows[0]] };
 
     // Keep the old value: "who changed the hourly rate, and from what" is a
     // question that only has an answer if the previous figure was recorded.
@@ -167,11 +200,15 @@ export const updateSettings = async (req, res) => {
 
     await client.query('BEGIN');
     const updated = [];
+    const cafeId = req.actor?.cafe_id ?? null;
 
     for (const key of keys) {
+      // The type in force for this café — its own row, or the default.
       const existing = await client.query(
-        `SELECT value_type FROM app_settings WHERE setting_key = $1 AND ${CAFE_SCOPE}`,
-        [key]
+        `SELECT value_type FROM app_settings
+          WHERE setting_key = $1 AND ${CAFE_SCOPE} AND (cafe_id IS NULL OR cafe_id = $2)
+          ORDER BY (cafe_id IS NULL) ASC LIMIT 1`,
+        [key, cafeId]
       );
       if (existing.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -184,12 +221,24 @@ export const updateSettings = async (req, res) => {
         return res.status(400).json({ success: false, message: `${key}: ${parsed.error}` });
       }
 
-      const row = await client.query(
-        `UPDATE app_settings
-         SET setting_value = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE setting_key = $2 RETURNING *`,
-        [parsed.value, key]
-      );
+      /* Insert-or-update this café's own row rather than editing the shared
+         default. Runs on the transaction's client so a failure part-way
+         through this batch rolls the whole set back. */
+      const row = cafeId === null
+        ? await client.query(
+            `UPDATE app_settings
+                SET setting_value = $1, updated_at = CURRENT_TIMESTAMP
+              WHERE setting_key = $2 AND cafe_id IS NULL RETURNING *`,
+            [parsed.value, key])
+        : await client.query(
+            `INSERT INTO app_settings
+               (setting_key, setting_value, value_type, category, description, scope, is_secret, cafe_id)
+             SELECT d.setting_key, $2, d.value_type, d.category, d.description, d.scope, d.is_secret, $3
+               FROM app_settings d WHERE d.setting_key = $1 AND d.cafe_id IS NULL
+             ON CONFLICT (setting_key, cafe_id) WHERE cafe_id IS NOT NULL
+             DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [key, parsed.value, cafeId]);
       updated.push(shape(row.rows[0]));
     }
 

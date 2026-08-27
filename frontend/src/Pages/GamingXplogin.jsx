@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import whiteLogo from '../assets/whitelogo.png';
 import { useAuth } from '../context/AuthContext';
 
@@ -300,9 +300,9 @@ const GamerXpLogin = () => {
                 />
                 <span className="text-gray-500 group-hover:text-gray-300 transition-colors">Remember Me</span>
               </label>
-              <a href="#" className="text-red-500 hover:text-red-400 font-semibold transition-colors hover:underline">
+              <Link to="/forgot-password" className="text-red-500 hover:text-red-400 font-semibold transition-colors hover:underline">
                 Forgot Password?
-              </a>
+              </Link>
             </div>
 
             {/* Login Button */}
