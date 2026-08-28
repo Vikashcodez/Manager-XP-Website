@@ -7,7 +7,7 @@
  * claim, a different storage key. Sharing a client between them would sooner
  * or later send one principal's token to the other's endpoint.
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const TOKEN_KEY = 'mxp_admin_token';
 const ADMIN_KEY = 'mxp_admin_user';

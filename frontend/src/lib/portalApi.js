@@ -10,7 +10,7 @@
  * the user — a way of saying "show me Bangalore" — and never a grant of
  * access. Nothing here can widen what the account may see.
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const TOKEN_KEY = 'cxp_token';
 const ORG_KEY = 'cxp_org';

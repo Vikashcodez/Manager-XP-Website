@@ -7,7 +7,7 @@
  * every customer's billing. So this helper exists to make sending the token
  * the default rather than something each page has to remember.
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const token = () => localStorage.getItem('mxp_token') || '';
 

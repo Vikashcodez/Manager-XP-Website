@@ -10,7 +10,7 @@
  * obvious. Cities are not cached: they are already narrow, and a stale city
  * list is the one that would actually be wrong.
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const memo = new Map();
 

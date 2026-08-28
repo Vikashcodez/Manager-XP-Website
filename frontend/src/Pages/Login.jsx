@@ -27,7 +27,7 @@ const Login = () => {
 
   /* Where the browser goes to start a Google sign-in — the backend endpoint,
      which redirects on to Google's consent screen. */
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const API_BASE = import.meta.env.VITE_API_URL;
   const googleUrl = `${API_BASE}/api/auth/google`;
 
   /* A failed Google sign-in comes back to /login?error=<code>. Turn the code
