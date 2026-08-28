@@ -300,6 +300,60 @@ export const initializeDatabase = async () => {
 
     console.log('✅ Wallet tables created/verified');
 
+    // session master — the sellable durations (30 Minutes, 1 Hour, Any Time…)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_master (
+        id SERIAL PRIMARY KEY,
+        session_name VARCHAR(255) NOT NULL,
+        duration_type VARCHAR(16) NOT NULL
+          CHECK (duration_type IN ('MINUTES','HOURS','CUSTOM','UNLIMITED')),
+        duration INTEGER,
+        duration_minutes INTEGER,
+        status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
+          CHECK (status IN ('ACTIVE','INACTIVE')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        -- An unlimited session has no duration; every other type must have one.
+        CONSTRAINT session_master_duration_shape CHECK (
+          (duration_type = 'UNLIMITED' AND duration IS NULL AND duration_minutes IS NULL)
+          OR (duration_type <> 'UNLIMITED' AND duration IS NOT NULL AND duration_minutes IS NOT NULL)
+        )
+      )
+    `);
+
+    // Session names are the label staff pick from, so keep them unique
+    // regardless of casing.
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_master_name
+        ON session_master (LOWER(session_name))
+    `);
+
+    // gaming price master — one price per game + session pair.
+    // The game catalogue is software_master, so software_id plays the game_id
+    // role described in the spec. No names or durations are duplicated here;
+    // they are read back through the joins.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gaming_prices (
+        id SERIAL PRIMARY KEY,
+        software_id INTEGER NOT NULL REFERENCES software_master(software_id) ON DELETE CASCADE,
+        session_master_id INTEGER NOT NULL REFERENCES session_master(id) ON DELETE CASCADE,
+        price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+        currency VARCHAR(8) NOT NULL DEFAULT 'INR',
+        status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
+          CHECK (status IN ('ACTIVE','INACTIVE')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT gaming_prices_unique_pair UNIQUE (software_id, session_master_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gaming_prices_software
+        ON gaming_prices (software_id)
+    `);
+
+    console.log('✅ Pricing tables created/verified');
+
     // play sessions — a customer (or a guest) on a station for a period of time
     await client.query(`
       CREATE TABLE IF NOT EXISTS sessions (
@@ -445,60 +499,6 @@ export const initializeDatabase = async () => {
     `);
 
     console.log('✅ Session tables created/verified');
-
-    // session master — the sellable durations (30 Minutes, 1 Hour, Any Time…)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS session_master (
-        id SERIAL PRIMARY KEY,
-        session_name VARCHAR(255) NOT NULL,
-        duration_type VARCHAR(16) NOT NULL
-          CHECK (duration_type IN ('MINUTES','HOURS','CUSTOM','UNLIMITED')),
-        duration INTEGER,
-        duration_minutes INTEGER,
-        status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
-          CHECK (status IN ('ACTIVE','INACTIVE')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        -- An unlimited session has no duration; every other type must have one.
-        CONSTRAINT session_master_duration_shape CHECK (
-          (duration_type = 'UNLIMITED' AND duration IS NULL AND duration_minutes IS NULL)
-          OR (duration_type <> 'UNLIMITED' AND duration IS NOT NULL AND duration_minutes IS NOT NULL)
-        )
-      )
-    `);
-
-    // Session names are the label staff pick from, so keep them unique
-    // regardless of casing.
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_master_name
-        ON session_master (LOWER(session_name))
-    `);
-
-    // gaming price master — one price per game + session pair.
-    // The game catalogue is software_master, so software_id plays the game_id
-    // role described in the spec. No names or durations are duplicated here;
-    // they are read back through the joins.
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS gaming_prices (
-        id SERIAL PRIMARY KEY,
-        software_id INTEGER NOT NULL REFERENCES software_master(software_id) ON DELETE CASCADE,
-        session_master_id INTEGER NOT NULL REFERENCES session_master(id) ON DELETE CASCADE,
-        price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
-        currency VARCHAR(8) NOT NULL DEFAULT 'INR',
-        status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
-          CHECK (status IN ('ACTIVE','INACTIVE')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT gaming_prices_unique_pair UNIQUE (software_id, session_master_id)
-      )
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_gaming_prices_software
-        ON gaming_prices (software_id)
-    `);
-
-    console.log('✅ Pricing tables created/verified');
 
     // application settings — values that used to be hardcoded in controllers.
     // Typed so callers can coerce safely instead of guessing.

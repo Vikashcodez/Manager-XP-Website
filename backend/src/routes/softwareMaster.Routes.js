@@ -12,7 +12,7 @@ import {
   updateHouseActivity,
   deleteHouseActivity,
   setSoftwareCategory
-} from '../controllers/softwareMaster.Controller.js';
+} from '../controllers/softwareMaster.controller.js';
 import { requireAuth, requirePlatformAdmin } from '../middleware/authGuards.js';
 
 const softwareMasterRouter = express.Router();
