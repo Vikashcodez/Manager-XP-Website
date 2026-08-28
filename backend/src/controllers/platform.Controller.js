@@ -303,9 +303,14 @@ export const createCafe = async (req, res) => {
       temporaryPassword = crypto.randomBytes(9).toString('base64url').slice(0, 12);
       const hashed = await bcrypt.hash(temporaryPassword, 10);
 
+      // Verified immediately: a ManagerXP admin is creating and vouching for
+      // this account directly, the same reasoning a staff-created customer
+      // gets — there is no self-service code screen in this admin tool to
+      // clear it with, so leaving the default FALSE would lock the owner out
+      // the first time they tried the ordinary sign-in door.
       owner = (await client.query(`
-        INSERT INTO users (email, phone_number, name, address, password, role)
-        VALUES ($1,$2,$3,$4,$5,'user')
+        INSERT INTO users (email, phone_number, name, address, password, role, email_verified)
+        VALUES ($1,$2,$3,$4,$5,'user',TRUE)
         RETURNING id, email, name, role
       `, [
         ownerEmail,
@@ -544,9 +549,12 @@ export const createUser = async (req, res) => {
        at the database rather than in validation. Empty string keeps the column
        honest — it records "we do not have a number", which is true — without
        inventing a placeholder that looks like a real one. */
+    // Verified immediately — same reasoning as createCafe above: a ManagerXP
+    // admin is vouching for this account directly, and this tool has no
+    // self-service code screen to clear the default FALSE with.
     const { rows } = await client.query(`
-      INSERT INTO users (email, phone_number, name, address, password, role)
-      VALUES ($1,$2,$3,$4,$5,$6)
+      INSERT INTO users (email, phone_number, name, address, password, role, email_verified)
+      VALUES ($1,$2,$3,$4,$5,$6,TRUE)
       RETURNING id, email, name, phone_number, role, created_at
     `, [
       email,

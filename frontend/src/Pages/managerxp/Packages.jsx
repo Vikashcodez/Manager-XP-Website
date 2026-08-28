@@ -148,6 +148,9 @@ export const PackageEditor = () => {
   const [features, setFeatures] = useState({});
   // Per-station-type caps, edited as rows so a type can be added or removed.
   const [stationLimits, setStationLimits] = useState([]);
+  /* The types to choose from, fetched rather than hard-coded — the set is
+     café-extensible, so any list written here would be wrong for somebody. */
+  const [stationTypes, setStationTypes] = useState([]);
 
   const mayEdit = adminAuth.can('packages.edit');
 
@@ -165,6 +168,13 @@ export const PackageEditor = () => {
     }).catch((e) => setError(e.message));
   }, [id]);
   useEffect(() => { load(); }, [load]);
+
+  /* Independent of the plan: the type list is the same whichever plan is open,
+     and a failure here must not stop the plan from being edited — the caps
+     already set stay visible and saveable either way. */
+  useEffect(() => {
+    adminApi.stationTypes().then((t) => setStationTypes(t || [])).catch(() => {});
+  }, []);
 
   if (error) return <Page title="Package"><Banner tone="bad">{error}</Banner></Page>;
   if (!data) return <Page title="Package"><Skeleton rows={4} height="h-24" /></Page>;
@@ -296,9 +306,6 @@ export const PackageEditor = () => {
         title="Station type limits"
         description="Optional caps per station type, on top of the overall Gaming PCs total above. A type with no cap here is limited only by that total. A café is blocked from setting more stations of a type than its cap."
       >
-        <datalist id="pe-station-types">
-          {['PC', 'PS5', 'Xbox', 'VR', 'Pool', 'Dart'].map((c) => <option key={c} value={c} />)}
-        </datalist>
         <div className="space-y-2">
           {stationLimits.length === 0 && (
             <p className="text-sm text-neutral-500">No per-type caps. Add one to limit a specific station type.</p>
@@ -306,9 +313,17 @@ export const PackageEditor = () => {
           {stationLimits.map((row, i) => (
             <div key={i} className="grid grid-cols-[1fr_8rem_auto] items-end gap-2">
               <Field label={i === 0 ? 'Station type' : ''} id={`pe-sl-cat-${i}`}>
-                <Input id={`pe-sl-cat-${i}`} list="pe-station-types" placeholder="e.g. PS5"
-                       value={row.category} disabled={!mayEdit}
-                       onChange={(e) => setLimitRow(i, 'category', e.target.value)} />
+                <Select id={`pe-sl-cat-${i}`} value={row.category} disabled={!mayEdit}
+                        onChange={(e) => setLimitRow(i, 'category', e.target.value)}>
+                  <option value="">— Select type —</option>
+                  {/* A cap already saved against a type that has since gone
+                      out of use still has to be selectable, or opening the
+                      plan would silently drop it on the next save. */}
+                  {(stationTypes.includes(row.category) || !row.category
+                    ? stationTypes
+                    : [...stationTypes, row.category].sort()
+                  ).map((c) => <option key={c} value={c}>{c}</option>)}
+                </Select>
               </Field>
               <Field label={i === 0 ? 'Max stations' : ''} id={`pe-sl-max-${i}`}>
                 <Input id={`pe-sl-max-${i}`} type="number" min="1" placeholder="e.g. 4"

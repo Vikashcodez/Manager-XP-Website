@@ -78,6 +78,15 @@ const shape = (row) => {
     cancelled_by: row.cancelled_by || null,
     cancelled_at: row.cancelled_at || null,
 
+    /* What this session was launched with, if anything — most sessions are
+       still open-ended counter play with no particular title attached. */
+    game_id: row.game_id || null,
+    game_name: row.game_name || null,
+    game_platform_id: row.game_platform_id || null,
+    platform: row.platform || null,
+    game_account_id: row.game_account_id || null,
+    game_account_name: row.account_name || null,
+
     session_id: row.session_id,
     pc_id: row.pc_id,
     pc_name: row.pc_name || null,
@@ -116,11 +125,15 @@ const shape = (row) => {
 
 const SELECT_SESSION = `
   SELECT s.*, p.name AS pc_name, p.category AS pc_category,
-         c.customer_name, w.balance AS wallet_balance
+         c.customer_name, w.balance AS wallet_balance,
+         g.name AS game_name, gp.platform, ga.account_name
   FROM sessions s
   LEFT JOIN pcs p ON p.pc_id = s.pc_id
   LEFT JOIN customers c ON c.customer_id = s.customer_id
   LEFT JOIN wallets w ON w.customer_id = s.customer_id
+  LEFT JOIN games g ON g.id = s.game_id
+  LEFT JOIN game_platforms gp ON gp.id = s.game_platform_id
+  LEFT JOIN game_accounts ga ON ga.id = s.game_account_id
 `;
 
 const fetchSession = async (client, id) => {
@@ -255,6 +268,154 @@ export const startSession = async (req, res) => {
       });
     }
 
+    /*
+     * A customer starting their own session, unwatched by staff, is not the
+     * same trust situation as a staff member starting one for someone they
+     * can see. `require_prepaid` is the flag only that self-service path
+     * sends: it must be able to name a fully-known price up front (a BLOCK or
+     * a FLAT — never the open-ended, metered HOUR path, which has no total to
+     * check a wallet against) and the wallet must already cover it. Getting
+     * this wrong is how a café ends up with an unattended session nobody can
+     * collect for.
+     */
+    if (req.body?.require_prepaid) {
+      if (!customerId) {
+        return res.status(400).json({
+          success: false,
+          message: 'A guest session cannot start itself — a registered account is required.'
+        });
+      }
+      if (pricing.pricing_unit !== 'BLOCK' && pricing.pricing_unit !== 'FLAT') {
+        return res.status(400).json({
+          success: false,
+          message: 'Self-service start requires a fixed-price plan.'
+        });
+      }
+      const due = amountForSeconds(
+        { pricing_unit: pricing.pricing_unit, flat_amount: pricing.flat_amount,
+          membership_discount_percent: membership.percent },
+        0
+      );
+      const wallet = await client.query('SELECT balance FROM wallets WHERE customer_id = $1', [customerId]);
+      const balance = wallet.rows[0] ? Number(wallet.rows[0].balance) : 0;
+      if (balance < due) {
+        return res.status(402).json({
+          success: false,
+          message: `Your wallet holds ₹${balance.toFixed(0)}, and this needs ₹${due.toFixed(0)}. Top up to start.`
+        });
+      }
+    }
+
+    /*
+     * GAME + PLATFORM + ACCOUNT
+     *
+     * Optional: most sessions are still open-ended counter play or a
+     * customer who hasn't picked a title yet. When a game is named, its
+     * platform and (for a venue-account game) an account must be resolved
+     * and, for the account, reserved — atomically, inside the same
+     * transaction as the session row itself, so a crash between reserving
+     * an account and creating the session can never strand that account
+     * IN_USE with nothing using it, and two stations racing for the last
+     * account can never both win.
+     */
+    let gameId = null, gamePlatformId = null, gameAccountId = null;
+    const { game_id, game_platform_id, game_account_id, use_venue_account } = req.body || {};
+
+    await client.query('BEGIN');
+
+    if (game_id !== undefined && game_id !== null && game_id !== '') {
+      gameId = parseInt(game_id, 10);
+      if (!Number.isInteger(gameId)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Invalid game' });
+      }
+
+      const cafeGame = (await client.query(
+        `SELECT cg.*, g.name AS game_name FROM cafe_games cg JOIN games g ON g.id = cg.game_id
+          WHERE cg.game_id = $1 AND cg.cafe_id IS NOT DISTINCT FROM $2 AND cg.enabled = TRUE`,
+        [gameId, station.cafe_id]
+      )).rows[0];
+      if (!cafeGame) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'This game is not available at this café' });
+      }
+
+      // Which platform: an explicit choice (validated against what this
+      // station actually has installed), or the only one it has installed.
+      const installedPlatforms = (await client.query(
+        `SELECT gp.id, gp.platform FROM station_game_platforms sgp
+           JOIN game_platforms gp ON gp.id = sgp.game_platform_id
+          WHERE sgp.pc_id = $1 AND sgp.installed = TRUE AND gp.game_id = $2 AND gp.status = 'ACTIVE'`,
+        [pcId, gameId]
+      )).rows;
+
+      if (game_platform_id !== undefined && game_platform_id !== null && game_platform_id !== '') {
+        gamePlatformId = parseInt(game_platform_id, 10);
+        if (!installedPlatforms.some((p) => p.id === gamePlatformId)) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ success: false, message: 'That platform of this game is not installed on this station' });
+        }
+      } else if (installedPlatforms.length === 1) {
+        gamePlatformId = installedPlatforms[0].id;
+      } else if (installedPlatforms.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: `${cafeGame.game_name} is not installed on this station` });
+      } else {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: 'This station has more than one version of this game installed — choose which platform to launch'
+        });
+      }
+
+      const accountMode = cafeGame.account_mode;
+      const wantsVenue = accountMode === 'VENUE_ACCOUNT'
+        || (accountMode === 'CUSTOMER_OR_VENUE' && !!use_venue_account);
+
+      if (wantsVenue) {
+        /* A specific licence the customer (or staff) picked from a list, or —
+           the common case — whichever one is free. `FOR UPDATE SKIP LOCKED`
+           is what makes "whichever is free" safe under real concurrency: a
+           second session racing for the same pool skips a row another
+           transaction is already claiming rather than blocking on it or,
+           worse, claiming it too. */
+        const reserved = (game_account_id !== undefined && game_account_id !== null && game_account_id !== '')
+          ? (await client.query(
+              `UPDATE game_accounts SET status = 'IN_USE', updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1 AND cafe_id = $2 AND game_platform_id = $3 AND status = 'AVAILABLE'
+               RETURNING id`,
+              [parseInt(game_account_id, 10), station.cafe_id, gamePlatformId]
+            )).rows[0]
+          : (await client.query(
+              `UPDATE game_accounts SET status = 'IN_USE', updated_at = CURRENT_TIMESTAMP
+                 WHERE id = (
+                   SELECT id FROM game_accounts
+                    WHERE cafe_id = $1 AND game_platform_id = $2 AND status = 'AVAILABLE'
+                    ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED
+                 )
+               RETURNING id`,
+              [station.cafe_id, gamePlatformId]
+            )).rows[0];
+
+        if (!reserved) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            success: false,
+            message: accountMode === 'VENUE_ACCOUNT'
+              ? 'No venue account is available for this game right now'
+              : 'No venue account is free right now — the customer can still log in with their own account'
+          });
+        }
+        gameAccountId = reserved.id;
+      } else if (accountMode === 'VENUE_ACCOUNT') {
+        // Unreachable given the branch above, kept only so a future account
+        // mode added here fails loudly instead of silently launching with no
+        // account resolved.
+        await client.query('ROLLBACK');
+        return res.status(500).json({ success: false, message: 'Could not resolve an account for this game' });
+      }
+    }
+
     const inserted = await client.query(
       `INSERT INTO sessions
          (cafe_id, pc_id, customer_id, guest_name, guest_phone,
@@ -262,8 +423,9 @@ export const startSession = async (req, res) => {
           gaming_price_id, pricing_unit, flat_amount, price_label,
           membership_discount_percent, membership_label,
           pricing_rule_id, pricing_rule_label, base_rate_per_hour, base_flat_amount,
-          block_unit_amount, block_unit_minutes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+          block_unit_amount, block_unit_minutes,
+          game_id, game_platform_id, game_account_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING session_id`,
       [
         cafe_id || station.cafe_id || null,
@@ -287,9 +449,19 @@ export const startSession = async (req, res) => {
         /* Only a block has a unit to extend by; everything else extends by
            bare minutes with no charge, exactly as before. */
         pricing.pricing_unit === 'BLOCK' ? pricing.flat_amount : null,
-        pricing.pricing_unit === 'BLOCK' ? (pricing.block_minutes ?? minutes) : null
+        pricing.pricing_unit === 'BLOCK' ? (pricing.block_minutes ?? minutes) : null,
+        gameId, gamePlatformId, gameAccountId
       ]
     );
+
+    // The account row now knows which session claimed it, not only that it
+    // is claimed — needed to release it again when that session ends.
+    if (gameAccountId) {
+      await client.query('UPDATE game_accounts SET current_session_id = $1 WHERE id = $2',
+        [inserted.rows[0].session_id, gameAccountId]);
+    }
+
+    await client.query('COMMIT');
 
     const session = await fetchSession(client, inserted.rows[0].session_id);
 
@@ -315,6 +487,10 @@ export const startSession = async (req, res) => {
 
     res.status(201).json({ success: true, message: 'Session started', data: shape(session) });
   } catch (error) {
+    // Harmless when nothing was ever begun — every early-return path above
+    // that opens a transaction rolls back explicitly before returning; this
+    // only catches an actual thrown error partway through one.
+    await client.query('ROLLBACK').catch(() => {});
     // The partial unique index is the real guard against a double-book.
     if (error.code === '23505') {
       return res.status(409).json({ success: false, message: 'That station already has a session running' });
@@ -734,6 +910,17 @@ export const endSession = async (req, res) => {
       [billableSeconds, amount, paymentStatus, walletTransactionId, reason, req.actor?.label || null, id]
     );
 
+    // A venue account this session was using goes back into the pool the
+    // moment the session itself stops being open — never left IN_USE for a
+    // session that is no longer running.
+    if (row.game_account_id) {
+      await client.query(
+        `UPDATE game_accounts SET status = 'AVAILABLE', current_session_id = NULL, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1 AND current_session_id = $2`,
+        [row.game_account_id, id]
+      );
+    }
+
     await client.query('COMMIT');
 
     const fresh = await fetchSession(client, id);
@@ -841,6 +1028,14 @@ export const cancelSession = async (req, res) => {
         WHERE session_id = $4`,
       [req.actor?.label || null, heldSeconds, reason || 'cancelled', id]
     );
+
+    if (row.game_account_id) {
+      await client.query(
+        `UPDATE game_accounts SET status = 'AVAILABLE', current_session_id = NULL, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1 AND current_session_id = $2`,
+        [row.game_account_id, id]
+      );
+    }
 
     await client.query('COMMIT');
 

@@ -17,6 +17,7 @@ import {
   dashboard,
   listOrganizations, getOrganization, getOrganizationEntitlements,
   setOverride, setOrganizationStatus,
+  listStationTypes,
   listPackages, getPackage, createPackage, updatePackage,
   setPackageFeatures, setPackagePrices,
   listFeatureMaster, createFeature, updateFeature,
@@ -53,6 +54,12 @@ import { loginLimiter, resetLimiter } from '../middleware/rateLimit.js';
 import {
   adminListTickets, adminGetTicket, adminReply, adminUpdateTicket, adminGetAttachment
 } from '../controllers/support.Controller.js';
+import {
+  listCatalog, getCatalogGame, createCatalogGame, updateCatalogGame, deleteCatalogGame,
+  createPlatform, updatePlatform, deletePlatform,
+  uploadCatalogLogo, uploadCatalogCover
+} from '../controllers/gameCatalog.Controller.js';
+import { catalogAssetUpload, handleCatalogUploadErrors } from '../middleware/catalogAssetUpload.js';
 import { supportUpload, handleUploadErrors } from '../middleware/supportUpload.js';
 
 const router = express.Router();
@@ -148,6 +155,7 @@ router.get('/devices', requirePermission('devices.view'), listDevices);
 router.post('/devices/:id/status', requirePermission('devices.disable'), setDeviceStatus);
 
 /* Package Master. */
+router.get('/station-types', requirePermission('packages.view'), listStationTypes);
 router.get('/packages', requirePermission('packages.view'), listPackages);
 router.get('/packages/:id', requirePermission('packages.view'), getPackage);
 router.post('/packages', requirePermission('packages.create'), createPackage);
@@ -178,6 +186,24 @@ router.post('/support/tickets/:id/reply', requirePermission('support.manage'),
   supportUpload.array('files', 5), handleUploadErrors, adminReply);
 router.patch('/support/tickets/:id', requirePermission('support.manage'), adminUpdateTicket);
 router.get('/support/attachments/:id', requirePermission('support.manage'), adminGetAttachment);
+
+/* The master Game Catalog. Every café's "add a game" list is a read of this;
+   only ManagerXP staff with catalogue.manage can write to it. */
+router.get('/game-catalog', requirePermission('catalogue.view'), listCatalog);
+router.post('/game-catalog', requirePermission('catalogue.manage'), createCatalogGame);
+router.get('/game-catalog/:id', requirePermission('catalogue.view'), getCatalogGame);
+router.patch('/game-catalog/:id', requirePermission('catalogue.manage'), updateCatalogGame);
+router.delete('/game-catalog/:id', requirePermission('catalogue.manage'), deleteCatalogGame);
+router.patch('/game-catalog/:id/logo', requirePermission('catalogue.manage'),
+  catalogAssetUpload, handleCatalogUploadErrors, uploadCatalogLogo);
+router.patch('/game-catalog/:id/cover', requirePermission('catalogue.manage'),
+  catalogAssetUpload, handleCatalogUploadErrors, uploadCatalogCover);
+
+/* One game, many stores. F1 25's Steam App ID and its EA launch config are
+   different rows here, never fields squeezed onto the game itself. */
+router.post('/game-catalog/:id/platforms', requirePermission('catalogue.manage'), createPlatform);
+router.patch('/game-catalog/:id/platforms/:platformId', requirePermission('catalogue.manage'), updatePlatform);
+router.delete('/game-catalog/:id/platforms/:platformId', requirePermission('catalogue.manage'), deletePlatform);
 
 router.get('/admin-users', requirePermission('admins.view'), listAdminUsers);
 router.post('/admin-users', requirePermission('admins.manage'), createAdminUser);

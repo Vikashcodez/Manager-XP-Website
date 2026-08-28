@@ -67,7 +67,7 @@ const MxFeatures = fromCatalogue('Features')
 const MxAddons = fromCatalogue('Addons')
 const MxAudit = fromCatalogue('AuditLogs')
 const MxNotBuilt = fromCatalogue('NotBuilt')
-const MxSoftware = lazy(() => import('./Pages/managerxp/SoftwareMaster'))
+const MxGameCatalog = lazy(() => import('./Pages/managerxp/GameCatalog'))
 const MxBranches = lazy(() => import('./Pages/managerxp/Branches'))
 const fromSubs = (name) =>
   lazy(() => import('./Pages/managerxp/Subscriptions').then((m) => ({ default: m[name] })))
@@ -281,7 +281,11 @@ const AppLayout = () => {
             <Route path="invoices" element={<MxInvoices />} />
             <Route path="installations" element={<MxInstallations />} />
             <Route path="devices" element={<MxDevices />} />
-            <Route path="software" element={<MxSoftware />} />
+            {/* Software Master was removed — the Game Catalog is now the one
+                place a title is authored. Redirected rather than dropped so an
+                existing bookmark lands there instead of an empty shell. */}
+            <Route path="software" element={<Navigate to="/admin/game-catalog" replace />} />
+            <Route path="game-catalog" element={<MxGameCatalog />} />
             <Route path="support" element={<MxSupport />} />
             <Route path="announcements" element={<MxNotBuilt title="Announcements" what="Announcements are not built yet." />} />
             <Route path="admin-users" element={<MxAdminUsers />} />

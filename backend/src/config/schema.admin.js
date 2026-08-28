@@ -65,6 +65,11 @@ const PERMISSIONS = [
   ['software.edit',         'Edit a software release'],
   ['software.publish',      'Publish, deprecate or retire a release'],
 
+  /* The master Game Catalog — every title's launcher, App ID and executable.
+     A café only ever selects from this; only ManagerXP staff can author it. */
+  ['catalogue.view',        'View the master game catalog'],
+  ['catalogue.manage',      'Create and edit the master game catalog'],
+
   ['support.manage',        'Manage support tickets and announcements'],
 
   ['admins.view',           'View ManagerXP admin users'],
@@ -82,7 +87,7 @@ const ROLE_GRANTS = {
   ADMIN: [
     'organizations.', 'branches.', 'packages.', 'features.', 'subscriptions.',
     'addons.', 'payments.view', 'installations.', 'devices.', 'software.view',
-    'support.manage', 'audit.view',
+    'catalogue.', 'support.manage', 'audit.view',
     /* Read-only. Someone running the platform day to day should be able to see
        who else has access — that is basic operational awareness, and it is the
        first thing anyone checks after a security scare. Changing who has

@@ -65,8 +65,10 @@ const NAV = [
     ]
   },
   {
-    label: 'Software',
-    items: [{ to: '/admin/software', label: 'Software Master', can: 'software.view' }]
+    label: 'Games',
+    items: [
+      { to: '/admin/game-catalog', label: 'Game Catalog', can: 'catalogue.view' }
+    ]
   },
   {
     label: 'Support',
@@ -299,7 +301,7 @@ const LABELS = {
   packages: 'Package Master', features: 'Feature Master', addons: 'Add-ons',
   'audit-logs': 'Audit Logs', branches: 'Branches', subscriptions: 'Subscriptions',
   payments: 'Payments', invoices: 'Invoices', installations: 'Installations',
-  devices: 'Devices', software: 'Software Master', support: 'Support',
+  devices: 'Devices', 'game-catalog': 'Game Catalog', support: 'Support',
   announcements: 'Announcements', 'admin-users': 'Admin Users', roles: 'Roles & Permissions',
   settings: 'Settings'
 };

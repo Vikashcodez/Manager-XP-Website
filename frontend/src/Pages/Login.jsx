@@ -3,11 +3,17 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/AuthLayout';
+import VerifyEmailStep from '../components/VerifyEmailStep';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, isLoading } = useAuth();
+  const { signIn, verifyEmail, resendVerification, isLoading } = useAuth();
+
+  /* Set only when a login attempt is refused for an unverified address —
+     switches the card over to the code step in place, rather than sending
+     the person to a different page mid-attempt. */
+  const [pendingVerification, setPendingVerification] = useState(null); // { email } | null
 
   /* Signup sends the new account's address through so it is already filled in
      — the one field somebody has definitely just typed correctly, and asking
@@ -71,9 +77,48 @@ const Login = () => {
 
       navigate(result.kind === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
+      if (err.data?.verification_required) {
+        setPendingVerification({ email: err.data.email || form.email });
+        return;
+      }
       setError(err.message || 'Unable to login');
     }
   };
+
+  /* The password is still sitting in state from the attempt that got
+     refused, so verifying the code can walk straight back into signing in
+     rather than making the person type it a second time. */
+  const onVerified = async () => {
+    const result = await signIn(form);
+    setPendingVerification(null);
+    navigate(result.kind === 'admin' ? '/admin' : '/dashboard', { replace: true });
+  };
+
+  if (pendingVerification) {
+    return (
+      <AuthLayout
+        title="Verify your email"
+        subtitle="One more step before you can sign in"
+        footer={
+          <button
+            type="button"
+            onClick={() => setPendingVerification(null)}
+            className="text-white hover:text-red-400 underline underline-offset-4 transition-colors"
+          >
+            Back to sign in
+          </button>
+        }
+      >
+        <VerifyEmailStep
+          email={pendingVerification.email}
+          sent={false}
+          verify={(code) => verifyEmail(pendingVerification.email, code)}
+          resend={() => resendVerification(pendingVerification.email)}
+          onVerified={onVerified}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout
