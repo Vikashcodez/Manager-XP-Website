@@ -99,6 +99,10 @@ export const adminApi = {
   setOrganizationStatus: (id, status, reason) =>
     request(`/organizations/${id}/status`, { method: 'POST', body: JSON.stringify({ status, reason }) }),
 
+  /* The station types cafés actually run and price — the plan editor's cap
+     list, so it offers real types rather than a guess baked into the page. */
+  stationTypes: () => request('/station-types').then((b) => b.data),
+
   packages: () => request('/packages').then((b) => b.data),
   package: (id) => request(`/packages/${id}`).then((b) => b.data),
   createPackage: (payload) =>
@@ -202,6 +206,43 @@ export const adminApi = {
 
   audit: (params) => request(`/audit${qs(params)}`).then((b) => b.data),
 
+  /*
+   * The master Game Catalog. Every café's "add a game" list reads this; a
+   * café never writes to it — only ManagerXP staff with catalogue.manage do.
+   *
+   * A game and its launch configuration are two levels, not one row: the game
+   * carries the name and artwork, and each platform it ships on (Steam, Epic,
+   * EA…) gets its own nested config, because the same title on three stores is
+   * three different App IDs. Every game response carries a `platforms` array.
+   *
+   * Logo/cover uploads go as multipart, so they skip the JSON `Content-Type`
+   * the same way `replyTicket`'s file path does above.
+   */
+  gameCatalog: (params) => request(`/game-catalog${qs(params)}`).then((b) => b.data),
+  catalogGame: (id) => request(`/game-catalog/${id}`).then((b) => b.data),
+  createCatalogGame: (payload) =>
+    request('/game-catalog', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updateCatalogGame: (id, payload) =>
+    request(`/game-catalog/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+  deleteCatalogGame: (id) => request(`/game-catalog/${id}`, { method: 'DELETE' }),
+  uploadCatalogLogo: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return request(`/game-catalog/${id}/logo`, { method: 'PATCH', body: fd }).then((b) => b.data);
+  },
+  uploadCatalogCover: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return request(`/game-catalog/${id}/cover`, { method: 'PATCH', body: fd }).then((b) => b.data);
+  },
+
+  createCatalogPlatform: (gameId, payload) =>
+    request(`/game-catalog/${gameId}/platforms`, { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updateCatalogPlatform: (gameId, platformId, payload) =>
+    request(`/game-catalog/${gameId}/platforms/${platformId}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
+  deleteCatalogPlatform: (gameId, platformId) =>
+    request(`/game-catalog/${gameId}/platforms/${platformId}`, { method: 'DELETE' }),
+
   /* Support desk. These see every café's tickets, and only these can read or
      write an internal note. */
   tickets: (params) => request(`/support/tickets${qs(params)}`).then((b) => b.data),
@@ -232,48 +273,16 @@ export const adminApi = {
     })
 };
 
-/* ──────────────────────────────────────────────────────────────────────────
-   THE GAMING SOFTWARE CATALOGUE
-
-   Lives at /api/software-master rather than under /api/admin, because it is
-   not an admin-only resource: the café console reads it to build a station's
-   library, and the station shows the artwork. Only writing is restricted.
-
-   Uploads go as multipart, so these bypass the JSON client above — and
-   deliberately do NOT set Content-Type, because the browser has to add the
-   multipart boundary itself. Setting it by hand produces a request the server
-   cannot parse, with no useful error.
-   ────────────────────────────────────────────────────────────────────────── */
-const softwareRequest = async (path, options = {}) => {
-  const headers = { ...(options.headers || {}) };
-  if (adminAuth.token()) headers.Authorization = `Bearer ${adminAuth.token()}`;
-  if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-
-  const res = await fetch(`${API_BASE_URL}/api/software-master${path}`, { ...options, headers });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(body.message || `Request failed (${res.status})`);
-    err.status = res.status;
-    if (res.status === 401) adminAuth.signOut();
-    throw err;
-  }
-  return body;
-};
+/*
+ * The Software Master client that used to live here is gone along with its
+ * admin page — the Game Catalog above is now the one place a title is
+ * authored. The server still serves /api/software-master, because the café
+ * console reads it; nothing in this console does.
+ */
 
 /** Absolute URL for an uploaded asset. Stored paths are server-relative. */
 export const assetUrl = (p) =>
   !p ? null : (p.startsWith('http') ? p : `${API_BASE_URL}${p.startsWith('/') ? '' : '/'}${p}`);
-
-export const softwareApi = {
-  list: (params) => softwareRequest(`${qs({ limit: 100, ...params })}`),
-  get: (id) => softwareRequest(`/${id}`).then((b) => b.data),
-  create: (formData) => softwareRequest('', { method: 'POST', body: formData }).then((b) => b.data),
-  update: (id, formData) => softwareRequest(`/${id}`, { method: 'PUT', body: formData }).then((b) => b.data),
-  /* Deactivate, not destroy: a station that still has this title linked keeps
-     its artwork. */
-  retire: (id) => softwareRequest(`/${id}`, { method: 'DELETE' }),
-  destroy: (id) => softwareRequest(`/permanent/${id}`, { method: 'DELETE' })
-};
 
 /* ── formatting, shared so every page agrees ── */
 

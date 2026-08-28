@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { customerStanding, outstandingFor } from '../config/customerTier.js';
+import { issueVerificationCode } from './emailVerification.Controller.js';
 
 function normalizeAddress(address) {
   if (address && typeof address === 'object') {
@@ -34,7 +35,8 @@ export const register = async (req, res) => {
       email,
       phone_number,
       password,
-      address
+      address,
+      pc_name
     } = req.body;
 
     const normalizedAddress = normalizeAddress(address);
@@ -44,6 +46,35 @@ export const register = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'All fields are required: customer_name, email, phone_number, password, address'
+      });
+    }
+
+    /*
+     * Which café this account belongs to.
+     *
+     * This endpoint is public — a station signs a customer up with no staff
+     * token — so nothing in the request can be trusted to declare its own
+     * café. What can be trusted is the station's own name, looked up against
+     * the `pcs` row a café's own console created; a customer is scoped to
+     * whichever café that row belongs to, never to a café_id supplied
+     * directly by the caller.
+     *
+     * Refused rather than silently created with no café: an account nobody's
+     * console can ever see is worse than a signup that failed with a plain
+     * reason. This is the bug that let a self-registered customer disappear —
+     * created, working, and invisible to every café's customer list because
+     * nothing had ever told the backend which café's station it came from.
+     */
+    let cafeId = null;
+    if (pc_name) {
+      const pc = await pool.query(
+        `SELECT cafe_id FROM pcs WHERE name = $1 AND cafe_id IS NOT NULL LIMIT 1`, [pc_name]);
+      cafeId = pc.rows[0]?.cafe_id ?? null;
+    }
+    if (!cafeId) {
+      return res.status(400).json({
+        success: false,
+        message: "This station isn't recognized by any café yet. Ask a staff member for help."
       });
     }
 
@@ -89,27 +120,25 @@ export const register = async (req, res) => {
 
     // Insert new customer
     const insertQuery = `
-      INSERT INTO customers (customer_name, email, phone_number, password, address)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING customer_id, customer_name, email, phone_number, address, created_at, updated_at
+      INSERT INTO customers (customer_name, email, phone_number, password, address, cafe_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING customer_id, customer_name, email, phone_number, address, cafe_id, created_at, updated_at
     `;
 
-    const values = [customer_name, email, phone_number, hashedPassword, normalizedAddress];
+    const values = [customer_name, email, phone_number, hashedPassword, normalizedAddress, cafeId];
     const result = await pool.query(insertQuery, values);
 
     const newCustomer = result.rows[0];
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        customer_id: newCustomer.customer_id, 
-        email: newCustomer.email,
-        customer_name: newCustomer.customer_name
-      },
-      // No fallback secret: env.js requires JWT_SECRET at boot, and signing
-      // with a well-known literal would make every customer token forgeable.
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+    /*
+     * The address is not trusted yet. A code goes out now and this account
+     * cannot be signed into until it comes back — see `login` below. No token
+     * is issued here: handing out a session at the same moment we claim the
+     * address is unproven would make the verification decorative.
+     */
+    const verification = await issueVerificationCode(
+      { id: newCustomer.customer_id, email: newCustomer.email, name: newCustomer.customer_name },
+      'customer'
     );
 
     // Remove password from response
@@ -117,10 +146,16 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: verification.sent
+        ? `Account created. We sent a six-digit code to ${newCustomer.email} — enter it to finish signing up.`
+        : `Account created, but the verification email could not be sent (${verification.message}). Try “Resend code”.`,
       data: {
         user: newCustomer,
-        token
+        // What the client app keys off to show the code screen instead of
+        // the dashboard — no token yet.
+        verification_required: true,
+        verification_sent: verification.sent,
+        email: newCustomer.email
       }
     });
 
@@ -158,11 +193,11 @@ export const login = async (req, res) => {
 
     // Find user by email
     const findUserQuery = `
-      SELECT customer_id, customer_name, email, phone_number, password, address, created_at, updated_at
-      FROM customers 
+      SELECT customer_id, customer_name, email, phone_number, password, address, created_at, updated_at, email_verified
+      FROM customers
       WHERE email = $1
     `;
-    
+
     const result = await pool.query(findUserQuery, [email]);
 
     if (result.rows.length === 0) {
@@ -176,11 +211,27 @@ export const login = async (req, res) => {
 
     // Compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    /*
+     * An address that has never been confirmed cannot open a session.
+     *
+     * Checked after the password so this cannot be used to discover which
+     * addresses are registered — only somebody who already knows the password
+     * learns that the account is pending. The client reads
+     * `verification_required` to open the code screen instead of a dead end.
+     */
+    if (user.email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Verify your email address to finish setting up this account. Check your inbox for the six-digit code.',
+        data: { verification_required: true, email: user.email }
       });
     }
 
@@ -318,9 +369,19 @@ export const createCustomer = async (req, res) => {
     await client.query('BEGIN');
 
     const hashed = await bcrypt.hash(password || Math.random().toString(36).slice(2) + Date.now(), 10);
+    /*
+     * Verified immediately, not left to the column's own default.
+     *
+     * Self-registration proves an address by sending a code to it; this path
+     * has no such address to prove — staff enter one in person, or there is
+     * none at all and a `@walkin.local` placeholder stands in (see above),
+     * which could never receive a real code anyway. Staff having created the
+     * account in person is the verification here, the same reasoning that
+     * already lets "Sign in with Google" skip it for café owners.
+     */
     const inserted = await client.query(
-      `INSERT INTO customers (customer_name, email, phone_number, password, address, cafe_id)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO customers (customer_name, email, phone_number, password, address, cafe_id, email_verified)
+       VALUES ($1,$2,$3,$4,$5,$6,TRUE)
        RETURNING ${CUSTOMER_FIELDS.replace(/c\./g, '')}`,
       [name, loginEmail, phone, hashed, address, cafeId]
     );

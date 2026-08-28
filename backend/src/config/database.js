@@ -13,7 +13,8 @@ import { initializeCafeScoping } from './schema.cafeScoping.js';
 import { initializeSettingsScoping } from './schema.settingsScoping.js';
 import { initializeCustomerTiers } from './schema.customerTiers.js';
 import { initializeSoftwareCategories } from './schema.softwareCategories.js';
-import { initializeGames } from './schema.games.js';
+import { initializeGameCatalog } from './schema.gameCatalog.js';
+import { initializeGamePlatforms } from './schema.gamePlatforms.js';
 import { initializeSupport } from './schema.support.js';
 
 const { Pool } = pg;
@@ -243,6 +244,22 @@ export const initializeDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    /* Email verification for new customers — the same discipline as `users`
+       above: a code is emailed on sign-up and the address is not trusted
+       until it comes back. The two-step default is the same trick for the
+       same reason — adding the column as DEFAULT TRUE marks every customer
+       who already existed as verified, then the default flips to FALSE for
+       everyone who registers from here on, so this migration cannot lock out
+       a café's existing customer base the moment it runs. */
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS verify_otp_hash VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS verify_otp_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS verify_otp_attempts SMALLINT NOT NULL DEFAULT 0
+    `);
+    await client.query(`ALTER TABLE customers ALTER COLUMN email_verified SET DEFAULT FALSE`);
 
     // wallet — one row per customer, holding the authoritative balance.
     // Money is NUMERIC, never floating point.
@@ -2358,10 +2375,17 @@ export const initializeDatabase = async () => {
 
     console.log('✅ Platform billing tables created/verified');
 
-    /* Game library depends on cafes (for the seed's café) and pcs (for
-       pc_games), both created above, so it runs here near the end. */
-    await initializeGames(client);
-    console.log('✅ Game library created/verified');
+    /* The game catalog depends on pcs (for pc_games) and, for its one-time
+       migration off the first version of this feature, on the old `games`
+       table already existing — so it runs here near the end. */
+    await initializeGameCatalog(client);
+    console.log('✅ Game catalog created/verified');
+
+    /* Corrects manager_games' "one game = one launcher" assumption — depends
+       on manager_games/cafe_games/pc_games (migrated from, above) and on
+       sessions (gains game_id/game_platform_id/game_account_id) already
+       existing. */
+    await initializeGamePlatforms(client);
 
     /* Depends on organizations, branches, users and admin_users. */
     await initializeSupport(client);

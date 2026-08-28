@@ -125,7 +125,13 @@ export const AuthProvider = ({ children }) => {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Login failed');
+        // `verification_required`/`email` ride on a 403 when the address has
+        // never been confirmed — carried on the thrown error, the same way
+        // portalApi/adminApi attach `.data`, so the login screen can open the
+        // code step instead of just showing red text.
+        const err = new Error(result.message || 'Login failed');
+        err.data = result.data;
+        throw err;
       }
 
       if (result.data?.kind === 'admin') {
@@ -287,6 +293,37 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * The two halves of finishing a signup or an interrupted first login:
+   * entering the code, and asking for a new one. Both are public endpoints —
+   * no token exists yet at this point, that is the entire reason they exist.
+   */
+  const verifyEmail = async (email, code) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Could not verify that code');
+    }
+    return result.data;
+  };
+
+  const resendVerification = async (email) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const result = await response.json();
+    // Always answers the same shape on success — the endpoint itself never
+    // leaks whether the address had anything pending.
+    if (!response.ok) throw new Error(result.message || 'Could not send a new code');
+    return result;
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -340,6 +377,8 @@ export const AuthProvider = ({ children }) => {
       completeGoogleLogin,
       staffLogin,
       register,
+      verifyEmail,
+      resendVerification,
       logout,
       updateUser,
       can,

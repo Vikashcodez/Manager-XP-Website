@@ -988,7 +988,35 @@ export const requestCashTopup = async (req, res) => {
 
     const charge = Number(amount.toFixed(2));
     const coins = Number((charge * settings.rate).toFixed(2));
-    const cafeId = await resolveCafeId(client, req.actor);
+
+    /*
+     * Which café approves this request.
+     *
+     * resolveCafeId's session-history guess is a proxy for "where is this
+     * customer physically sitting" — useful when the request carries nothing
+     * better, wrong the moment something better is available. A brand-new
+     * customer who registers at a station and asks to top up cash before
+     * staff has ever started a session for them has no session history at
+     * all: on an install with more than one café, resolveCafeId then returns
+     * null, and the request lands nowhere any café's console can see it —
+     * exactly the gap this closes. The station they are physically standing
+     * at is the actual ground truth and takes priority over the guess.
+     */
+    let cafeId = null;
+    const pcName = req.body?.pc_name ? String(req.body.pc_name).trim() : '';
+    if (pcName) {
+      const pc = await client.query(
+        `SELECT cafe_id FROM pcs WHERE name = $1 AND cafe_id IS NOT NULL LIMIT 1`, [pcName]);
+      cafeId = pc.rows[0]?.cafe_id ?? null;
+    }
+    if (cafeId == null) cafeId = await resolveCafeId(client, req.actor);
+
+    if (cafeId == null) {
+      return res.status(409).json({
+        success: false,
+        message: "Couldn't tell which café to send this to. Ask a staff member to add the coins directly."
+      });
+    }
 
     const created = await client.query(
       `INSERT INTO topup_orders

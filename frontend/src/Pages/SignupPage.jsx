@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Rocket } from 'lucide-react';
 import { portalApi, portalAuth } from '../lib/portalApi';
 import { adminAuth } from '../lib/adminApi';
+import { useAuth } from '../context/AuthContext';
 import { COUNTRIES, countryByCode, flagOf, joinPhone } from '../lib/geo';
 import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/AuthLayout';
 import LocationSelector from '../components/LocationSelector';
+import VerifyEmailStep from '../components/VerifyEmailStep';
 
 /*
  * Sign up — one page, whether the visitor arrived at /signup or /start-trial.
@@ -44,10 +46,14 @@ const Field = ({ label, id, required, hint, children }) => (
 
 const SignupPage = () => {
   const navigate = useNavigate();
+  const { verifyEmail, resendVerification } = useAuth();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  /* Set once signup succeeds and the account is waiting on its code —
+     swaps the wizard over to the verify step in place of step 1/2. */
+  const [pendingVerification, setPendingVerification] = useState(null); // { email } | null
 
   const [form, setForm] = useState({
     name: '', email: '', phone: '', password: '', confirm: '',
@@ -130,16 +136,23 @@ const SignupPage = () => {
         pc_count: form.pc_count ? Number(form.pc_count) : undefined
       });
 
-      /* Signing up does not sign you in. The account is created and the
-         customer goes to the sign-in page to use the password they have just
-         chosen — which also proves to them it works, rather than finding out
-         days later when the session expires.
-         The token the server returned is deliberately discarded, and any
-         session already in this browser is cleared, so a half-remembered
-         earlier login cannot be mistaken for the new account. */
+      /* Signing up does not sign you in — the account cannot be signed into
+         at all until the address is verified, so there is nothing here worth
+         discarding, but the same defensive sign-out stays: any session
+         already in this browser is cleared so a half-remembered earlier
+         login cannot be mistaken for the new account. */
       adminAuth.signOut();
       portalAuth.signOut();
 
+      if (data.verification_required) {
+        setPendingVerification({ email: form.email.trim(), organizationName: data.organization.name });
+        return;
+      }
+
+      // Defensive fallback — should not be reachable while the backend always
+      // sends a code at signup, but a signup that somehow skipped it (an
+      // account created before this existed, say) should still land somewhere
+      // sane rather than get stuck.
       navigate('/login', {
         replace: true,
         state: {
@@ -154,6 +167,33 @@ const SignupPage = () => {
       setSaving(false);
     }
   };
+
+  const onVerified = async () => {
+    navigate('/login', {
+      replace: true,
+      state: {
+        notice: `${pendingVerification.organizationName} is ready. Sign in with ${pendingVerification.email} to continue.`,
+        email: pendingVerification.email
+      }
+    });
+  };
+
+  if (pendingVerification) {
+    return (
+      <AuthLayout
+        title="Verify your email"
+        subtitle="One more step and your café is ready"
+        footer={<>Your trial has already started — verifying just unlocks signing in.</>}
+      >
+        <VerifyEmailStep
+          email={pendingVerification.email}
+          verify={(code) => verifyEmail(pendingVerification.email, code)}
+          resend={() => resendVerification(pendingVerification.email)}
+          onVerified={onVerified}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

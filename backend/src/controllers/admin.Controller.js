@@ -475,6 +475,41 @@ export const setOrganizationStatus = async (req, res) => {
    PACKAGE MASTER
    ========================================================================== */
 
+/**
+ * GET /api/admin/station-types
+ *
+ * The station types a plan can cap, for the plan editor's dropdown.
+ *
+ * Drawn from what cafés actually run and price rather than a list baked into
+ * the frontend: the set is café-extensible by design (one sells bowling,
+ * another does not), so a hard-coded list is guaranteed to be wrong for
+ * somebody — it would offer a cap on a type nobody has, and no way to cap the
+ * type they do.
+ *
+ * Both sides are counted because either alone is incomplete: a type can be
+ * priced before any station of it exists, and a station can exist before
+ * anyone prices it. Unlike the café-facing category list this is deliberately
+ * NOT scoped to one café — a plan applies across the platform, so capping a
+ * type means capping it wherever it is run. Only the type names are returned,
+ * never which café runs what.
+ */
+export const listStationTypes = async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT category FROM (
+        SELECT category FROM pcs            WHERE category IS NOT NULL AND category <> ''
+        UNION ALL
+        SELECT category FROM software_master WHERE category IS NOT NULL AND category <> ''
+      ) t
+      ORDER BY category
+    `);
+    res.json({ success: true, data: rows.map((r) => r.category) });
+  } catch (error) {
+    console.error('Station type list failed:', error);
+    res.status(500).json({ success: false, message: 'Could not load station types' });
+  }
+};
+
 /** GET /api/admin/packages */
 export const listPackages = async (req, res) => {
   try {

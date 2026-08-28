@@ -17,6 +17,7 @@ import pool from '../config/database.js';
 import { getSetting } from '../config/settings.js';
 import { recordTenantAudit, assertOwnership } from '../middleware/tenancy.js';
 import { resolveLocation } from './locations.Controller.js';
+import { issueVerificationCode } from './emailVerification.Controller.js';
 import {
   getSubscription, getUsage, getEntitlements, checkLimit
 } from '../modules/entitlements/entitlements.service.js';
@@ -215,11 +216,17 @@ export const signup = async (req, res) => {
 
     await client.query('COMMIT');
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: 'user', organization_id: org.organization_id, cafe_id: cafe.cafe_id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
+    /*
+     * The address is not trusted yet. The business exists from this moment —
+     * deferring that until the code comes back would mean holding a whole
+     * signup (account + organization + branch + trial) in limbo somewhere
+     * outside the database — but no token is issued, so nobody can act as
+     * this owner until they prove the address is theirs. `auth.Controller.js`'s
+     * `login` already refuses an unverified `users` row; this is what makes
+     * that refusal reachable for the signup path real owners actually use,
+     * rather than one nothing ever sends a code through.
+     */
+    const verification = await issueVerificationCode(user);
 
     /* `trialDays` comes back from the provisioning helper. It used to be a
        local called `days`, and the rename was missed here — which threw a
@@ -242,9 +249,15 @@ export const signup = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Welcome to CafeXP, ${name.split(' ')[0]}`,
+      message: verification.sent
+        ? `Account created. We sent a six-digit code to ${user.email} — enter it to finish signing up.`
+        : `Account created, but the verification email could not be sent (${verification.message}). Try “Resend code”.`,
       data: {
-        token,
+        // What the frontend keys off to show the code screen instead of the
+        // dashboard — no token yet, so there is nothing to act as this owner
+        // with until the address is verified.
+        verification_required: true,
+        verification_sent: verification.sent,
         user: { id: user.id, name: user.name, email: user.email },
         organization: { id: org.organization_id, name: org.name },
         branch: { id: branch.branch_id, name: branch.name },
@@ -1033,7 +1046,16 @@ export const acceptInvite = async (req, res) => {
     }
 
     await client.query('BEGIN');
-    await client.query('UPDATE users SET password = $2 WHERE id = $1',
+    /*
+     * Verified in the same statement — accepting an invite already proves the
+     * address, the same way a Google sign-in does: the invite token only
+     * reached them because they control the inbox it was sent to. Leaving
+     * `email_verified` at the column's default FALSE would work for this
+     * request (the token below is minted regardless) but silently lock them
+     * out the next time they sign in through the ordinary password door,
+     * which never sent them a code to clear it with.
+     */
+    await client.query('UPDATE users SET password = $2, email_verified = TRUE WHERE id = $1',
       [invite.user_id, await bcrypt.hash(password, 10)]);
     await client.query(`
       UPDATE organization_users

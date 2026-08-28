@@ -8,8 +8,9 @@ import {
   setCustomerTier,
   getCustomerCredit
 } from '../controllers/customer.Controller.js';
+import { verifyCustomerEmail, resendCustomerVerification } from '../controllers/emailVerification.Controller.js';
 import { requireStaff, requirePermission } from '../middleware/authGuards.js';
-import { loginLimiter } from '../middleware/rateLimit.js';
+import { loginLimiter, resetLimiter } from '../middleware/rateLimit.js';
 
 const customerRouter = express.Router();
 
@@ -18,6 +19,11 @@ const customerRouter = express.Router();
 // from one IP — are never throttled; only a run of failures is.
 customerRouter.post('/register', register);
 customerRouter.post('/login', loginLimiter, login);
+
+// Public: finishing sign-up. Both send an email, so they share the OTP
+// limiter with password reset rather than the login one.
+customerRouter.post('/verify-email', resetLimiter, verifyCustomerEmail);
+customerRouter.post('/resend-verification', resetLimiter, resendCustomerVerification);
 
 // Staff only: these return other people's contact details.
 customerRouter.post('/', requirePermission('customers.manage'), createCustomer);
