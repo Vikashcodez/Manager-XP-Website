@@ -26,9 +26,12 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   /* Where the browser goes to start a Google sign-in — the backend endpoint,
-     which redirects on to Google's consent screen. */
+     which redirects on to Google's consent screen. The page's own origin
+     rides along so the backend can send the browser back to wherever it
+     actually came from (this machine, or another one's LAN IP) instead of
+     a single fixed address from .env. */
   const API_BASE = import.meta.env.VITE_API_URL;
-  const googleUrl = `${API_BASE}/api/auth/google`;
+  const googleUrl = `${API_BASE}/api/auth/google?origin=${encodeURIComponent(window.location.origin)}`;
 
   /* A failed Google sign-in comes back to /login?error=<code>. Turn the code
      into something a person can read; anything unmapped gets a safe generic. */

@@ -49,18 +49,34 @@ const fail = (res, reason) =>
 /* ==========================================================================
    GET /api/auth/google
    ========================================================================== */
+/* Accept the frontend's own origin as where the browser started from, so the
+   post-login redirect lands back on whichever host/IP actually served the
+   login page — the LAN IP of a second machine, not just whatever single
+   address happens to be in .env. Only a bare http(s) origin is trusted
+   (scheme+host+port, no path); anything else falls back to .env's default. */
+const parseOrigin = (raw) => {
+  if (!raw) return null;
+  try {
+    const u = new URL(String(raw));
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.origin;
+  } catch { return null; }
+};
+
 export const startGoogleAuth = (req, res) => {
   if (!googleConfigured()) {
     return fail(res, 'google_not_configured');
   }
+  const origin = parseOrigin(req.query.origin);
   /*
    * `state` is a short-lived signed token, checked on the way back. Without it
    * an attacker could feed a victim a callback URL carrying the attacker's code
    * and sign the victim into the attacker's account (login CSRF). Signed with
    * the app secret and given two minutes to live, it cannot be forged and
-   * cannot be replayed later.
+   * cannot be replayed later. The caller's origin rides along in the same
+   * signed payload so it can't be tampered with on the way back either.
    */
-  const state = jwt.sign({ n: crypto.randomBytes(8).toString('hex') },
+  const state = jwt.sign({ n: crypto.randomBytes(8).toString('hex'), origin },
     process.env.JWT_SECRET, { expiresIn: '2m' });
 
   const url = client().generateAuthUrl({
@@ -85,8 +101,10 @@ export const googleCallback = async (req, res) => {
   if (error) return fail(res, 'google_denied');
   if (!code || !state) return fail(res, 'google_bad_request');
 
+  let postLogin = POST_LOGIN;
   try {
-    jwt.verify(String(state), process.env.JWT_SECRET);   // throws if forged/expired
+    const decoded = jwt.verify(String(state), process.env.JWT_SECRET);   // throws if forged/expired
+    if (decoded.origin) postLogin = `${decoded.origin}/auth/google`;
   } catch {
     return fail(res, 'google_state_invalid');
   }
@@ -171,7 +189,7 @@ export const googleCallback = async (req, res) => {
       cafe_id: cafeId, avatar_url: picture
     })).toString('base64');
 
-    return res.redirect(`${POST_LOGIN}#token=${encodeURIComponent(token)}&user=${encodeURIComponent(profile)}`);
+    return res.redirect(`${postLogin}#token=${encodeURIComponent(token)}&user=${encodeURIComponent(profile)}`);
   } catch (err) {
     console.error('Google callback failed:', err.message);
     return fail(res, 'google_failed');
