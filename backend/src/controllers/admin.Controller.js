@@ -38,7 +38,8 @@ export const dashboard = async (req, res) => {
         (SELECT COUNT(DISTINCT user_id)::int FROM organization_users
            WHERE role = 'OWNER' AND status = 'ACTIVE')                              AS cafe_owners,
         (SELECT COUNT(*)::int FROM branches WHERE status <> 'CLOSED')               AS branches,
-        (SELECT COUNT(*)::int FROM pcs WHERE is_active AND device_type = 'GAMING_PC') AS gaming_pcs,
+        (SELECT COUNT(*)::int FROM pcs WHERE is_active AND device_type = 'GAMING_PC'
+           AND (category = 'PC' OR category IS NULL))                       AS gaming_pcs,
         (SELECT COUNT(*)::int FROM installations WHERE status = 'ACTIVE')           AS installations,
         (SELECT COUNT(*)::int FROM subscriptions
            WHERE type = 'TRIAL' AND status IN ('TRIAL','ACTIVE') AND end_date > NOW()) AS trials,
@@ -82,6 +83,7 @@ export const dashboard = async (req, res) => {
         JOIN subscriptions s ON s.organization_id = o.organization_id
         LEFT JOIN pcs p ON p.organization_id = o.organization_id
              AND p.is_active AND p.device_type = 'GAMING_PC'
+             AND (p.category = 'PC' OR p.category IS NULL)
         WHERE s.max_pcs IS NOT NULL AND s.status IN ('TRIAL','ACTIVE')
         GROUP BY o.organization_id, o.name, s.max_pcs
         HAVING COUNT(p.pc_id) >= s.max_pcs * $1 / 100.0
@@ -193,7 +195,8 @@ export const listOrganizations = async (req, res) => {
                WHERE b.organization_id = o.organization_id AND b.status <> 'CLOSED') AS branches,
              (SELECT COUNT(*)::int FROM pcs pc
                WHERE pc.organization_id = o.organization_id AND pc.is_active
-                 AND pc.device_type = 'GAMING_PC')                                   AS pcs,
+                 AND pc.device_type = 'GAMING_PC'
+                 AND (pc.category = 'PC' OR pc.category IS NULL))                    AS pcs,
              s.max_pcs, s.max_branches
       FROM organizations o
       LEFT JOIN LATERAL (
@@ -240,7 +243,8 @@ export const getOrganization = async (req, res) => {
       pool.query(`
         SELECT b.branch_id, b.name, b.code, b.city, b.status, b.cafe_id,
                (SELECT COUNT(*)::int FROM pcs p WHERE p.branch_id = b.branch_id
-                  AND p.is_active AND p.device_type = 'GAMING_PC') AS pcs,
+                  AND p.is_active AND p.device_type = 'GAMING_PC'
+                  AND (p.category = 'PC' OR p.category IS NULL)) AS pcs,
                (SELECT COUNT(*)::int FROM installations i WHERE i.branch_id = b.branch_id
                   AND i.status = 'ACTIVE') AS installations
         FROM branches b WHERE b.organization_id = $1 AND b.status <> 'CLOSED'

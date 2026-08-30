@@ -561,7 +561,8 @@ export const listBranches = async (req, res) => {
       SELECT b.*,
              (SELECT COUNT(*)::int FROM pcs p
                WHERE p.branch_id = b.branch_id AND p.is_active
-                 AND p.device_type = 'GAMING_PC')                        AS pc_count,
+                 AND p.device_type = 'GAMING_PC'
+                 AND (p.category = 'PC' OR p.category IS NULL))          AS pc_count,
              (SELECT COUNT(*)::int FROM branch_users bu
                WHERE bu.branch_id = b.branch_id AND bu.status = 'ACTIVE') AS user_count,
              (SELECT i.status FROM installations i

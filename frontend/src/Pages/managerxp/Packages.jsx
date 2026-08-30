@@ -304,7 +304,7 @@ export const PackageEditor = () => {
 
       <Panel
         title="Station type limits"
-        description="Optional caps per station type, on top of the overall Gaming PCs total above. A type with no cap here is limited only by that total. A café is blocked from setting more stations of a type than its cap."
+        description="Optional caps per station type. Gaming PCs above counts PC stations only — a PS5, Pool table or VR rig is capped here, not against that total, and a type with no cap here is uncapped."
       >
         <div className="space-y-2">
           {stationLimits.length === 0 && (

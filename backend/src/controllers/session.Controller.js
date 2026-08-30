@@ -31,7 +31,10 @@ const defaultRatePerHour = () => getSetting('session.default_rate_per_hour', 60)
 
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
-/** Seconds of billable play, evaluated at `at` (defaults to now). */
+/** Seconds actually elapsed, evaluated at `at` (defaults to now) — the true
+    wall-clock duration, before the start-of-session grace below. Used where
+    that truth matters regardless of billing, such as cancelSession's record
+    of how long a station was held. */
 const elapsedSeconds = (row, at) => {
   const now = at ? new Date(at) : new Date();
   const started = new Date(row.started_at);
@@ -42,10 +45,24 @@ const elapsedSeconds = (row, at) => {
   return Math.max(0, seconds);
 };
 
+/*
+ * A five-minute buffer at the start of every session for the game or
+ * launcher to actually load — free, and not shown ticking. The countdown
+ * (or count-up, for open-ended play) sits at its starting value until this
+ * elapses, then moves normally; a session ended inside it is charged
+ * nothing, whatever it was priced at (see endSession). Cancelling was
+ * already always free, so it needs no change here.
+ */
+const GRACE_SECONDS = 300;
+
+/** What's actually billed and shown ticking — elapsedSeconds() net of the
+    start-of-session grace above. */
+const gracedSeconds = (row, at) => Math.max(0, elapsedSeconds(row, at) - GRACE_SECONDS);
+
 const shape = (row) => {
   const elapsed = (row.status === 'ended' || row.status === 'cancelled')
     ? (row.billable_seconds || 0)
-    : elapsedSeconds(row);
+    : gracedSeconds(row);
   const plannedSeconds = row.planned_minutes ? row.planned_minutes * 60 : null;
   const running = amountForSeconds(row, elapsed);
   const walletBalance = num(row.wallet_balance);
@@ -793,9 +810,14 @@ export const endSession = async (req, res) => {
     /* Duration from the server's own timestamps and the amount from the
        session's own snapshot. Neither is taken from the request: what the
        browser believed the timer said has no bearing on what is charged. */
-    const billableSeconds = elapsedSeconds(row);
+    const billableSeconds = gracedSeconds(row);
     const rate = Number(row.rate_per_hour || 0);
-    const amount = amountForSeconds(row, billableSeconds);
+    /* Still inside the grace period: whatever this was priced at, the
+       customer never really started playing, so it costs nothing — not just
+       the pro-rated HOUR case gracedSeconds already zeroes out, but a
+       BLOCK/FLAT session too, which amountForSeconds bills whole regardless
+       of seconds played and would otherwise charge in full for zero play. */
+    const amount = billableSeconds > 0 ? amountForSeconds(row, billableSeconds) : 0;
 
     let paymentStatus = 'not_applicable';
     let walletTransactionId = null;

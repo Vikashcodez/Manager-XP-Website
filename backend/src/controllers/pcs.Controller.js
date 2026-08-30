@@ -1,7 +1,7 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
-import { checkStationLimit } from '../modules/entitlements/entitlements.service.js';
+import { checkLimit, checkStationLimit } from '../modules/entitlements/entitlements.service.js';
 
 // Get all PCs with optional filtering
 /*
@@ -159,23 +159,64 @@ export const createPC = async (req, res) => {
     }
 
     // Check if cafe exists
-    const cafeCheck = await pool.query('SELECT cafe_id FROM cafes WHERE cafe_id = $1', [cafe_id]);
+    const cafeCheck = await pool.query('SELECT cafe_id, organization_id FROM cafes WHERE cafe_id = $1', [cafe_id]);
     if (cafeCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Cafe not found'
       });
     }
+    const orgId = cafeCheck.rows[0].organization_id;
+
+    /* Entitlement, checked before the row exists rather than after: creating
+       then deleting an over-limit station would still have let the plan be
+       exceeded for the moment in between, and any code racing the count in
+       that window would see it. A category of PC (or none set) draws down the
+       overall Gaming PCs total; anything else only has its own per-type cap,
+       if the plan sets one — see getUsage's category filter for why these two
+       checks are mutually exclusive, not additive. */
+    const normalizedCategory = category ? String(category).trim().slice(0, 60) || null : null;
+    if (orgId) {
+      const room = (!normalizedCategory || normalizedCategory === 'PC')
+        ? await checkLimit(orgId, 'pc')
+        : await checkStationLimit(orgId, normalizedCategory);
+      if (!room.ok) {
+        return res.status(409).json({ success: false, message: room.message, data: room });
+      }
+    }
     
     // Check if branch exists
-    const branchCheck = await pool.query('SELECT branch_id FROM branches WHERE branch_id = $1', [branch_id]);
+    const branchCheck = await pool.query(
+      'SELECT branch_id, name, max_pcs FROM branches WHERE branch_id = $1', [branch_id]
+    );
     if (branchCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Branch not found'
       });
     }
-    
+    const branch = branchCheck.rows[0];
+
+    /* A branch's own max_pcs is a slice of the org's overall Gaming PCs total
+       (see adminBranches.Controller.js's PC pool), so it only ever gates a
+       PC — the same condition the org-wide check above uses. Unset means the
+       branch draws from the shared pool with no allocation of its own. */
+    if (branch.max_pcs != null && (!normalizedCategory || normalizedCategory === 'PC')) {
+      const used = (await pool.query(`
+        SELECT COUNT(*)::int AS n FROM pcs
+        WHERE branch_id = $1 AND is_active AND device_type = 'GAMING_PC'
+          AND (category = 'PC' OR category IS NULL)
+      `, [branch_id])).rows[0].n;
+      if (used >= branch.max_pcs) {
+        return res.status(409).json({
+          success: false,
+          message: `${branch.name} has used all ${branch.max_pcs} of its allocated PCs. ` +
+            'Raise its allocation or free one up.',
+          data: { reason: 'branch_allocation_reached', used, max: branch.max_pcs }
+        });
+      }
+    }
+
     /* Only meaningful for a networked station. Two pool tables both having no
        address is not a clash — it is the normal case. */
     if (networked) {
@@ -192,23 +233,31 @@ export const createPC = async (req, res) => {
     }
 
     const query = `
-      INSERT INTO pcs (cafe_id, branch_id, name, ip_address, mac_address, port,
+      INSERT INTO pcs (cafe_id, branch_id, organization_id, name, ip_address, mac_address, port,
                        is_active, category, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
     const result = await pool.query(query, [
       cafe_id,
       branch_id,
+      // Without this, a boot-time backfill (schema.tenancy.js) is the only
+      // thing that ever sets it — which means every entitlement check above
+      // (and every usage count anywhere else) is blind to this row until the
+      // next restart. That is the gap that let the limit check above pass
+      // once already: the row it should have been counting had no
+      // organization_id yet to be counted by.
+      orgId || null,
       name,
       ip_address || null,
       mac_address || null,
       // A station with no address has nothing to connect to, so no port either.
       networked ? (port || await getSetting('station.default_port', 9090)) : null,
       is_active !== undefined ? is_active : true,
-      // What kind of play it hosts — decides its prices and its floor grouping.
-      category ? String(category).trim().slice(0, 60) || null : null,
+      // What kind of play it hosts — decides its prices, its floor grouping,
+      // and (above) which entitlement it just drew down.
+      normalizedCategory,
       description ? String(description).trim().slice(0, 160) || null : null
     ]);
     

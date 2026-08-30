@@ -60,7 +60,8 @@ export const listBranches = async (req, res) => {
              s.status AS subscription_status, s.max_pcs AS org_max_pcs,
              (SELECT COUNT(*)::int FROM pcs pc
                WHERE pc.branch_id = b.branch_id AND pc.is_active
-                 AND pc.device_type = 'GAMING_PC')                         AS pcs,
+                 AND pc.device_type = 'GAMING_PC'
+                 AND (pc.category = 'PC' OR pc.category IS NULL))          AS pcs,
              (SELECT COUNT(*)::int FROM pcs pc
                WHERE pc.branch_id = b.branch_id AND pc.is_active)          AS devices,
              (SELECT COUNT(*)::int FROM branch_users bu
@@ -108,7 +109,8 @@ export const getPcPool = async (req, res) => {
         SELECT b.branch_id, b.name, b.max_pcs AS allocated,
                (SELECT COUNT(*)::int FROM pcs p
                  WHERE p.branch_id = b.branch_id AND p.is_active
-                   AND p.device_type = 'GAMING_PC') AS used
+                   AND p.device_type = 'GAMING_PC'
+                   AND (p.category = 'PC' OR p.category IS NULL)) AS used
         FROM branches b
         WHERE b.organization_id = $1 AND b.status <> 'CLOSED'
         ORDER BY b.name
@@ -182,6 +184,7 @@ export const updateBranch = async (req, res) => {
       const inUse = (await pool.query(`
         SELECT COUNT(*)::int AS n FROM pcs
         WHERE branch_id = $1 AND is_active AND device_type = 'GAMING_PC'
+          AND (category = 'PC' OR category IS NULL)
       `, [id])).rows[0].n;
       if (wanted < inUse) {
         return res.status(409).json({

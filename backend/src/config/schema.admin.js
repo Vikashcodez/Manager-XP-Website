@@ -383,6 +383,24 @@ export const initializeAdmin = async (client) => {
     }
   }
 
+  /* Same idea, for the café-owner test account (CAFE_TEST_EMAIL/PASSWORD).
+     Only resyncs an EXISTING `users` row — this does not create one, since
+     that needs a cafe to scope it to, which .env has no way to say. */
+  const cafeEmail = String(process.env.CAFE_TEST_EMAIL || '').trim().toLowerCase();
+  const cafePassword = String(process.env.CAFE_TEST_PASSWORD || '');
+  if (cafeEmail && cafePassword) {
+    const cafeUser = (await client.query(
+      'SELECT id, password FROM users WHERE LOWER(email) = $1', [cafeEmail]
+    )).rows[0];
+    if (cafeUser && !(await bcrypt.compare(cafePassword, cafeUser.password))) {
+      await client.query(
+        'UPDATE users SET password = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [cafeUser.id, await bcrypt.hash(cafePassword, 10)]
+      );
+      console.log(`✅ Café test account password re-synced from CAFE_TEST_PASSWORD: ${cafeEmail}`);
+    }
+  }
+
   /* ======================================================================
      SETTINGS the admin console owns
      ====================================================================== */

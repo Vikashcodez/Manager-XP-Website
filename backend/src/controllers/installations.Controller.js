@@ -308,6 +308,7 @@ export const registerDevice = async (req, res) => {
             const used = (await pool.query(`
               SELECT COUNT(*)::int AS n FROM pcs
               WHERE branch_id = $1 AND is_active AND device_type = 'GAMING_PC'
+                AND (category = 'PC' OR category IS NULL)
             `, [scope.branchId])).rows[0].n;
             if (used >= branch.max_pcs) {
               return res.status(409).json({

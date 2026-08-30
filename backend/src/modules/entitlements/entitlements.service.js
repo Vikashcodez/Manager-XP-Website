@@ -237,10 +237,13 @@ export const getUsage = async (organizationId) => {
     SELECT
       (SELECT COUNT(*)::int FROM branches
         WHERE organization_id = $1 AND status <> 'CLOSED')                  AS branches,
-      /* Gaming PCs only. Counting the front desk and the server against a
-         customer's PC allowance would be charging them for the till. */
+      /* Gaming PCs only. device_type says "customer device, not the till";
+         category says "what kind of play" — a PS5 or a pool table is also
+         device_type GAMING_PC, so both must hold. A station with no category
+         set predates the multi-type feature and was always a PC. */
       (SELECT COUNT(*)::int FROM pcs
-        WHERE organization_id = $1 AND is_active AND device_type = 'GAMING_PC') AS pcs,
+        WHERE organization_id = $1 AND is_active AND device_type = 'GAMING_PC'
+          AND (category = 'PC' OR category IS NULL))                       AS pcs,
       (SELECT COUNT(*)::int FROM pcs
         WHERE organization_id = $1 AND is_active)                            AS devices,
       (SELECT COUNT(*)::int FROM organization_users
@@ -447,9 +450,10 @@ export const checkLimit = async (organizationId, kind) => {
 /**
  * Is there room for one more station of a given type?
  *
- * The per-type cap sits on top of the overall max_pcs (which its own callers
- * still enforce). A type with no entry in station_limits is uncapped here and
- * bounded only by that total, so this returns ok for it. `excludePcId` lets a
+ * Independent of max_pcs, not layered on it: max_pcs/getUsage count only
+ * category 'PC' (see getUsage above), so a PS5 or Pool cap here is the only
+ * limit that type has. A type with no entry in station_limits is uncapped —
+ * there is no shared total for it to fall back to. `excludePcId` lets a
  * category change on an existing station not count itself.
  *
  * Returns the same refusal shape as checkLimit so a caller can answer with a
