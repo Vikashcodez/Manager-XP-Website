@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react';
 import AuthLayout, { authFieldClasses, authLabelClasses } from '../components/AuthLayout';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 /*
  * One page for both a café owner and a customer — a single door, the same

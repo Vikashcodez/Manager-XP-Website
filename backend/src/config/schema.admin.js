@@ -329,7 +329,7 @@ export const initializeAdmin = async (client) => {
   }
 
   /* ----------------------------------------------------------------------
-     MIGRATE THE ENVIRONMENT CREDENTIAL
+     SYNC THE ENVIRONMENT CREDENTIAL
 
      `/api/auth/login` had a second admin path: it compared the request's
      password to process.env.ADMIN_PASSWORD with `===` and, on a match, issued
@@ -341,14 +341,29 @@ export const initializeAdmin = async (client) => {
      with a bcrypt hash of ADMIN_PASSWORD. The same email and password keep
      working, but now through the path that has a lockout, an audit trail and
      a password that can be changed.
+
+     Kept in sync on every boot, not just the first: this is a development
+     credential edited directly in a text file, and a hash that silently stops
+     matching the file next to it is a worse failure mode than one that stays
+     current. bcrypt.compare decides whether a rehash is needed rather than
+     rehashing unconditionally — hashing is deliberately slow, and comparing is
+     the same cost every other sign-in already pays on every boot regardless.
+     A changed password also clears any lockout, since a lockout that survives
+     the very fix meant to end it helps no one.
+
+     This can overwrite a password set through the admin console's own
+     change-password screen with whatever ADMIN_PASSWORD says — acceptable
+     here because this row exists FOR that env pair, but it is why this is not
+     how a real production administrator's password should ever be managed.
      ---------------------------------------------------------------------- */
   const envEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const envPassword = String(process.env.ADMIN_PASSWORD || '');
   if (envEmail && envPassword) {
-    const already = (await client.query(
-      'SELECT 1 FROM admin_users WHERE LOWER(email) = $1', [envEmail]
+    const existing = (await client.query(
+      'SELECT admin_user_id, password_hash FROM admin_users WHERE LOWER(email) = $1', [envEmail]
     )).rows[0];
-    if (!already) {
+
+    if (!existing) {
       const superRole = (await client.query(
         `SELECT admin_role_id FROM admin_roles WHERE role_key = 'SUPER_ADMIN'`
       )).rows[0];
@@ -356,7 +371,15 @@ export const initializeAdmin = async (client) => {
         INSERT INTO admin_users (email, name, password_hash, admin_role_id)
         VALUES ($1,'ManagerXP Admin',$2,$3) ON CONFLICT (email) DO NOTHING
       `, [envEmail, await bcrypt.hash(envPassword, 10), superRole.admin_role_id]);
-      console.log(`✅ ManagerXP admin migrated from ADMIN_EMAIL: ${envEmail}`);
+      console.log(`✅ ManagerXP admin created from ADMIN_EMAIL: ${envEmail}`);
+    } else if (!(await bcrypt.compare(envPassword, existing.password_hash))) {
+      await client.query(`
+        UPDATE admin_users
+        SET password_hash = $2, failed_attempts = 0, locked_until = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE admin_user_id = $1
+      `, [existing.admin_user_id, await bcrypt.hash(envPassword, 10)]);
+      console.log(`✅ ManagerXP admin password re-synced from ADMIN_PASSWORD: ${envEmail}`);
     }
   }
 

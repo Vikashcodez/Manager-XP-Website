@@ -314,7 +314,7 @@ export const initializeBilling = async (client) => {
        'Prefix for subscription invoice numbers'),
       ('platform.auto_bill', 'false', 'boolean', 'billing',
        'Whether the monthly billing run issues invoices automatically'),
-      ('platform.pay_base_url', 'http://localhost:5173', 'string', 'billing',
+      ('platform.pay_base_url', '${process.env.PUBLIC_BASE_URL || 'http://localhost:5173'}', 'string', 'billing',
        'Where payment links point — the public address of the website'),
       ('platform.link_expiry_days', '14', 'number', 'billing',
        'How long a payment link stays usable'),

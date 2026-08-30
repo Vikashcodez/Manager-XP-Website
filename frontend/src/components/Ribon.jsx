@@ -3,6 +3,8 @@ import { Zap, Rocket, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const FreeTrialRibbon = () => {
   const [trialData, setTrialData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,7 +16,7 @@ const FreeTrialRibbon = () => {
   useEffect(() => {
     const fetchTrialData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/subscription-plans/gamingxp-free-trial');
+        const response = await fetch(`${API_BASE_URL}/api/subscription-plans/gamingxp-free-trial`);
         const result = await response.json();
         if (result.success && result.data.length > 0) {
           setTrialData(result.data[0]);
@@ -34,7 +36,7 @@ const FreeTrialRibbon = () => {
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/subscriptions?cafe_id=${user.cafe_id}&is_active=true`,
+          `${API_BASE_URL}/api/subscriptions?cafe_id=${user.cafe_id}&is_active=true`,
           {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -95,7 +97,7 @@ const FreeTrialRibbon = () => {
       const endDate = new Date(today);
       endDate.setDate(endDate.getDate() + (trialData?.no_of_days || 15));
 
-      const response = await fetch('http://localhost:5000/api/subscriptions', {
+      const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import whiteLogo from '../assets/whitelogo.png';
 import { useAuth } from '../context/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const GamerXpLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +19,9 @@ const GamerXpLogin = () => {
   // Send token to electron app
   const sendTokenToElectron = (token, user) => {
     try {
-      // Send token to electron via HTTP endpoint
+      // Send token to electron via HTTP endpoint — a local IPC bridge on this
+      // same machine, not the backend API, so it stays on localhost
+      // regardless of environment.
       fetch('http://localhost:3334/auth/token', {
         method: 'POST',
         headers: {
@@ -68,7 +72,7 @@ const GamerXpLogin = () => {
       const credentials = { email: email.trim(), password };
 
       const attempt = async (path) => {
-        const res = await fetch(`http://localhost:5000${path}`, {
+        const res = await fetch(`${API_BASE_URL}${path}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(credentials)
