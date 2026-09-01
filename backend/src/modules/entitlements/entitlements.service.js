@@ -520,4 +520,54 @@ export const requireFeature = (featureKey) => async (req, res, next) => {
   next();
 };
 
+/**
+ * Route guard for the older café/staff-token surface.
+ *
+ * `requireFeature` above assumes `req.tenant.organizationId`, which only the
+ * newer portal/organization routes carry. Every café-console and client-app
+ * route still runs on `req.actor.cafe_id` instead, so this is the same idea
+ * translated through `resolveOrganizationForCafe`. Without it, a feature
+ * switched off for one customer stays reachable through its API — the sidebar
+ * hides the button, but nothing stops the request that skips the button.
+ */
+export const requireCafeFeature = (featureKey) => async (req, res, next) => {
+  const scope = await resolveOrganizationForCafe(req.actor?.cafe_id);
+  if (!scope) return next(); // pre-tenancy install: no organization to check against
+
+  const allowed = await can(scope.organizationId, featureKey, scope.branchId);
+  if (!allowed) {
+    return res.status(403).json({
+      success: false,
+      message: 'This feature is not included in your current subscription',
+      data: { feature: featureKey, reason: 'disabled_for_account' }
+    });
+  }
+  next();
+};
+
+/**
+ * Which organization is a café-token caller's café part of?
+ *
+ * The desktop app and its stations carry `cafe_id`, not `organization_id` —
+ * this is the one place that translation happens, so every route built on
+ * the older café token asks the same question the entitlements endpoint
+ * does, rather than each re-deriving it.
+ */
+export const resolveOrganizationForCafe = async (cafeId) => {
+  const id = Number(cafeId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+
+  const row = (await pool.query(`
+    SELECT c.cafe_id, c.organization_id, b.branch_id
+    FROM cafes c
+    LEFT JOIN branches b ON b.cafe_id = c.cafe_id AND b.status <> 'CLOSED'
+    WHERE c.cafe_id = $1
+    ORDER BY b.branch_id
+    LIMIT 1
+  `, [id])).rows[0];
+
+  if (!row?.organization_id) return null;
+  return { cafeId: row.cafe_id, organizationId: row.organization_id, branchId: row.branch_id || null };
+};
+
 export { getAddonGrants };

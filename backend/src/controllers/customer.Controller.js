@@ -282,6 +282,21 @@ const CUSTOMER_FIELDS = `
   c.customer_type, c.discount_percent, c.credit_limit, c.tier_note
 `;
 
+/* Wallet balance plus total time actually played — everything a single
+   customer's own profile or a staff detail view wants, in one row. The
+   subquery only ever runs for one customer at a time (never a list), so its
+   cost is a non-issue against the index on sessions(customer_id, started_at).
+   VOID sessions have no billable_seconds worth counting; a paused or active
+   one has not finished being timed yet, so 'ended' is the only status whose
+   figure is final. */
+const CUSTOMER_DETAIL_SELECT = `
+  ${CUSTOMER_FIELDS},
+  w.balance AS wallet_balance,
+  w.currency AS wallet_currency,
+  (SELECT COALESCE(SUM(s.billable_seconds), 0) FROM sessions s
+     WHERE s.customer_id = c.customer_id AND s.status = 'ended') AS total_play_seconds
+`;
+
 const shapeCustomer = (row) => ({
   customer_id: row.customer_id,
   customer_name: row.customer_name,
@@ -308,7 +323,13 @@ const shapeCustomer = (row) => ({
   wallet_balance: row.wallet_balance === null || row.wallet_balance === undefined
     ? null
     : Number(row.wallet_balance),
-  wallet_currency: row.wallet_currency || null
+  wallet_currency: row.wallet_currency || null,
+
+  // Only present where the caller asked for it (CUSTOMER_DETAIL_SELECT) —
+  // a per-row subquery on every listing would be a query per customer.
+  total_play_seconds: row.total_play_seconds === undefined || row.total_play_seconds === null
+    ? undefined
+    : Number(row.total_play_seconds)
 });
 
 /*
@@ -477,6 +498,39 @@ export const getCustomers = async (req, res) => {
   }
 };
 
+/*
+ * GET /api/customers/me
+ *
+ * The signed-in customer's own profile, live — including how long they've
+ * actually played, which the login/register response never carried and the
+ * client only ever cached from that one moment. A customer token is the only
+ * kind that carries customer_id (see readToken's note in authGuards.js), so
+ * a staff token here simply has nothing to look itself up by.
+ */
+export const getMyProfile = async (req, res) => {
+  try {
+    const id = req.actor?.customer_id;
+    if (!id) return res.status(403).json({ success: false, message: 'Customers only' });
+
+    const result = await pool.query(
+      `SELECT ${CUSTOMER_DETAIL_SELECT}
+       FROM customers c
+       LEFT JOIN wallets w ON w.customer_id = c.customer_id
+       WHERE c.customer_id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    res.status(200).json({ success: true, data: shapeCustomer(result.rows[0]) });
+  } catch (error) {
+    console.error('Error fetching own profile:', error);
+    res.status(500).json({ success: false, message: 'Error fetching profile' });
+  }
+};
+
 // GET /api/customers/:id
 export const getCustomerById = async (req, res) => {
   try {
@@ -486,9 +540,7 @@ export const getCustomerById = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT ${CUSTOMER_FIELDS},
-              w.balance AS wallet_balance,
-              w.currency AS wallet_currency
+      `SELECT ${CUSTOMER_DETAIL_SELECT}
        FROM customers c
        LEFT JOIN wallets w ON w.customer_id = c.customer_id
        WHERE c.customer_id = $1 AND c.cafe_id IS NOT DISTINCT FROM $2`,

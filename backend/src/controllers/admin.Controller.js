@@ -975,6 +975,85 @@ export const createAddon = async (req, res) => {
   }
 };
 
+/*
+ * PATCH /api/admin/addons/:id
+ *
+ * Everything about an add-on is editable after it exists, including which
+ * features it grants — the code is the one thing that never changes, because
+ * an existing `subscription_addons` row and every audit entry referring to
+ * this add-on point at the id, not the code, so nothing downstream breaks
+ * when the price or the feature list changes under it.
+ *
+ * Feature grants are replaced wholesale rather than diffed: the caller sends
+ * the complete set it wants, matching how a station's type limits are
+ * replaced rather than merged elsewhere in this file — a partial update
+ * silently leaving an old grant in place would be a worse bug than requiring
+ * the full set every time.
+ */
+export const updateAddon = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const id = Number(req.params.id);
+    const before = (await client.query('SELECT * FROM addons WHERE addon_id = $1', [id])).rows[0];
+    if (!before) return res.status(404).json({ success: false, message: 'Add-on not found' });
+
+    const name = req.body?.name !== undefined ? String(req.body.name).trim() : before.name;
+    if (!name) return res.status(400).json({ success: false, message: 'A name is required' });
+
+    await client.query('BEGIN');
+    const addon = (await client.query(`
+      UPDATE addons SET
+        name = $2,
+        description = $3,
+        price = $4,
+        currency = $5,
+        billing_period = $6,
+        grant_pcs = $7,
+        grant_branches = $8,
+        grant_users = $9,
+        grant_installations = $10,
+        is_active = $11,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE addon_id = $1
+      RETURNING *
+    `, [
+      id, name,
+      req.body?.description !== undefined ? (req.body.description || null) : before.description,
+      req.body?.price !== undefined ? Number(req.body.price) || 0 : before.price,
+      req.body?.currency || before.currency,
+      req.body?.billing_period || before.billing_period,
+      req.body?.grant_pcs !== undefined ? Number(req.body.grant_pcs) || 0 : before.grant_pcs,
+      req.body?.grant_branches !== undefined ? Number(req.body.grant_branches) || 0 : before.grant_branches,
+      req.body?.grant_users !== undefined ? Number(req.body.grant_users) || 0 : before.grant_users,
+      req.body?.grant_installations !== undefined ? Number(req.body.grant_installations) || 0 : before.grant_installations,
+      req.body?.is_active !== undefined ? !!req.body.is_active : before.is_active
+    ])).rows[0];
+
+    if (Array.isArray(req.body?.features)) {
+      await client.query('DELETE FROM addon_features WHERE addon_id = $1', [id]);
+      for (const key of req.body.features) {
+        await client.query(
+          'INSERT INTO addon_features (addon_id, feature_key) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [id, String(key)]
+        );
+      }
+    }
+    await client.query('COMMIT');
+
+    await recordAdminAudit(req, {
+      action: 'addon.updated', resource_type: 'addon', resource_id: id,
+      old_value: before, new_value: addon
+    });
+    res.json({ success: true, message: `${addon.name} saved`, data: addon });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Admin add-on update failed:', error);
+    res.status(500).json({ success: false, message: 'Could not save that add-on' });
+  } finally {
+    client.release();
+  }
+};
+
 /* ==========================================================================
    AUDIT
    ========================================================================== */

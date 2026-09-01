@@ -128,40 +128,73 @@ export const Features = () => {
 /* ==========================================================================
    ADD-ONS — section 23
    ========================================================================== */
+const ADDON_BLANK_FORM = {
+  code: '', name: '', description: '', price: '', billing_period: 'monthly',
+  grant_pcs: '', grant_branches: '', grant_users: '', grant_installations: '',
+  features: []
+};
+
 export const Addons = () => {
   const [rows, setRows] = useState(null);
+  const [moduleList, setModuleList] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({
-    code: '', name: '', description: '', price: '',
-    grant_pcs: '', grant_branches: '', grant_users: ''
-  });
+  // null = closed, 'new' = creating, an addon_id = editing that row. One form
+  // handles both — an edit is a create with the blanks already filled in.
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(ADDON_BLANK_FORM);
 
   const mayEdit = adminAuth.can('addons.edit');
 
   const load = useCallback(() => {
     adminApi.addons().then(setRows).catch((e) => setError(e.message));
+    adminApi.features().then(setModuleList).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const create = async (e) => {
+  const toggleFeature = (key) => setForm((f) => ({
+    ...f,
+    features: f.features.includes(key) ? f.features.filter((k) => k !== key) : [...f.features, key]
+  }));
+
+  const startCreate = () => { setForm(ADDON_BLANK_FORM); setEditing('new'); };
+  const startEdit = (a) => {
+    setForm({
+      code: a.code, name: a.name, description: a.description || '',
+      price: String(a.price ?? ''), billing_period: a.billing_period || 'monthly',
+      grant_pcs: String(a.grant_pcs || ''), grant_branches: String(a.grant_branches || ''),
+      grant_users: String(a.grant_users || ''), grant_installations: String(a.grant_installations || ''),
+      features: a.features || []
+    });
+    setEditing(a.addon_id);
+  };
+  const cancel = () => { setEditing(null); setForm(ADDON_BLANK_FORM); };
+
+  const save = async (e) => {
     e.preventDefault();
     setNotice(null);
+    const payload = {
+      name: form.name, description: form.description,
+      price: Number(form.price) || 0,
+      billing_period: form.billing_period,
+      grant_pcs: Number(form.grant_pcs) || 0,
+      grant_branches: Number(form.grant_branches) || 0,
+      grant_users: Number(form.grant_users) || 0,
+      grant_installations: Number(form.grant_installations) || 0,
+      features: form.features
+    };
     try {
-      await adminApi.createAddon({
-        code: form.code, name: form.name, description: form.description,
-        price: Number(form.price) || 0,
-        grant_pcs: Number(form.grant_pcs) || 0,
-        grant_branches: Number(form.grant_branches) || 0,
-        grant_users: Number(form.grant_users) || 0
-      });
-      setForm({ code: '', name: '', description: '', price: '', grant_pcs: '', grant_branches: '', grant_users: '' });
-      setAdding(false);
+      if (editing === 'new') {
+        await adminApi.createAddon({ ...payload, code: form.code });
+        setNotice({ tone: 'good', text: 'Add-on created' });
+      } else {
+        await adminApi.updateAddon(editing, payload);
+        setNotice({ tone: 'good', text: 'Add-on saved' });
+      }
+      cancel();
       load();
-      setNotice({ tone: 'good', text: 'Add-on created' });
     } catch (err) {
       setNotice({ tone: 'bad', text: err.message });
     }
@@ -174,24 +207,33 @@ export const Addons = () => {
       title="Add-ons"
       lede="Sold on top of a package. An add-on only ever grants — it can switch a feature on or raise a ceiling, never the reverse."
       actions={mayEdit && (
-        <Button onClick={() => setAdding((a) => !a)}>{adding ? 'Cancel' : 'New add-on'}</Button>
+        <Button onClick={() => (editing ? cancel() : startCreate())}>{editing ? 'Cancel' : 'New add-on'}</Button>
       )}
     >
       {notice && <Banner tone={notice.tone}>{notice.text}</Banner>}
 
-      {adding && (
-        <Panel title="New add-on">
-          <form onSubmit={create} className="grid gap-4 sm:grid-cols-3">
+      {editing && (
+        <Panel title={editing === 'new' ? 'New add-on' : `Edit ${form.name || 'add-on'}`}>
+          <form onSubmit={save} className="grid gap-4 sm:grid-cols-3">
             <Field label="Name" id="ad-name">
               <Input id="ad-name" value={form.name} required onChange={set('name')} placeholder="Extra 25 PCs" />
             </Field>
-            <Field label="Code" id="ad-code">
-              <Input id="ad-code" value={form.code} required
+            <Field label="Code" id="ad-code" hint={editing !== 'new' ? "Fixed once created — existing subscriptions and audit history point at it" : undefined}>
+              <Input id="ad-code" value={form.code} required disabled={editing !== 'new'}
                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
                      placeholder="EXTRA_25_PCS" />
             </Field>
-            <Field label="Price per month" id="ad-price">
+            <Field label="Price" id="ad-price">
               <Input id="ad-price" type="number" min="0" value={form.price} onChange={set('price')} />
+            </Field>
+            <Field label="Billing period" id="ad-period">
+              <Select id="ad-period" value={form.billing_period} onChange={set('billing_period')}>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="half_yearly">Half-yearly</option>
+                <option value="annual">Annual</option>
+                <option value="one_time">One-time</option>
+              </Select>
             </Field>
             <Field label="Grants gaming PCs" id="ad-pcs" hint="Per unit purchased">
               <Input id="ad-pcs" type="number" min="0" value={form.grant_pcs} onChange={set('grant_pcs')} />
@@ -202,12 +244,47 @@ export const Addons = () => {
             <Field label="Grants users" id="ad-users">
               <Input id="ad-users" type="number" min="0" value={form.grant_users} onChange={set('grant_users')} />
             </Field>
+            <Field label="Grants installations" id="ad-installs">
+              <Input id="ad-installs" type="number" min="0" value={form.grant_installations} onChange={set('grant_installations')} />
+            </Field>
             <div className="sm:col-span-3">
               <Field label="Description" id="ad-desc">
                 <Input id="ad-desc" value={form.description} onChange={set('description')} />
               </Field>
             </div>
-            <div className="sm:col-span-3"><Button type="submit">Create add-on</Button></div>
+
+            <div className="sm:col-span-3">
+              <Field label="Grants features" id="ad-features" hint="A café without this feature on its package gets it while this add-on is active — e.g. sell Reservations or the payment gateway module on its own, without moving the whole package.">
+                {!moduleList ? (
+                  <div className="text-[11px] text-neutral-600">Loading the feature catalogue…</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {moduleList.map((m) => (
+                      <div key={m.module_key} className="rounded-lg border border-white/10 p-3">
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{m.label}</div>
+                        <div className="flex flex-col gap-1.5">
+                          {m.features.map((f) => (
+                            <label key={f.feature_key} className="flex items-center gap-2 text-[12px] text-neutral-300">
+                              <input
+                                type="checkbox"
+                                checked={form.features.includes(f.feature_key)}
+                                onChange={() => toggleFeature(f.feature_key)}
+                              />
+                              {f.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            </div>
+
+            <div className="sm:col-span-3 flex gap-2">
+              <Button type="submit">{editing === 'new' ? 'Create add-on' : 'Save changes'}</Button>
+              <Button type="button" variant="ghost" onClick={cancel}>Cancel</Button>
+            </div>
           </form>
         </Panel>
       )}
@@ -215,7 +292,7 @@ export const Addons = () => {
       {!rows ? <Skeleton rows={3} height="h-14" />
         : rows.length === 0 ? <Empty title="No add-ons" text="Create one to sell capacity or a feature on top of a package." />
         : (
-          <Table columns={['Add-on', 'Price', 'Grants capacity', 'Grants features', 'In use']}>
+          <Table columns={['Add-on', 'Price', 'Grants capacity', 'Grants features', 'In use', '']}>
             {rows.map((a) => (
               <tr key={a.addon_id} className="hover:bg-white/[0.03]">
                 <td className="px-4 py-2.5">
@@ -243,6 +320,9 @@ export const Addons = () => {
                   </div>
                 </td>
                 <td className="px-4 py-2.5 tabular-nums text-neutral-400">{a.active_subscriptions}</td>
+                <td className="px-4 py-2.5 text-right">
+                  {mayEdit && <Button variant="ghost" onClick={() => startEdit(a)}>Edit</Button>}
+                </td>
               </tr>
             ))}
           </Table>

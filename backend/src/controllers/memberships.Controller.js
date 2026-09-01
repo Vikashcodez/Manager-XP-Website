@@ -237,7 +237,7 @@ export const subscribe = async (req, res) => {
     }
 
     const customer = await client.query(
-      'SELECT customer_id, customer_name FROM customers WHERE customer_id = $1', [customerId]
+      'SELECT customer_id, customer_name, cafe_id FROM customers WHERE customer_id = $1', [customerId]
     );
     if (customer.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -259,10 +259,10 @@ export const subscribe = async (req, res) => {
     const billNumber = 'CX-' + String(seq.rows[0].n).padStart(6, '0');
 
     const bill = await client.query(
-      `INSERT INTO bills (bill_number, customer_id, currency, created_by, subtotal, total)
-       VALUES ($1::varchar, $2::int, $3::varchar, $4::varchar, $5::numeric, $5::numeric)
+      `INSERT INTO bills (bill_number, customer_id, cafe_id, currency, created_by, subtotal, total)
+       VALUES ($1::varchar, $2::int, $3::int, $4::varchar, $5::varchar, $6::numeric, $6::numeric)
        RETURNING bill_id`,
-      [billNumber, customerId, row.currency, req.actor?.label || null, price]
+      [billNumber, customerId, customer.rows[0].cafe_id ?? null, row.currency, req.actor?.label || null, price]
     );
     const billId = bill.rows[0].bill_id;
 
@@ -397,6 +397,29 @@ export const listMemberships = async (req, res) => {
     console.error('Error listing memberships:', error);
     res.status(500).json({ success: false, message: 'Error fetching memberships' });
   }
+};
+
+/*
+ * GET /api/memberships/plans/catalog — what a signed-in customer could
+ * subscribe to themselves.
+ * POST /api/memberships/plans/:id/subscribe-self — subscribe, paid from
+ * their own wallet.
+ *
+ * Same idea as packages.Controller.js's catalog/purchase-self: thin wrappers
+ * that resolve who's paying from the token rather than the body, then hand
+ * off to the exact code path staff already use to sell a plan. Plans are not
+ * café-scoped, so unlike packages there is no café to resolve here.
+ */
+export const listPlansCatalog = async (req, res) => {
+  req.query = { ...req.query, status: 'ACTIVE' };
+  return listPlans(req, res);
+};
+
+export const subscribeSelf = async (req, res) => {
+  const customerId = Number(req.actor?.customer_id);
+  if (!customerId) return res.status(400).json({ success: false, message: 'Sign in required' });
+  req.body = { ...req.body, customer_id: customerId, payment_method: 'wallet' };
+  return subscribe(req, res);
 };
 
 // GET /api/memberships/customer/:customerId

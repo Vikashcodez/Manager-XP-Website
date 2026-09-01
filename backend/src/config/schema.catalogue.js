@@ -123,7 +123,13 @@ export const initializeCatalogue = async (client) => {
       ('WALLET',      'Wallet',           'Balances, top-ups and transactions',      'WALLET',      110, FALSE),
       ('LOYALTY',     'Loyalty',          'Points, rewards and redemption',          'LOYALTY',     120, FALSE),
       ('STAFF',       'Staff management', 'Staff accounts, roles and shifts',        'STAFF',       160, FALSE),
-      ('SETTINGS',    'Settings',         'Configuration and preferences',           'SETTINGS',    190, TRUE)
+      ('SETTINGS',    'Settings',         'Configuration and preferences',           'SETTINGS',    190, TRUE),
+      /* Booking ahead of time — the admin console's Reservations page and the
+         public managerxp.com/book/:slug page a café shares with customers.
+         Grouped under Sessions rather than a new module of its own: booking a
+         station and running one are the same underlying thing, one before the
+         customer arrives and one after. */
+      ('RESERVATIONS','Reservations',     'Bookings, check-in and the public booking page', 'SESSIONS', 45, FALSE)
     ON CONFLICT (feature_key) DO NOTHING
   `);
 

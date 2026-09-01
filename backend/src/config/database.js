@@ -16,6 +16,8 @@ import { initializeSoftwareCategories } from './schema.softwareCategories.js';
 import { initializeGameCatalog } from './schema.gameCatalog.js';
 import { initializeGamePlatforms } from './schema.gamePlatforms.js';
 import { initializeSupport } from './schema.support.js';
+import { initializeReservations } from './schema.reservations.js';
+import { initializeCafeSlugs } from './schema.cafeSlugs.js';
 
 const { Pool } = pg;
 
@@ -547,6 +549,8 @@ export const initializeDatabase = async () => {
          'Minutes remaining at which a session is flagged as ending soon'),
         ('session.critical_minutes',      '5',   'number',  'session',
          'Minutes remaining at which a session is flagged as critical'),
+        ('session.grace_minutes',         '5',   'number',  'session',
+         'Buffer at the start of a session for the game to load before the timer starts and billing begins'),
         ('wallet.currency',               'XP',  'string',  'wallet',
          'Currency code used for customer wallets'),
         ('wallet.max_transaction',        '1000000', 'number', 'wallet',
@@ -2391,9 +2395,45 @@ export const initializeDatabase = async () => {
     await initializeSupport(client);
     console.log('✅ Support tickets created/verified');
 
+    /* Depends on cafes. */
+    await initializeCafeSlugs(client);
 
+    /* Depends on cafes, pcs, customers and sessions. */
+    await initializeReservations(client);
 
-    
+    /* ======================================================================
+       NAV-VISIBILITY PERMISSIONS
+
+       Game Credentials, Discovery, Server Log and Expenses were gated on the
+       nearest existing permission key (sessions.manage, floor.manage,
+       settings.manage, reports.view) when Roles-based sidebar visibility
+       first shipped — real, purpose-built keys are cleaner and let an owner
+       grant each independently rather than as a side effect of a broader
+       permission. Owner and Manager only by default, same as every other
+       sensitive key added after the original seed (floor.layout, ai.ask,
+       station.power): a role that already had the old proxy key does not
+       automatically inherit these, so an owner who does want a Cashier
+       managing game logins or reading expenses grants it explicitly.
+       ====================================================================== */
+    await client.query(`
+      INSERT INTO permissions (permission_key, category, description) VALUES
+        ('games.credentials', 'catalogue', 'Manage game account credentials'),
+        ('floor.discovery',   'floor',     'See and register stations discovered on the network'),
+        ('system.logs',       'system',    'See the console server log'),
+        ('expenses.view',     'expenses',  'See café expenses')
+      ON CONFLICT (permission_key) DO NOTHING
+    `);
+    await client.query(`
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.role_id, p.permission_id
+      FROM roles r CROSS JOIN permissions p
+      WHERE p.permission_key IN ('games.credentials', 'floor.discovery', 'system.logs', 'expenses.view')
+        AND r.is_system = TRUE
+        AND LOWER(r.role_name) IN ('owner', 'manager')
+      ON CONFLICT DO NOTHING
+    `);
+    console.log('✅ Nav-visibility permissions seeded');
+
     console.log('✅ Users table created/verified');
 
     // Seed subscription_plans table with default data if empty

@@ -1,5 +1,6 @@
 import express from 'express';
-import { checkForUpdate, reportUpdateState } from '../controllers/updates.Controller.js';
+import { checkForUpdate, reportUpdateState, checkForUpdateMine } from '../controllers/updates.Controller.js';
+import { requireStaff } from '../middleware/authGuards.js';
 
 const router = express.Router();
 
@@ -17,5 +18,9 @@ const router = express.Router();
    ========================================================================== */
 router.post('/check', checkForUpdate);
 router.post('/report', reportUpdateState);
+
+/* Same question, asked over the console's ordinary staff login — see the
+   doc comment on checkForUpdateMine for why this exists alongside /check. */
+router.get('/mine', requireStaff('Café staff access required'), checkForUpdateMine);
 
 export default router;

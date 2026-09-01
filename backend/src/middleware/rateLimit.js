@@ -47,3 +47,16 @@ export const resetLimiter = rateLimit({
   legacyHeaders: false,
   handler: refusal('Too many password-reset requests from here. Wait a few minutes and try again.')
 });
+
+/*
+ * The public booking page (managerxp.com/book/:slug) takes no login at all,
+ * which is exactly what makes it worth limiting — nothing else stops a
+ * script from filling a café's calendar with junk reservations.
+ */
+export const publicBookingLimiter = rateLimit({
+  windowMs: minutes(15),
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: refusal('Too many booking attempts from here. Wait a few minutes and try again.')
+});

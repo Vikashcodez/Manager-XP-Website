@@ -123,6 +123,8 @@ export const adminApi = {
   addons: () => request('/addons').then((b) => b.data),
   createAddon: (payload) =>
     request('/addons', { method: 'POST', body: JSON.stringify(payload) }).then((b) => b.data),
+  updateAddon: (id, payload) =>
+    request(`/addons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((b) => b.data),
 
   branches: (params) => request(`/branches${qs(params)}`).then((b) => b.data),
   updateBranch: (id, payload) =>

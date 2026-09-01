@@ -19,7 +19,7 @@ import { recordTenantAudit, assertOwnership } from '../middleware/tenancy.js';
 import { resolveLocation } from './locations.Controller.js';
 import { issueVerificationCode } from './emailVerification.Controller.js';
 import {
-  getSubscription, getUsage, getEntitlements, checkLimit
+  getSubscription, getUsage, getEntitlements, checkLimit, can
 } from '../modules/entitlements/entitlements.service.js';
 
 const slugify = (name) =>
@@ -558,7 +558,7 @@ export const updateOrganization = async (req, res) => {
 export const listBranches = async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT b.*,
+      SELECT b.*, c.slug AS cafe_slug,
              (SELECT COUNT(*)::int FROM pcs p
                WHERE p.branch_id = b.branch_id AND p.is_active
                  AND p.device_type = 'GAMING_PC'
@@ -570,6 +570,7 @@ export const listBranches = async (req, res) => {
              (SELECT i.last_seen_at FROM installations i
                WHERE i.branch_id = b.branch_id ORDER BY i.installation_id DESC LIMIT 1) AS installation_last_seen
       FROM branches b
+      LEFT JOIN cafes c ON c.cafe_id = b.cafe_id
       WHERE b.organization_id = $1
         AND b.branch_id = ANY($2::int[])
         AND b.status <> 'CLOSED'
@@ -593,7 +594,14 @@ export const listBranches = async (req, res) => {
         installation_status: b.installation_status || 'NOT_INSTALLED',
         installation_online: b.installation_last_seen
           ? (Date.now() - new Date(b.installation_last_seen).getTime()) < 5 * 60 * 1000
-          : false
+          : false,
+        // The public booking page for this branch's café — null until the
+        // slug backfill has reached it, which happens on the next restart.
+        cafe_slug: b.cafe_slug || null,
+        // Reservations are refused outside this window. Null means never set
+        // — treated as open around the clock, not as "always closed".
+        opening_time: b.opening_time ? String(b.opening_time).slice(0, 5) : null,
+        closing_time: b.closing_time ? String(b.closing_time).slice(0, 5) : null
       })),
       meta: { max_branches: subscription?.limits.max_branches ?? null }
     });
@@ -614,6 +622,19 @@ export const createBranch = async (req, res) => {
     const limit = await checkLimit(req.tenant.organizationId, 'branch');
     if (!limit.ok) {
       return res.status(403).json({ success: false, message: limit.message, data: limit });
+    }
+
+    /* The numeric ceiling above says how many; this says whether more than one
+       is allowed at all. Every organization gets its first branch at signup
+       regardless — this only stops a second, so a package without
+       MULTI_BRANCH cannot be worked around by simply staying under whatever
+       trial/default ceiling checkLimit happens to allow. */
+    if (limit.used > 0 && !(await can(req.tenant.organizationId, 'MULTI_BRANCH'))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Multiple branches are not included in your current subscription',
+        data: { feature: 'MULTI_BRANCH', reason: 'disabled_for_account' }
+      });
     }
 
     await client.query('BEGIN');
@@ -678,7 +699,8 @@ export const updateBranch = async (req, res) => {
     }
 
     const map = { name: 'name', code: 'code', city: 'city', address: 'street',
-                  phone: 'phone', status: 'status' };
+                  phone: 'phone', status: 'status',
+                  opening_time: 'opening_time', closing_time: 'closing_time' };
     const fields = [];
     const values = [id];
     for (const [key, column] of Object.entries(map)) {

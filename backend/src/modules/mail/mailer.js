@@ -295,8 +295,13 @@ export const invoicePaymentLinkEmail = ({ invoice, link, url, organizationName }
  * station or on a shared kiosk, where clicking through a link is more
  * friction than typing six digits into the app they already have open.
  */
-export const passwordResetOtpEmail = ({ name, code, minutes }) => {
-  const subject = `${code} is your ManagerXP password reset code`;
+export const passwordResetOtpEmail = ({ name, code, minutes, cafeName }) => {
+  /* The code lives in the body only — a subject line is what shows on a lock
+     screen or in a notification preview, which defeats the point of a code
+     nobody but the recipient should see. The café name here instead, so a
+     person juggling logins for more than one café knows which one this is
+     for before they even open it. */
+  const subject = `Reset your password — ${cafeName || 'ManagerXP'}`;
   const body = `
     <p style="margin:0 0 20px;color:#a3a3a3;font-size:14px;line-height:1.6">
       Hello${name ? ` ${name}` : ''},<br>
@@ -332,8 +337,9 @@ export const passwordResetOtpEmail = ({ name, code, minutes }) => {
  * the other, and a familiar-looking security email is one people read rather
  * than delete.
  */
-export const emailVerificationOtpEmail = ({ name, code, minutes }) => {
-  const subject = `${code} is your ManagerXP verification code`;
+export const emailVerificationOtpEmail = ({ name, code, minutes, cafeName }) => {
+  // See passwordResetOtpEmail above — the code never rides in the subject.
+  const subject = `Verify your email — ${cafeName || 'ManagerXP'}`;
   const body = `
     <p style="margin:0 0 20px;color:#a3a3a3;font-size:14px;line-height:1.6">
       Welcome${name ? ` ${name}` : ''},<br>

@@ -39,6 +39,27 @@ const KIND = {
   customer: { table: 'customers', idColumn: 'customer_id', relatedType: 'customer' }
 };
 
+/*
+ * Which café's name goes in the email's subject, so someone juggling logins
+ * for more than one café — or a customer account under a specific café —
+ * knows which one a code is for before opening it. A brand-new owner
+ * account has no café yet (one hasn't been provisioned at registration
+ * time), so this resolves to nothing and the email falls back to plain
+ * "ManagerXP" branding rather than a wrong or missing name.
+ */
+const resolveCafeName = async (principal, kind) => {
+  const row = kind === 'customer'
+    ? (await pool.query(
+        'SELECT c.name FROM cafes c JOIN customers cu ON cu.cafe_id = c.cafe_id WHERE cu.customer_id = $1',
+        [principal.id]
+      )).rows[0]
+    : (await pool.query(
+        'SELECT name FROM cafes WHERE user_id = $1 ORDER BY cafe_id ASC LIMIT 1',
+        [principal.id]
+      )).rows[0];
+  return row ? row.name : null;
+};
+
 /**
  * Put a fresh code on an account and email it.
  *
@@ -64,7 +85,8 @@ export const issueVerificationCode = async (principal, kind = 'owner') => {
       [hashOtp(code), expiresAt, principal.id]
     );
 
-    const tpl = emailVerificationOtpEmail({ name: principal.name, code, minutes: OTP_MINUTES });
+    const cafeName = await resolveCafeName(principal, kind).catch(() => null);
+    const tpl = emailVerificationOtpEmail({ name: principal.name, code, minutes: OTP_MINUTES, cafeName });
     const mail = await sendMail({
       to: principal.email, toName: principal.name, ...tpl,
       kind: 'email_verification', relatedType, relatedId: String(principal.id)

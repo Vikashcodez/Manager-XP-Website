@@ -283,10 +283,10 @@ export const purchasePackage = async (req, res) => {
     const billNumber = 'CX-' + String(seq.rows[0].n).padStart(6, '0');
 
     const bill = await client.query(
-      `INSERT INTO bills (bill_number, customer_id, currency, created_by, subtotal, total)
-       VALUES ($1::varchar, $2::int, $3::varchar, $4::varchar, $5::numeric, $5::numeric)
+      `INSERT INTO bills (bill_number, customer_id, cafe_id, currency, created_by, subtotal, total)
+       VALUES ($1::varchar, $2::int, $3::int, $4::varchar, $5::varchar, $6::numeric, $6::numeric)
        RETURNING bill_id`,
-      [billNumber, customerId, row.currency, req.actor?.label || null, price]
+      [billNumber, customerId, req.actor?.cafe_id ?? null, row.currency, req.actor?.label || null, price]
     );
     const billId = bill.rows[0].bill_id;
 
@@ -376,6 +376,41 @@ export const purchasePackage = async (req, res) => {
   } finally {
     client.release();
   }
+};
+
+/*
+ * GET /api/packages/catalog — what a signed-in customer could buy themselves.
+ * POST /api/packages/:id/purchase-self — buy one, paid from their own wallet.
+ *
+ * Thin wrappers around the staff-facing listPackages/purchasePackage rather
+ * than a second copy of that logic: a customer is never trusted to name their
+ * own café or pay any way but their own wallet, so this resolves both from
+ * the token and their own row, then hands off to the exact same code path
+ * staff selling a package already goes through.
+ */
+export const listPackagesCatalog = async (req, res) => {
+  const customerId = Number(req.actor?.customer_id);
+  if (!customerId) return res.status(400).json({ success: false, message: 'Sign in required' });
+  const customer = await pool.query('SELECT cafe_id FROM customers WHERE customer_id = $1', [customerId]);
+  if (!customer.rows.length) return res.status(404).json({ success: false, message: 'Customer not found' });
+
+  req.actor = { ...req.actor, cafe_id: customer.rows[0].cafe_id };
+  req.query = { ...req.query, status: 'ACTIVE' };
+  return listPackages(req, res);
+};
+
+export const purchasePackageSelf = async (req, res) => {
+  const customerId = Number(req.actor?.customer_id);
+  if (!customerId) return res.status(400).json({ success: false, message: 'Sign in required' });
+  const customer = await pool.query('SELECT cafe_id FROM customers WHERE customer_id = $1', [customerId]);
+  if (!customer.rows.length) return res.status(404).json({ success: false, message: 'Customer not found' });
+
+  req.actor = { ...req.actor, cafe_id: customer.rows[0].cafe_id };
+  // Never the body's word for who is paying or how — a customer buying for
+  // themselves always pays from their own wallet, never cash they didn't hand
+  // anyone, and never another customer's account.
+  req.body = { ...req.body, customer_id: customerId, payment_method: 'wallet' };
+  return purchasePackage(req, res);
 };
 
 // GET /api/packages/customer/:customerId

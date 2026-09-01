@@ -54,6 +54,27 @@ const findAccounts = async (email) => {
   return accounts;
 };
 
+/*
+ * Which café's name goes in the reset email's subject. A customer account
+ * belongs to exactly one café; an owner may run more than one, so the
+ * oldest — the one they set up first — wins, same rule auth.Controller.js
+ * uses to decide which café an owner's session is scoped to. Neither table
+ * having a café yet (a bare owner account with none provisioned) falls back
+ * to plain "ManagerXP" branding rather than a missing name.
+ */
+const resolveCafeName = async (account) => {
+  const row = account.table === 'customers'
+    ? (await pool.query(
+        'SELECT c.name FROM cafes c JOIN customers cu ON cu.cafe_id = c.cafe_id WHERE cu.customer_id = $1',
+        [account.id]
+      )).rows[0]
+    : (await pool.query(
+        'SELECT name FROM cafes WHERE user_id = $1 ORDER BY cafe_id ASC LIMIT 1',
+        [account.id]
+      )).rows[0];
+  return row ? row.name : null;
+};
+
 const setOtp = async (account, hash, expiresAt) => {
   await pool.query(
     `UPDATE ${account.table}
@@ -123,7 +144,11 @@ export const forgotPassword = async (req, res) => {
     await Promise.all(accounts.map((a) => setOtp(a, hash, expiresAt)));
 
     const name = accounts[0].name;
-    const template = passwordResetOtpEmail({ name, code, minutes: OTP_MINUTES });
+    // The customer side is the more specific "this café's login" framing when
+    // an email is both a customer and an owner somewhere.
+    const cafeAccount = accounts.find((a) => a.table === 'customers') || accounts[0];
+    const cafeName = await resolveCafeName(cafeAccount).catch(() => null);
+    const template = passwordResetOtpEmail({ name, code, minutes: OTP_MINUTES, cafeName });
     const sent = await sendMail({ to: email, toName: name, kind: 'password_reset', ...template });
 
     console.log(`[password reset] OTP issued for ${email} (${accounts.map((a) => a.table).join(' + ')})` +

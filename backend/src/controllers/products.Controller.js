@@ -1,5 +1,8 @@
 import pool from '../config/database.js';
 import { getSetting } from '../config/settings.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { optimizeLogo } from '../middleware/catalogAssetUpload.js';
 
 /*
  * Products, categories and stock.
@@ -314,6 +317,30 @@ export const customerMenu = async (req, res) => {
   } catch (error) {
     console.error('Error building menu:', error);
     res.status(500).json({ success: false, message: 'Error fetching menu' });
+  }
+};
+
+/*
+ * POST /api/products/upload-image — multipart, field name "image".
+ *
+ * Standalone rather than tied to a product id, because a brand-new product
+ * doesn't have one yet: staff pick a file while filling in the create form,
+ * this hands back the URL to include in that same create/update payload —
+ * the same two-step a browser file input already implies, just against our
+ * own storage instead of asking staff to host the picture themselves and
+ * paste a link.
+ */
+export const uploadProductImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No image was uploaded' });
+    const optimizedName = `optimized-${path.basename(req.file.filename, path.extname(req.file.filename))}.png`;
+    const optimizedPath = path.join(path.dirname(req.file.path), optimizedName);
+    await optimizeLogo(req.file.path, optimizedPath);
+    res.json({ success: true, data: { image_url: `/uploads/${optimizedName}` } });
+  } catch (error) {
+    if (req.file) await fs.unlink(req.file.path).catch(() => {});
+    console.error('Product image upload failed:', error);
+    res.status(500).json({ success: false, message: 'Could not save that image' });
   }
 };
 

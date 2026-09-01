@@ -46,23 +46,32 @@ const elapsedSeconds = (row, at) => {
 };
 
 /*
- * A five-minute buffer at the start of every session for the game or
- * launcher to actually load — free, and not shown ticking. The countdown
- * (or count-up, for open-ended play) sits at its starting value until this
- * elapses, then moves normally; a session ended inside it is charged
- * nothing, whatever it was priced at (see endSession). Cancelling was
- * already always free, so it needs no change here.
+ * A buffer at the start of every session for the game or launcher to
+ * actually load — free, and not shown ticking. The countdown (or count-up,
+ * for open-ended play) sits at its starting value until this elapses, then
+ * moves normally; a session ended inside it is charged nothing, whatever it
+ * was priced at (see endSession). Cancelling was already always free, so it
+ * needs no change here.
+ *
+ * Per café, and settable from Settings without a code change or a restart —
+ * see settings.js's getSetting cache. Five minutes if a café has never set
+ * one, matching what this was hardcoded to before it became configurable.
  */
-const GRACE_SECONDS = 300;
+const DEFAULT_GRACE_MINUTES = 5;
+const graceSecondsFor = async (cafeId) => {
+  const minutes = await getSetting('session.grace_minutes', DEFAULT_GRACE_MINUTES, cafeId);
+  return Math.max(0, Number(minutes) || 0) * 60;
+};
 
 /** What's actually billed and shown ticking — elapsedSeconds() net of the
     start-of-session grace above. */
-const gracedSeconds = (row, at) => Math.max(0, elapsedSeconds(row, at) - GRACE_SECONDS);
+const gracedSeconds = (row, at, graceSeconds) => Math.max(0, elapsedSeconds(row, at) - graceSeconds);
 
-const shape = (row) => {
+const shape = async (row) => {
+  const graceSeconds = await graceSecondsFor(row.cafe_id);
   const elapsed = (row.status === 'ended' || row.status === 'cancelled')
     ? (row.billable_seconds || 0)
-    : gracedSeconds(row);
+    : gracedSeconds(row, undefined, graceSeconds);
   const plannedSeconds = row.planned_minutes ? row.planned_minutes * 60 : null;
   const running = amountForSeconds(row, elapsed);
   const walletBalance = num(row.wallet_balance);
@@ -502,7 +511,7 @@ export const startSession = async (req, res) => {
       }
     });
 
-    res.status(201).json({ success: true, message: 'Session started', data: shape(session) });
+    res.status(201).json({ success: true, message: 'Session started', data: await shape(session) });
   } catch (error) {
     // Harmless when nothing was ever begun — every early-return path above
     // that opens a transaction rolls back explicitly before returning; this
@@ -566,7 +575,7 @@ export const listSessions = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.rows.map(shape),
+      data: await Promise.all(result.rows.map(shape)),
       pagination: { limit, offset, total: total.rows[0].count }
     });
   } catch (error) {
@@ -581,7 +590,7 @@ export const getSession = async (req, res) => {
   try {
     const session = await fetchSession(client, parseInt(req.params.id, 10));
     if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
-    res.status(200).json({ success: true, data: shape(session) });
+    res.status(200).json({ success: true, data: await shape(session) });
   } catch (error) {
     console.error('Error fetching session:', error);
     res.status(500).json({ success: false, message: 'Error fetching session' });
@@ -639,7 +648,7 @@ const mutate = async (req, res, handler, action) => {
     res.status(200).json({
       success: true,
       message: outcome?.message || 'Session updated',
-      data: shape(fresh)
+      data: await shape(fresh)
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -810,7 +819,7 @@ export const endSession = async (req, res) => {
     /* Duration from the server's own timestamps and the amount from the
        session's own snapshot. Neither is taken from the request: what the
        browser believed the timer said has no bearing on what is charged. */
-    const billableSeconds = gracedSeconds(row);
+    const billableSeconds = gracedSeconds(row, undefined, await graceSecondsFor(row.cafe_id));
     const rate = Number(row.rate_per_hour || 0);
     /* Still inside the grace period: whatever this was priced at, the
        customer never really started playing, so it costs nothing — not just
@@ -973,7 +982,7 @@ export const endSession = async (req, res) => {
       message: paymentStatus === 'paid' ? 'Session ended and charged'
         : paymentStatus === 'unpaid' ? 'Session ended — payment outstanding'
         : 'Session ended',
-      data: shape(fresh)
+      data: await shape(fresh)
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -1081,7 +1090,7 @@ export const cancelSession = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Session cancelled — nothing charged',
-      data: shape(fresh)
+      data: await shape(fresh)
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

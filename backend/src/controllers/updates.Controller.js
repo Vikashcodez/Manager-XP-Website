@@ -17,6 +17,9 @@
  */
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
+import { resolveOrganizationForCafe, getSubscription } from '../modules/entitlements/entitlements.service.js';
+
+const LIVE_STATUSES = new Set(['TRIAL', 'ACTIVE', 'PAST_DUE', 'GRACE_PERIOD']);
 
 /* ==========================================================================
    VERSIONS
@@ -191,6 +194,83 @@ export const checkForUpdate = async (req, res) => {
     });
   } catch (error) {
     console.error('Error checking for updates:', error);
+    res.status(500).json({ success: false, message: 'Could not check for updates' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * GET /api/updates/mine
+ *
+ * The same question as /check, asked by a café's own console over its
+ * ordinary staff login instead of a licence key. No installation has gone
+ * through licence activation yet, so this is what actually gets called today;
+ * /check stays in place for whenever that flow exists. Entitlement follows
+ * the subscription directly rather than license_keys.cafe_id, which is empty
+ * for almost every café right now.
+ *
+ * No download block here on purpose — this endpoint answers "is one
+ * available", not "here is the file". Fetching the artifact is the next
+ * phase, once real releases exist to fetch.
+ */
+export const checkForUpdateMine = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const refuse = (reason, detail) => res.json({
+      success: true,
+      data: { entitled: false, reason, detail, update_available: false }
+    });
+
+    const scope = await resolveOrganizationForCafe(req.actor?.cafe_id);
+    if (!scope) return refuse('no_organization', 'This installation is not linked to a business yet.');
+
+    const subscription = await getSubscription(scope.organizationId);
+    if (!subscription || !LIVE_STATUSES.has(subscription.status)) {
+      return refuse('subscription_lapsed', 'The subscription has lapsed. Renew to receive updates.');
+    }
+
+    const channelRow = (await client.query(
+      `SELECT setting_value FROM app_settings WHERE setting_key = 'updates.channel'`)).rows[0];
+    const channel = channelRow?.setting_value === 'beta' ? 'beta' : 'stable';
+    const component = req.query?.component === 'client' ? 'client' : 'server';
+
+    const latest = (await client.query(`
+      SELECT * FROM client_releases
+      WHERE product = 'cafexp' AND component = $2 AND is_published
+        AND (channel = $1 OR channel = 'stable')
+      ORDER BY version_sort DESC LIMIT 1
+    `, [channel, component])).rows[0];
+
+    if (!latest) {
+      return res.json({
+        success: true,
+        data: {
+          entitled: true, component, update_available: false,
+          reason: 'no_release', detail: `No ${component} release has been published yet.`
+        }
+      });
+    }
+
+    const reported = String(req.query?.current_version || '0.0.0');
+    res.json({
+      success: true,
+      data: {
+        entitled: true,
+        component,
+        update_available: isNewer(latest.version, reported),
+        current_version: reported,
+        latest_version: latest.version,
+        channel: latest.channel,
+        release_notes: latest.release_notes,
+        is_mandatory: latest.is_mandatory,
+        below_minimum: latest.min_supported_version
+          ? versionSort(reported) < versionSort(latest.min_supported_version)
+          : false
+      }
+    });
+  } catch (error) {
+    console.error('Error checking for updates (mine):', error);
     res.status(500).json({ success: false, message: 'Could not check for updates' });
   } finally {
     client.release();

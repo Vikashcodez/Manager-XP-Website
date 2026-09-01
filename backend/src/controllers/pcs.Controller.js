@@ -3,6 +3,34 @@ import { recordAudit } from '../config/audit.js';
 import { getSetting } from '../config/settings.js';
 import { checkLimit, checkStationLimit } from '../modules/entitlements/entitlements.service.js';
 
+/**
+ * POST /api/pcs/:id/client-version
+ *
+ * The console relays what a station reports about its own CafeXP Client build
+ * the moment it connects. Advisory, like updates.Controller's reportUpdateState
+ * — it feeds the version inventory an operator sees in Settings, never an
+ * entitlement decision, so a station that misreports only confuses its own row.
+ */
+export const reportClientVersion = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const version = String(req.body?.version || '').trim().slice(0, 32);
+    if (!version) return res.status(400).json({ success: false, message: 'A version is required' });
+
+    const { rows } = await pool.query(`
+      UPDATE pcs SET client_version = $2, client_version_seen_at = CURRENT_TIMESTAMP
+      WHERE pc_id = $1 AND cafe_id = $3
+      RETURNING pc_id, client_version, client_version_seen_at
+    `, [id, version, req.actor.cafe_id]);
+
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Station not found' });
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error recording client version:', error);
+    res.status(500).json({ success: false, message: 'Could not record version' });
+  }
+};
+
 // Get all PCs with optional filtering
 /*
  * Which café's stations the caller may read.

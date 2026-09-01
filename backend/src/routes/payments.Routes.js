@@ -6,6 +6,7 @@ import {
   requestCashTopup, approveCashTopup, rejectCashTopup, listPendingTopups
 } from '../controllers/payments.Controller.js';
 import { requireAuth, requirePermission } from '../middleware/authGuards.js';
+import { requireCafeFeature } from '../modules/entitlements/entitlements.service.js';
 
 /* ==========================================================================
    WEBHOOKS
@@ -31,6 +32,8 @@ webhookRouter.post('/webhook/:provider',
 );
 
 const router = express.Router();
+const billingFeature = requireCafeFeature('BILLING');
+const walletFeature = requireCafeFeature('WALLET');
 
 /* ==========================================================================
    HOSTED CHECKOUT
@@ -49,32 +52,34 @@ router.post('/checkout/:nonce/complete', completeCheckout);
    changing them are separate permissions: a manager can be shown that
    Razorpay is live without being able to point it somewhere else.
    ========================================================================== */
-router.get('/providers', requirePermission('payments.gateway.view'), getProviderCatalogue);
-router.get('/gateways', requirePermission('payments.gateway.view'), listGateways);
-router.put('/gateways/:provider', requirePermission('payments.gateway.manage'), saveGateway);
-router.post('/gateways/:provider/test', requirePermission('payments.gateway.manage'), testGateway);
-router.delete('/gateways/:provider', requirePermission('payments.gateway.manage'), deleteGateway);
+router.get('/providers', requirePermission('payments.gateway.view'), billingFeature, getProviderCatalogue);
+router.get('/gateways', requirePermission('payments.gateway.view'), billingFeature, listGateways);
+router.put('/gateways/:provider', requirePermission('payments.gateway.manage'), billingFeature, saveGateway);
+router.post('/gateways/:provider/test', requirePermission('payments.gateway.manage'), billingFeature, testGateway);
+router.delete('/gateways/:provider', requirePermission('payments.gateway.manage'), billingFeature, deleteGateway);
 
-router.get('/topups', requirePermission('payments.topup.view'), listTopups);
+router.get('/topups', requirePermission('payments.topup.view'), billingFeature, listTopups);
 
 /* Cash approvals. Separated from the gateway permissions because this is
    counter work, not configuration: a cashier confirms the notes arrived
    without being able to see or change where card money lands. */
-router.get('/topups/pending', requirePermission('payments.topup.view'), listPendingTopups);
-router.post('/topups/:id/approve', requirePermission('payments.topup.approve'), approveCashTopup);
-router.post('/topups/:id/reject', requirePermission('payments.topup.approve'), rejectCashTopup);
+router.get('/topups/pending', requirePermission('payments.topup.view'), billingFeature, listPendingTopups);
+router.post('/topups/:id/approve', requirePermission('payments.topup.approve'), billingFeature, approveCashTopup);
+router.post('/topups/:id/reject', requirePermission('payments.topup.approve'), billingFeature, rejectCashTopup);
 
 /* ==========================================================================
    CUSTOMER — self-service top-up
 
    requireAuth, then the controller takes the customer from the token. These
    routes never read a customer id from the body, so a valid token cannot be
-   used to fund somebody else's wallet.
+   used to fund somebody else's wallet. Gated on WALLET, not BILLING — this is
+   the customer funding their own balance, the same module a disabled WALLET
+   feature switches off in the console.
    ========================================================================== */
-router.get('/topup/options', requireAuth, getTopupOptions);
-router.get('/topup/mine', requireAuth, myTopups);
-router.post('/topup/order', requireAuth, createTopupOrder);
-router.post('/topup/cash', requireAuth, requestCashTopup);
-router.post('/topup/verify', requireAuth, verifyTopup);
+router.get('/topup/options', requireAuth, walletFeature, getTopupOptions);
+router.get('/topup/mine', requireAuth, walletFeature, myTopups);
+router.post('/topup/order', requireAuth, walletFeature, createTopupOrder);
+router.post('/topup/cash', requireAuth, walletFeature, requestCashTopup);
+router.post('/topup/verify', requireAuth, walletFeature, verifyTopup);
 
 export default router;

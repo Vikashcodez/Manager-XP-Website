@@ -27,6 +27,7 @@ const CafeManager = lazy(() => import('./components/cafeManager'))
 const GamerXpLogin = lazy(() => import('./Pages/GamingXplogin'))
 const StoreConsole = lazy(() => import('./Pages/StoreConsole'))
 const PayLink = lazy(() => import('./Pages/PayLink'))
+const BookSlot = lazy(() => import('./Pages/BookSlot'))
 
 // CafeXP customer portal. Its own shell, its own token, its own chunk — a
 // visitor reading the marketing site should never download it.
@@ -127,6 +128,7 @@ const AppLayout = () => {
     '/start-trial', '/accept-invite', '/auth/google']
     .includes(location.pathname)
     || location.pathname.startsWith('/pay/')
+    || location.pathname.startsWith('/book/')
     // The dashboard and the admin console have their own sidebar and header;
     // the marketing chrome on top of them would be two navigations competing
     // for the same screen.
@@ -212,6 +214,9 @@ const AppLayout = () => {
           <Route path="/store-login" element={<StoreLogin />} />
           {/* Public: a customer pays from an emailed link, with no account. */}
           <Route path="/pay/:token" element={<PayLink />} />
+          {/* The public booking page a café shares with its customers —
+              managerxp.com/book/:slug. No login, the slug is the only key. */}
+          <Route path="/book/:slug" element={<BookSlot />} />
           <Route
             path="/store"
             element={(

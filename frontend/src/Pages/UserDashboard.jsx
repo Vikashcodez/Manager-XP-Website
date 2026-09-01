@@ -363,7 +363,7 @@ const CafeCard = ({ cafe }) => {
 };
 
 const UserDashboard = () => {
-  const { user, isAuthenticated, updateUser } = useAuth();
+  const { user, token, isAuthenticated, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const [profileLoading, setProfileLoading] = useState(true);
@@ -374,7 +374,7 @@ const UserDashboard = () => {
   const [subscriptionError, setSubscriptionError] = useState('');
   const [cafes, setCafes] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
-  
+
   const abortControllerRef = useRef(null);
 
   useEffect(() => {
@@ -463,7 +463,9 @@ const UserDashboard = () => {
       
       const subscriptionPromises = cafes.map(async (cafe) => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/subscriptions/cafe/${cafe.cafe_id}`);
+          const response = await fetch(`${API_BASE_URL}/api/subscriptions/cafe/${cafe.cafe_id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
           if (!response.ok) {
             return null;
           }
@@ -494,7 +496,7 @@ const UserDashboard = () => {
     };
 
     loadSubscriptions();
-  }, [cafes]);
+  }, [cafes, token]);
 
   const userCafes = useMemo(
     () => cafes.filter((cafe) => String(cafe.user_id) === String(user?.id)),

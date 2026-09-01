@@ -10,7 +10,8 @@ import {
   getActivePCs,
   getPCsByCafe,
   checkPCExists,
-  registerDiscoveredPC
+  registerDiscoveredPC,
+  reportClientVersion
 } from '../controllers/pcs.Controller.js';
 import { requireAuth, requireStaff } from '../middleware/authGuards.js';
 
@@ -46,5 +47,6 @@ pcsRouter.post('/register-discovered', staff, registerDiscoveredPC);
 pcsRouter.put('/:id', staff, updatePC);
 pcsRouter.delete('/:id', staff, deletePC);
 pcsRouter.patch('/:id/restore', staff, restorePC);
+pcsRouter.post('/:id/client-version', staff, reportClientVersion);
 
 export default pcsRouter;

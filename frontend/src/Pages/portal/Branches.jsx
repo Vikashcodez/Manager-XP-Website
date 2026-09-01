@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { portalApi } from '../../lib/portalApi';
+import { portalApi, portalAuth } from '../../lib/portalApi';
 import { Page, Card, Button, Field, Input, Pill, Banner, Empty, Skeleton, StatusDot, Meter } from '../../components/portal/ui';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 /*
  * Branches — the physical locations a business trades from.
@@ -18,18 +20,94 @@ const Branches = () => {
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', city: '', address: '', phone: '' });
+  // null until known — whether this business's package includes online
+  // booking, read from the same entitlement resolver the café console asks.
+  // A raw fetch to the desktop-app entitlements endpoint rather than
+  // portalApi (which always targets /api/portal/*): the same owner token
+  // already works there, and there is no portal-specific copy of this
+  // resolver to duplicate.
+  const [bookingEnabled, setBookingEnabled] = useState(null);
+  const [copiedBranchId, setCopiedBranchId] = useState(null);
+  // Draft store hours per branch, seeded from the loaded data and edited
+  // independently of it — so typing in one branch's fields never touches
+  // another's, and a failed save leaves the draft as typed rather than
+  // reverting silently.
+  const [hoursDraft, setHoursDraft] = useState({});
+  const [savingHoursId, setSavingHoursId] = useState(null);
+  const [hoursError, setHoursError] = useState({});
 
   const load = useCallback(() => {
     setLoading(true);
     portalApi.branches()
-      .then((res) => { setBranches(res.data); setMeta(res.meta || {}); setError(null); })
+      .then((res) => {
+        setBranches(res.data);
+        setMeta(res.meta || {});
+        setError(null);
+        setHoursDraft(Object.fromEntries((res.data || []).map((b) => [
+          b.branch_id, { opening_time: b.opening_time || '', closing_time: b.closing_time || '' }
+        ])));
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    let ignore = false;
+    const token = portalAuth.token();
+    if (!token) return undefined;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/entitlements/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const body = await res.json();
+        if (ignore) return;
+        // Unresolved (a business that predates organizations) defaults to
+        // shown — the same "can't tell, don't brick it" call the café
+        // console makes for the same situation.
+        setBookingEnabled(body?.data?.resolved ? !!body.data.features?.RESERVATIONS?.enabled : true);
+      } catch {
+        if (!ignore) setBookingEnabled(true);
+      }
+    })();
+
+    return () => { ignore = true; };
+  }, []);
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const setHoursField = (branchId, field) => (e) =>
+    setHoursDraft((d) => ({ ...d, [branchId]: { ...d[branchId], [field]: e.target.value } }));
+
+  const saveHours = async (branchId) => {
+    setSavingHoursId(branchId);
+    setHoursError((e) => ({ ...e, [branchId]: null }));
+    const draft = hoursDraft[branchId] || {};
+    try {
+      await portalApi.updateBranch(branchId, {
+        opening_time: draft.opening_time || null,
+        closing_time: draft.closing_time || null
+      });
+      load();
+    } catch (err) {
+      setHoursError((e) => ({ ...e, [branchId]: err.message }));
+    } finally {
+      setSavingHoursId(null);
+    }
+  };
+
+  const copyBookingLink = async (branchId, url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedBranchId(branchId);
+      setTimeout(() => setCopiedBranchId((id) => (id === branchId ? null : id)), 2000);
+    } catch {
+      // Clipboard access can be refused; the link is still visible to copy by hand.
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -150,6 +228,60 @@ const Branches = () => {
                     <dd className="mt-0.5 text-sm text-neutral-300">{b.phone || '—'}</dd>
                   </div>
                 </dl>
+
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <p className="text-[11px] uppercase tracking-wider text-neutral-500">Store hours</p>
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    Reservations can only be booked inside this window. Leave blank for open around the clock.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-end gap-3">
+                    <Field label="Opens" id={`br-open-${b.branch_id}`}>
+                      <Input
+                        id={`br-open-${b.branch_id}`} type="time"
+                        value={hoursDraft[b.branch_id]?.opening_time || ''}
+                        onChange={setHoursField(b.branch_id, 'opening_time')}
+                      />
+                    </Field>
+                    <Field label="Closes" id={`br-close-${b.branch_id}`}>
+                      <Input
+                        id={`br-close-${b.branch_id}`} type="time"
+                        value={hoursDraft[b.branch_id]?.closing_time || ''}
+                        onChange={setHoursField(b.branch_id, 'closing_time')}
+                      />
+                    </Field>
+                    <Button
+                      type="button" variant="ghost"
+                      disabled={savingHoursId === b.branch_id}
+                      onClick={() => saveHours(b.branch_id)}
+                    >
+                      {savingHoursId === b.branch_id ? 'Saving…' : 'Save hours'}
+                    </Button>
+                  </div>
+                  {hoursError[b.branch_id] && (
+                    <p className="mt-2 text-xs text-red-300">{hoursError[b.branch_id]}</p>
+                  )}
+                </div>
+
+                {b.cafe_slug && bookingEnabled && (
+                  <div className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <span className="truncate font-mono text-[11px] text-neutral-400">
+                      {`${window.location.origin}/book/${b.cafe_slug}`}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => copyBookingLink(b.branch_id, `${window.location.origin}/book/${b.cafe_slug}`)}
+                    >
+                      {copiedBranchId === b.branch_id ? 'Copied' : 'Copy booking link'}
+                    </Button>
+                  </div>
+                )}
+
+                {b.cafe_slug && bookingEnabled === false && (
+                  <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200/80">
+                    Online booking isn&apos;t included in your current package.
+                  </p>
+                )}
               </article>
             ))}
           </div>

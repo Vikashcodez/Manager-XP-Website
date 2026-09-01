@@ -12,6 +12,12 @@ export const createSubscription = async (req, res) => {
       is_active = true
     } = req.body;
 
+    // A café token may only ever create a subscription for its own café —
+    // never trust the body's cafe_id on its own.
+    if (Number(cafe_id) !== Number(req.actor.cafe_id)) {
+      return res.status(403).json({ success: false, message: 'You can only manage your own café\'s subscription' });
+    }
+
     // Validate required fields
     if (!cafe_id || !sub_id || !max_pcs || !start_date || !end_date) {
       return res.status(400).json({
@@ -115,8 +121,14 @@ export const createSubscription = async (req, res) => {
 // Get all subscriptions with cafe and plan details
 export const getAllSubscriptions = async (req, res) => {
   try {
-    const { cafe_id, is_active, page = 1, limit = 10 } = req.query;
-    
+    const { is_active, page = 1, limit = 10 } = req.query;
+    // A café token only ever gets its own subscriptions, regardless of what
+    // cafe_id a caller passes in the query string.
+    const cafe_id = req.actor.cafe_id;
+    if (!cafe_id) {
+      return res.status(200).json({ success: true, data: [], pagination: { page: 1, limit: Number(limit), total: 0, totalPages: 0 } });
+    }
+
     let query = `
       SELECT 
         s.subscription_id,
@@ -382,6 +394,9 @@ export const deleteExpiredSubscriptions = async (req, res) => {
 export const getSubscriptionsByCafeId = async (req, res) => {
   try {
     const { cafe_id } = req.params;
+    if (Number(cafe_id) !== Number(req.actor.cafe_id)) {
+      return res.status(403).json({ success: false, message: 'You can only view your own café\'s subscription' });
+    }
     const query = `
       SELECT s.*, 
       s1.*
@@ -401,5 +416,37 @@ export const getSubscriptionsByCafeId = async (req, res) => {
       message: 'Internal server error',
       error: error.message
     });
+  }
+};
+
+/*
+ * GET /api/subscriptions/addons/catalog
+ *
+ * Every add-on ManagerXP currently sells, for a signed-in café to browse —
+ * not just the ones already on this café's plan. This is what the console's
+ * "not included in your plan" screens read from to name a price rather than
+ * just saying a feature is missing. Read-only: there is no self-service
+ * checkout yet, so this never touches this café's own subscription.
+ */
+export const listAddonCatalog = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT a.addon_id, a.code, a.name, a.description, a.price, a.currency, a.billing_period,
+             COALESCE(
+               json_agg(json_build_object('feature_key', f.feature_key, 'label', f.label))
+                 FILTER (WHERE f.feature_key IS NOT NULL),
+               '[]'
+             ) AS features
+      FROM addons a
+      LEFT JOIN addon_features af ON af.addon_id = a.addon_id
+      LEFT JOIN features f ON f.feature_key = af.feature_key
+      WHERE a.is_active = TRUE
+      GROUP BY a.addon_id
+      ORDER BY a.name
+    `);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error listing add-on catalog:', error);
+    res.status(500).json({ success: false, message: 'Could not load add-ons' });
   }
 };

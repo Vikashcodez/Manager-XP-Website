@@ -15,9 +15,8 @@
  * Read-only. Nothing here can change an entitlement, only report one.
  */
 import express from 'express';
-import pool from '../config/database.js';
 import { requireAuth } from '../middleware/authGuards.js';
-import { getEntitlements, getSubscription, getUsage } from '../modules/entitlements/entitlements.service.js';
+import { getEntitlements, getSubscription, getUsage, resolveOrganizationForCafe } from '../modules/entitlements/entitlements.service.js';
 import { getSetting } from '../config/settings.js';
 
 const router = express.Router();
@@ -29,22 +28,7 @@ const router = express.Router();
  * the row rather than trusted: the café is looked up, and the organization
  * comes from the café row in the database, never from the request.
  */
-const resolveScope = async (actor) => {
-  const cafeId = Number(actor?.cafe_id);
-  if (!Number.isFinite(cafeId) || cafeId <= 0) return null;
-
-  const row = (await pool.query(`
-    SELECT c.cafe_id, c.organization_id, b.branch_id
-    FROM cafes c
-    LEFT JOIN branches b ON b.cafe_id = c.cafe_id AND b.status <> 'CLOSED'
-    WHERE c.cafe_id = $1
-    ORDER BY b.branch_id
-    LIMIT 1
-  `, [cafeId])).rows[0];
-
-  if (!row?.organization_id) return null;
-  return { cafeId: row.cafe_id, organizationId: row.organization_id, branchId: row.branch_id || null };
-};
+const resolveScope = (actor) => resolveOrganizationForCafe(actor?.cafe_id);
 
 /**
  * GET /api/entitlements/me

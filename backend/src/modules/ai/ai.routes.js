@@ -1,6 +1,7 @@
 import express from 'express';
 import { askController, healthController, suggestionsController } from './ai.controller.js';
 import { requirePermission } from '../../middleware/authGuards.js';
+import { requireCafeFeature } from '../entitlements/entitlements.service.js';
 
 const aiRouter = express.Router();
 
@@ -17,8 +18,18 @@ const aiRouter = express.Router();
  */
 const canAsk = requirePermission('ai.ask');
 
-aiRouter.get('/health', canAsk, healthController);
-aiRouter.get('/suggestions', canAsk, suggestionsController);
-aiRouter.post('/ask', canAsk, askController);
+/*
+ * `canAsk` only checks the caller's ROLE — it says nothing about whether this
+ * café's subscription includes the module at all. Without this, ManagerXP
+ * switching the AI feature off for one customer (section 57's entitlement
+ * overrides) hid the sidebar entry in the desktop console but left the
+ * endpoint itself answering, since nothing here ever consulted the same
+ * resolver.
+ */
+const requireAi = requireCafeFeature('AI');
+
+aiRouter.get('/health', canAsk, requireAi, healthController);
+aiRouter.get('/suggestions', canAsk, requireAi, suggestionsController);
+aiRouter.post('/ask', canAsk, requireAi, askController);
 
 export default aiRouter;

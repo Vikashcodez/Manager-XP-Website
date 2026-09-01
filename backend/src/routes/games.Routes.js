@@ -7,6 +7,7 @@ import {
   listAccounts, createAccount, updateAccount, deleteAccount
 } from '../controllers/gameAccounts.Controller.js';
 import { requireStaff } from '../middleware/authGuards.js';
+import { requireCafeFeature } from '../modules/entitlements/entitlements.service.js';
 
 /*
  * A café's Game Library. Every route is staff-scoped — `requireStaff` puts
@@ -21,23 +22,24 @@ import { requireStaff } from '../middleware/authGuards.js';
  */
 const gamesRouter = express.Router();
 const staff = requireStaff('Café staff access required');
+const feature = requireCafeFeature('SESSION_MANAGEMENT');
 
 // More specific paths before /:id.
-gamesRouter.get('/catalog', staff, browseCatalog);
-gamesRouter.get('/pc/:pcId', staff, listPcGames);
-gamesRouter.put('/pc/:pcId', staff, setPcGames);
+gamesRouter.get('/catalog', staff, feature, browseCatalog);
+gamesRouter.get('/pc/:pcId', staff, feature, listPcGames);
+gamesRouter.put('/pc/:pcId', staff, feature, setPcGames);
 
 // A platform's venue account pool. Scoped by game_platform_id, not by the
 // café's cafe_games row, since accounts are café-owned data independent of
 // whether the game happens to be enabled right now.
-gamesRouter.get('/platforms/:platformId/accounts', staff, listAccounts);
-gamesRouter.post('/platforms/:platformId/accounts', staff, createAccount);
-gamesRouter.patch('/platforms/:platformId/accounts/:accountId', staff, updateAccount);
-gamesRouter.delete('/platforms/:platformId/accounts/:accountId', staff, deleteAccount);
+gamesRouter.get('/platforms/:platformId/accounts', staff, feature, listAccounts);
+gamesRouter.post('/platforms/:platformId/accounts', staff, feature, createAccount);
+gamesRouter.patch('/platforms/:platformId/accounts/:accountId', staff, feature, updateAccount);
+gamesRouter.delete('/platforms/:platformId/accounts/:accountId', staff, feature, deleteAccount);
 
-gamesRouter.get('/', staff, listGames);
-gamesRouter.post('/', staff, addGame);
-gamesRouter.patch('/:id', staff, updateCafeGame);
-gamesRouter.delete('/:id', staff, removeGame);
+gamesRouter.get('/', staff, feature, listGames);
+gamesRouter.post('/', staff, feature, addGame);
+gamesRouter.patch('/:id', staff, feature, updateCafeGame);
+gamesRouter.delete('/:id', staff, feature, removeGame);
 
 export default gamesRouter;

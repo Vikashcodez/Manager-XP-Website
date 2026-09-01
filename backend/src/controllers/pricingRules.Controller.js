@@ -335,6 +335,7 @@ export const previewRates = async (req, res) => {
         category: row.category,
         session_name: row.session_name,
         duration_minutes: row.duration_minutes,
+        is_unlimited: row.duration_type === 'UNLIMITED',
         currency: row.currency,
         base_price: base,
         current_price: now,
