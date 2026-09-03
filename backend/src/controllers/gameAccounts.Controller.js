@@ -18,7 +18,7 @@
  */
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
-import { encryptSecret } from '../modules/payments/payments.crypto.js';
+import { encryptSecret, decryptSecret } from '../modules/payments/payments.crypto.js';
 
 const clean = (v, max) => {
   if (v === undefined || v === null) return null;
@@ -159,6 +159,45 @@ export const updateAccount = async (req, res) => {
   } catch (error) {
     console.error('Venue account update failed:', error);
     res.status(500).json({ success: false, message: 'Could not save that venue account' });
+  }
+};
+
+/*
+ * GET /api/games/platforms/:platformId/accounts/:accountId/credential
+ *
+ * The one exception to "nothing here ever returns the password, decrypted or
+ * otherwise" — added deliberately, not by accident, so the console can relay
+ * it to a station for an automated sign-in instead of a launcher already left
+ * signed in being the only supported way to run a venue account.
+ *
+ * Every other route in this file exists for a person — filling in a form,
+ * reading a table — and a person seeing a plaintext password is exactly what
+ * "encrypted at rest, never shown again" was written to prevent. This route
+ * exists for the console's own internal relay path only: it is never called
+ * from anywhere a value could end up rendered, logged, or audited, and
+ * nothing here writes the result anywhere. Callers must keep it that way.
+ */
+export const revealCredential = async (req, res) => {
+  try {
+    const cafeId = req.actor?.cafe_id ?? null;
+    const platformId = parseInt(req.params.platformId, 10);
+    const accountId = parseInt(req.params.accountId, 10);
+
+    const account = (await pool.query(
+      'SELECT username, credentials_encrypted FROM game_accounts WHERE id = $1 AND game_platform_id = $2 AND cafe_id IS NOT DISTINCT FROM $3',
+      [accountId, platformId, cafeId]
+    )).rows[0];
+    if (!account) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const password = account.credentials_encrypted ? decryptSecret(account.credentials_encrypted) : null;
+    if (!password) {
+      return res.status(404).json({ success: false, message: 'No password saved for this account' });
+    }
+
+    res.json({ success: true, data: { username: account.username || null, password } });
+  } catch (error) {
+    console.error('Venue account credential reveal failed:', error);
+    res.status(500).json({ success: false, message: 'Could not read that credential' });
   }
 };
 

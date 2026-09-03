@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 /*
  * Auth guards for the wallet routes.
@@ -191,6 +192,38 @@ export const requirePlatformAdmin = (req, res, next) => {
    * exists and is worth attacking. It is simply not available to them.
    */
   return res.status(403).json({ success: false, message: 'Not available for this account' });
+};
+
+/**
+ * The one automated caller allowed to publish a client release: the GitHub
+ * release workflow, right after it builds an installer. Not a JWT — CI has
+ * no interactive session to hold one, and baking a person's admin login into
+ * a permanent GitHub Secret is worse than a token whose only power is one
+ * route.
+ *
+ * On a match, proceeds straight to the route handler. Otherwise calls
+ * `next('route')` — not plain `next()` — which skips the REST of this same
+ * route's own handler array (createRelease would otherwise run
+ * unauthenticated) and moves on to the next registered route matching this
+ * path: the ordinary admin-gated `/releases` route further down in
+ * platform.Routes.js. That route still runs requirePlatformAdmin exactly as
+ * before, so a missing or wrong token here ends up refused exactly like
+ * today, never let through.
+ */
+export const requireReleaseAgent = (req, res, next) => {
+  const configured = process.env.RELEASE_PUBLISH_TOKEN;
+  const header = req.headers.authorization || '';
+
+  if (configured && header.startsWith('Bearer ')) {
+    const provided = Buffer.from(header.slice(7).trim());
+    const expected = Buffer.from(configured);
+    if (provided.length === expected.length && crypto.timingSafeEqual(provided, expected)) {
+      req.actor = { isStaff: true, isPlatformAdmin: true, isReleaseAgent: true, label: 'release-agent' };
+      return next();
+    }
+  }
+
+  next('route');
 };
 
 /**

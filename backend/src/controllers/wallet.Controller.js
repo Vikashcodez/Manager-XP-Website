@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
+import { customerStanding, floorFor } from '../config/customerTier.js';
 
 /*
  * Customer wallet.
@@ -156,7 +157,7 @@ const applyMovement = async (req, res, direction) => {
       return res.status(400).json({ success: false, message: error });
     }
 
-    const category = String(req.body?.category || (direction === 'credit' ? 'topup' : 'purchase')).slice(0, 32);
+    const requestedCategory = String(req.body?.category || (direction === 'credit' ? 'topup' : 'purchase')).slice(0, 32);
     const method = req.body?.method ? String(req.body.method).slice(0, 32) : null;
     const note = req.body?.note ? String(req.body.note) : null;
     const performedBy = req.actor?.label || null;
@@ -186,14 +187,25 @@ const applyMovement = async (req, res, direction) => {
       ? Number((current + amount).toFixed(2))
       : Number((current - amount).toFixed(2));
 
-    if (next < 0) {
+    // A regular customer's wallet may go negative, up to their own
+    // credit_limit — see customerTier.js. Everyone else's floor stays zero.
+    const standing = direction === 'debit' ? await customerStanding(client, customerId) : null;
+    const floor = standing ? floorFor(standing) : 0;
+
+    if (next < floor) {
       await client.query('ROLLBACK');
       return res.status(409).json({
         success: false,
-        message: 'Insufficient balance',
-        data: { balance: current, requested: amount }
+        message: floor < 0 ? 'That would exceed their credit limit' : 'Insufficient balance',
+        data: { balance: current, requested: amount, credit_limit: standing ? standing.creditLimit : 0 }
       });
     }
+
+    // A debit that crosses into negative territory is a regular customer
+    // drawing on their credit, not an ordinary spend — the ledger says so
+    // regardless of what category the caller asked for, so "how much is
+    // outstanding" can be read straight off wallet_transactions.
+    const category = direction === 'debit' && next < 0 ? 'credit_used' : requestedCategory;
 
     const updated = await client.query(
       `UPDATE wallets

@@ -311,6 +311,9 @@ const shapeCustomer = (row) => ({
      till can read these without first checking the type. */
   customer_type: row.customer_type || 'NORMAL',
   is_regular: (row.customer_type || 'NORMAL') === 'REGULAR',
+  // A test/internal account — see schema.customerTiers.js. Every revenue
+  // figure the platform computes excludes one of these.
+  is_staff: (row.customer_type || 'NORMAL') === 'STAFF',
   discount_percent: Number(row.discount_percent) || 0,
   credit_limit: Number(row.credit_limit) || 0,
   can_pay_later: (row.customer_type || 'NORMAL') === 'REGULAR' && Number(row.credit_limit) > 0,
@@ -579,8 +582,8 @@ export const setCustomerTier = async (req, res) => {
     }
 
     const type = String(req.body?.customer_type || '').toUpperCase();
-    if (!['NORMAL', 'REGULAR'].includes(type)) {
-      return res.status(400).json({ success: false, message: 'Type must be NORMAL or REGULAR' });
+    if (!['NORMAL', 'REGULAR', 'STAFF'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Type must be NORMAL, REGULAR or STAFF' });
     }
 
     /* Demoting clears the privileges rather than leaving them set but
@@ -641,7 +644,9 @@ export const setCustomerTier = async (req, res) => {
       sensitive: type === 'REGULAR' && credit > 0,
       summary: type === 'REGULAR'
         ? `Made ${before.customer_name} a regular — ${discount}% off, ${credit} credit limit`
-        : `Returned ${before.customer_name} to a normal customer`,
+        : type === 'STAFF'
+          ? `Marked ${before.customer_name} as a staff/test account — excluded from revenue`
+          : `Returned ${before.customer_name} to a normal customer`,
       meta: {
         from: { type: before.customer_type, discount: before.discount_percent, credit: before.credit_limit },
         to: { type, discount, credit }
@@ -650,7 +655,9 @@ export const setCustomerTier = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: type === 'REGULAR' ? 'Customer is now a regular' : 'Customer set back to normal',
+      message: type === 'REGULAR' ? 'Customer is now a regular'
+        : type === 'STAFF' ? 'Customer marked as staff — excluded from revenue reports'
+        : 'Customer set back to normal',
       data: shapeCustomer(updated.rows[0])
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Normal and regular customers.
+   Normal, regular, and staff customers.
 
    A café knows the difference between somebody who walked in once and
    somebody who is there every week. The second gets treated differently:
@@ -10,6 +10,17 @@
    gaming-only. Being a regular is something the café *grants*: no expiry,
    no charge, and the discount is on the whole bill because it is a
    relationship rather than a product.
+
+   ── Staff ────────────────────────────────────────────────────────────────
+   A third type, for a customer record that exists to test the system rather
+   than to be a paying customer — a café owner's own account, used to try a
+   top-up flow or run a session end to end without it landing in the day's
+   real takings. Every revenue figure this platform computes (Reports,
+   Dashboard, Billing totals) excludes a staff customer's sessions, orders
+   and top-ups — see the `customer_type != 'STAFF'` filters in
+   reports.Controller.js, billing.Controller.js and portal.Controller.js.
+   Carries no discount or credit — same shape as a normal customer, just
+   invisible to the numbers a café owner makes decisions from.
 
    ── Credit ────────────────────────────────────────────────────────────────
    `credit_limit` is what the café is willing to be owed at any one time, not
@@ -30,16 +41,25 @@ export const initializeCustomerTiers = async (client) => {
       ADD COLUMN IF NOT EXISTS tier_note VARCHAR(255)
   `);
 
-  /* Constraints added separately and only when absent — ALTER TABLE has no
-     IF NOT EXISTS for these, and this runs on every boot. */
+  /*
+   * The type check is dropped and recreated every boot rather than added
+   * only when absent, unlike the others below — its allowed set has grown
+   * once already (STAFF, added after REGULAR), and a constraint that only
+   * gets created when missing would never pick up that widening on a
+   * database that already has the old, narrower one. Cheap to redo: it is
+   * just a value list, not a computation over existing rows.
+   */
+  await client.query(`ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_type_check`);
+  await client.query(`
+    ALTER TABLE customers ADD CONSTRAINT customers_type_check
+      CHECK (customer_type IN ('NORMAL','REGULAR','STAFF'))
+  `);
+
+  /* The rest are added only when absent — ALTER TABLE has no IF NOT EXISTS
+     for these, and this runs on every boot. */
   await client.query(`
     DO $$
     BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'customers_type_check') THEN
-        ALTER TABLE customers ADD CONSTRAINT customers_type_check
-          CHECK (customer_type IN ('NORMAL','REGULAR'));
-      END IF;
-
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'customers_discount_check') THEN
         ALTER TABLE customers ADD CONSTRAINT customers_discount_check
           CHECK (discount_percent >= 0 AND discount_percent <= 100);
@@ -68,7 +88,7 @@ export const initializeCustomerTiers = async (client) => {
     CREATE INDEX IF NOT EXISTS idx_customers_type ON customers (cafe_id, customer_type)
   `);
 
-  console.log('✅ Customer tiers (normal / regular) created/verified');
+  console.log('✅ Customer tiers (normal / regular / staff) created/verified');
 };
 
 export default { initializeCustomerTiers };

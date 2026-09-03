@@ -4,7 +4,7 @@ import {
   listPcGames, setPcGames
 } from '../controllers/games.Controller.js';
 import {
-  listAccounts, createAccount, updateAccount, deleteAccount
+  listAccounts, createAccount, updateAccount, deleteAccount, revealCredential
 } from '../controllers/gameAccounts.Controller.js';
 import { requireStaff } from '../middleware/authGuards.js';
 import { requireCafeFeature } from '../modules/entitlements/entitlements.service.js';
@@ -36,6 +36,9 @@ gamesRouter.get('/platforms/:platformId/accounts', staff, feature, listAccounts)
 gamesRouter.post('/platforms/:platformId/accounts', staff, feature, createAccount);
 gamesRouter.patch('/platforms/:platformId/accounts/:accountId', staff, feature, updateAccount);
 gamesRouter.delete('/platforms/:platformId/accounts/:accountId', staff, feature, deleteAccount);
+// Internal relay use only — see revealCredential's own comment. Never called
+// from a UI; the console uses it to hand a station what it needs to sign in.
+gamesRouter.get('/platforms/:platformId/accounts/:accountId/credential', staff, feature, revealCredential);
 
 gamesRouter.get('/', staff, feature, listGames);
 gamesRouter.post('/', staff, feature, addGame);

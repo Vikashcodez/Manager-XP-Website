@@ -1054,6 +1054,42 @@ export const updateAddon = async (req, res) => {
   }
 };
 
+/*
+ * DELETE /api/admin/addons/:id
+ *
+ * `subscription_addons.addon_id` is ON DELETE RESTRICT — deliberately, so a
+ * café's billing history can never be silently erased by removing something
+ * from the catalogue. Any café that has ever bought this add-on, even one
+ * long since cancelled or expired, blocks the delete at the database rather
+ * than this code having to reason about it. is_active already exists for
+ * "stop selling this" (via the same PATCH the Edit form uses); this is only
+ * for an add-on nobody has ever actually bought.
+ */
+export const deleteAddon = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const before = (await pool.query('SELECT * FROM addons WHERE addon_id = $1', [id])).rows[0];
+    if (!before) return res.status(404).json({ success: false, message: 'Add-on not found' });
+
+    await pool.query('DELETE FROM addons WHERE addon_id = $1', [id]);
+
+    await recordAdminAudit(req, {
+      action: 'addon.deleted', resource_type: 'addon', resource_id: id, old_value: before
+    });
+    res.json({ success: true, message: `${before.name} deleted` });
+  } catch (error) {
+    if (error.code === '23503') {
+      return res.status(409).json({
+        success: false,
+        message: 'This add-on has been sold to at least one café and cannot be deleted. ' +
+          'Turn it off instead — Edit and switch it to inactive — so it stops appearing for new sales.'
+      });
+    }
+    console.error('Admin add-on delete failed:', error);
+    res.status(500).json({ success: false, message: 'Could not delete that add-on' });
+  }
+};
+
 /* ==========================================================================
    AUDIT
    ========================================================================== */

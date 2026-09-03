@@ -2,7 +2,7 @@ import pool from '../config/database.js';
 import { recordAudit } from '../config/audit.js';
 import { resolveCode } from './discounts.Controller.js';
 import { activeMembershipDiscount, applyMembershipDiscount } from '../config/membershipPricing.js';
-import { customerStanding, checkCredit, outstandingFor } from '../config/customerTier.js';
+import { customerStanding, checkCredit, outstandingFor, floorFor } from '../config/customerTier.js';
 import { loadRules, pickRule, applyRule, describeRule } from '../config/pricingRules.js';
 import { getSetting } from '../config/settings.js';
 
@@ -549,12 +549,12 @@ export const createBill = async (req, res) => {
     const bill = await loadBill(client, billId);
     let credit = null;
     if (customer_id) {
-      const verdict = await checkCredit(client, customer_id, bill.balance_due, billCafe, billId);
+      const verdict = await checkCredit(client, customer_id, bill.balance_due, billCafe);
       credit = {
         can_pay_later: verdict.ok,
         reason: verdict.reason || null,
         message: verdict.message || null,
-        outstanding: verdict.owed ?? null,
+        wallet_balance: verdict.balance ?? null,
         credit_limit: verdict.limit ?? null,
         remaining: verdict.remaining ?? null
       };
@@ -700,6 +700,17 @@ export const listBills = async (req, res) => {
       listParams
     );
 
+    /*
+     * The summary figures (billed/collected/outstanding/refunded) are what
+     * shows up as the café's revenue on this screen, so a staff/test bill is
+     * excluded from them here — but not from the list itself just above,
+     * which stays a bill-management view: staff still need to find and
+     * settle their own test bills, just without those bills counting as
+     * takings.
+     */
+    const totalsFilters = filters.concat(["COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'"]);
+    const totalsWhere = `WHERE ${totalsFilters.join(' AND ')}`;
+
     const totals = await pool.query(
       `SELECT COUNT(*)::int AS count,
               COALESCE(SUM(b.total),0) AS billed,
@@ -714,8 +725,8 @@ export const listBills = async (req, res) => {
                         WHERE pp.amount < 0
                           AND bb.bill_id IN (SELECT b2.bill_id FROM bills b2
                                              LEFT JOIN customers c2 ON c2.customer_id = b2.customer_id
-                                             ${where.replace('b.', 'b2.').replace('c.', 'c2.')})), 0) AS refunded
-       FROM bills b LEFT JOIN customers c ON c.customer_id = b.customer_id ${where}`,
+                                             ${totalsWhere.replace(/\bb\./g, 'b2.').replace(/\bc\./g, 'c2.')})), 0) AS refunded
+       FROM bills b LEFT JOIN customers c ON c.customer_id = b.customer_id ${totalsWhere}`,
       params
     );
 
@@ -1205,16 +1216,21 @@ export const recordPayment = async (req, res) => {
       }
 
       const balance = Number(wallet.rows[0].balance);
-      if (balance < amount) {
+      // A regular customer may run this negative, up to their own
+      // credit_limit — see customerTier.js. Everyone else's floor is zero,
+      // same refusal as before.
+      const standing = await customerStanding(client, bill.customer_id);
+      const floor = floorFor(standing);
+      const next = money(balance - amount);
+      if (next < floor) {
         await client.query('ROLLBACK');
         return res.status(409).json({
           success: false,
-          message: 'Not enough in the wallet',
-          data: { balance: money(balance), requested: amount }
+          message: floor < 0 ? 'That would exceed their credit limit' : 'Not enough in the wallet',
+          data: { balance: money(balance), requested: amount, credit_limit: standing.creditLimit }
         });
       }
 
-      const next = money(balance - amount);
       await client.query(
         'UPDATE wallets SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE wallet_id = $2',
         [next, wallet.rows[0].wallet_id]
@@ -1222,9 +1238,10 @@ export const recordPayment = async (req, res) => {
       const ledger = await client.query(
         `INSERT INTO wallet_transactions
            (wallet_id, customer_id, direction, amount, balance_after, category, note, performed_by)
-         VALUES ($1,$2,'debit',$3,$4,'purchase',$5,$6) RETURNING transaction_id`,
+         VALUES ($1,$2,'debit',$3,$4,$5,$6,$7) RETURNING transaction_id`,
         [
           wallet.rows[0].wallet_id, bill.customer_id, amount, next,
+          next < 0 ? 'credit_used' : 'purchase',
           `Bill ${bill.bill_number}`, req.actor?.label || null
         ]
       );

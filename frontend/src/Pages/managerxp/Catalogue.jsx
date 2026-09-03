@@ -172,6 +172,19 @@ export const Addons = () => {
   };
   const cancel = () => { setEditing(null); setForm(ADDON_BLANK_FORM); };
 
+  const handleDelete = async (a) => {
+    if (!window.confirm(`Delete ${a.name}? This cannot be undone.`)) return;
+    setNotice(null);
+    try {
+      const r = await adminApi.deleteAddon(a.addon_id);
+      setNotice({ tone: 'good', text: r.message });
+      if (editing === a.addon_id) cancel();
+      load();
+    } catch (err) {
+      setNotice({ tone: 'bad', text: err.message });
+    }
+  };
+
   const save = async (e) => {
     e.preventDefault();
     setNotice(null);
@@ -321,7 +334,12 @@ export const Addons = () => {
                 </td>
                 <td className="px-4 py-2.5 tabular-nums text-neutral-400">{a.active_subscriptions}</td>
                 <td className="px-4 py-2.5 text-right">
-                  {mayEdit && <Button variant="ghost" onClick={() => startEdit(a)}>Edit</Button>}
+                  {mayEdit && (
+                    <>
+                      <Button variant="ghost" className="!px-2 !py-1 !text-xs" onClick={() => startEdit(a)}>Edit</Button>
+                      <Button variant="danger" className="!px-2 !py-1 !text-xs" onClick={() => handleDelete(a)}>Delete</Button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

@@ -78,33 +78,45 @@ export const summary = async (req, res) => {
            COUNT(*) FILTER (WHERE status = 'PAID')::int    AS paid_count,
            COUNT(*) FILTER (WHERE status = 'OPEN')::int    AS open_count,
            COALESCE(SUM(total) FILTER (WHERE status = 'OPEN'), 0) AS outstanding
-         FROM bills WHERE created_at BETWEEN $1 AND $2`, args
+         FROM bills b
+         LEFT JOIN customers c ON c.customer_id = b.customer_id
+         WHERE b.created_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'`, args
       ),
       pool.query(
         `SELECT
            COUNT(*)::int                                        AS session_count,
-           COUNT(*) FILTER (WHERE customer_id IS NULL)::int      AS guest_count,
-           COALESCE(SUM(billable_seconds), 0)                    AS play_seconds,
-           COALESCE(AVG(NULLIF(billable_seconds, 0)), 0)         AS avg_seconds
-         FROM sessions WHERE started_at BETWEEN $1 AND $2`, args
+           COUNT(*) FILTER (WHERE s.customer_id IS NULL)::int    AS guest_count,
+           COALESCE(SUM(s.billable_seconds), 0)                  AS play_seconds,
+           COALESCE(AVG(NULLIF(s.billable_seconds, 0)), 0)       AS avg_seconds
+         FROM sessions s
+         LEFT JOIN customers c ON c.customer_id = s.customer_id
+         WHERE s.started_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'`, args
       ),
       pool.query(
         `SELECT
            COUNT(*)::int                                       AS order_count,
-           COALESCE(SUM(total), 0)                             AS fnb_revenue,
-           COUNT(*) FILTER (WHERE status = 'CANCELLED')::int    AS cancelled
-         FROM orders WHERE created_at BETWEEN $1 AND $2`, args
+           COALESCE(SUM(o.total), 0)                           AS fnb_revenue,
+           COUNT(*) FILTER (WHERE o.status = 'CANCELLED')::int  AS cancelled
+         FROM orders o
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
+         WHERE o.created_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'`, args
       ),
       pool.query(
         `SELECT
            COUNT(*)::int AS new_customers
-         FROM customers WHERE created_at BETWEEN $1 AND $2`, args
+         FROM customers WHERE created_at BETWEEN $1 AND $2 AND customer_type <> 'STAFF'`, args
       ),
       pool.query(
         `SELECT
-           COALESCE(SUM(amount) FILTER (WHERE direction = 'credit'), 0) AS topped_up,
-           COALESCE(SUM(amount) FILTER (WHERE direction = 'debit'), 0)  AS spent
-         FROM wallet_transactions WHERE created_at BETWEEN $1 AND $2`, args
+           COALESCE(SUM(w.amount) FILTER (WHERE w.direction = 'credit'), 0) AS topped_up,
+           COALESCE(SUM(w.amount) FILTER (WHERE w.direction = 'debit'), 0)  AS spent
+         FROM wallet_transactions w
+         LEFT JOIN customers c ON c.customer_id = w.customer_id
+         WHERE w.created_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'`, args
       )
     ]);
 
@@ -179,25 +191,34 @@ export const revenue = async (req, res) => {
          ) AS at
        ),
        billed AS (
-         SELECT date_trunc($3, created_at) AS at,
-                SUM(total)    AS revenue,
-                SUM(discount) AS discounts,
-                COUNT(*)::int AS bills
-         FROM bills WHERE created_at BETWEEN $1 AND $2
+         SELECT date_trunc($3, b.created_at) AS at,
+                SUM(b.total)    AS revenue,
+                SUM(b.discount) AS discounts,
+                COUNT(*)::int   AS bills
+         FROM bills b
+         LEFT JOIN customers c ON c.customer_id = b.customer_id
+         WHERE b.created_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
          GROUP BY 1
        ),
        played AS (
-         SELECT date_trunc($3, started_at) AS at,
+         SELECT date_trunc($3, s.started_at) AS at,
                 COUNT(*)::int AS sessions,
-                SUM(billable_seconds) AS play_seconds
-         FROM sessions WHERE started_at BETWEEN $1 AND $2
+                SUM(s.billable_seconds) AS play_seconds
+         FROM sessions s
+         LEFT JOIN customers c ON c.customer_id = s.customer_id
+         WHERE s.started_at BETWEEN $1 AND $2
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
          GROUP BY 1
        ),
        sold AS (
-         SELECT date_trunc($3, created_at) AS at,
-                SUM(total) AS fnb_revenue,
+         SELECT date_trunc($3, o.created_at) AS at,
+                SUM(o.total) AS fnb_revenue,
                 COUNT(*)::int AS orders
-         FROM orders WHERE created_at BETWEEN $1 AND $2 AND status <> 'CANCELLED'
+         FROM orders o
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
+         WHERE o.created_at BETWEEN $1 AND $2 AND o.status <> 'CANCELLED'
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
          GROUP BY 1
        )
        SELECT span.at,
@@ -255,8 +276,15 @@ export const stations = async (req, res) => {
               MAX(s.started_at)                     AS last_session
        FROM pcs p
        LEFT JOIN floor_zones z ON z.zone_id = p.zone_id
-       LEFT JOIN sessions s
-         ON s.pc_id = p.pc_id AND s.started_at BETWEEN $1 AND $2
+       LEFT JOIN (
+         /* Pre-filtered rather than a WHERE after the join to pcs: a WHERE
+            there would drop a station down to no row at all for a window
+            where every session on it happened to be a staff/test one,
+            instead of correctly showing it idle. */
+         SELECT s.* FROM sessions s
+         LEFT JOIN customers c ON c.customer_id = s.customer_id
+         WHERE COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
+       ) s ON s.pc_id = p.pc_id AND s.started_at BETWEEN $1 AND $2
        GROUP BY p.pc_id, p.name, z.zone_name
        ORDER BY play_seconds DESC, p.name`,
       [window.from, window.to]
@@ -301,7 +329,11 @@ export const hours = async (req, res) => {
               COUNT(s.session_id)::int             AS sessions,
               COALESCE(SUM(s.billable_seconds), 0) AS play_seconds
        FROM slots
-       LEFT JOIN sessions s
+       LEFT JOIN (
+         SELECT s.* FROM sessions s
+         LEFT JOIN customers c ON c.customer_id = s.customer_id
+         WHERE COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
+       ) s
          ON EXTRACT(HOUR FROM s.started_at) = slots.hour
         AND s.started_at BETWEEN $1 AND $2
        GROUP BY slots.hour
@@ -343,7 +375,7 @@ export const customers = async (req, res) => {
                 MAX(s.started_at)                    AS last_visit
          FROM customers c
          JOIN sessions s ON s.customer_id = c.customer_id
-         WHERE s.started_at BETWEEN $1 AND $2
+         WHERE s.started_at BETWEEN $1 AND $2 AND c.customer_type <> 'STAFF'
          GROUP BY c.customer_id, c.customer_name, c.phone_number
          ORDER BY gaming_spend DESC, sessions DESC
          LIMIT $3`,
@@ -353,9 +385,11 @@ export const customers = async (req, res) => {
       // someone who joined last year and came back counts as returning.
       pool.query(
         `WITH first_seen AS (
-           SELECT customer_id, MIN(started_at) AS first_session
-           FROM sessions WHERE customer_id IS NOT NULL
-           GROUP BY customer_id
+           SELECT s.customer_id, MIN(s.started_at) AS first_session
+           FROM sessions s
+           JOIN customers c ON c.customer_id = s.customer_id
+           WHERE s.customer_id IS NOT NULL AND c.customer_type <> 'STAFF'
+           GROUP BY s.customer_id
          )
          SELECT
            COUNT(*) FILTER (WHERE first_session BETWEEN $1 AND $2)::int AS new_customers,
@@ -408,7 +442,9 @@ export const products = async (req, res) => {
                 COALESCE(SUM(oi.amount), 0) AS revenue
          FROM order_items oi
          JOIN orders o ON o.order_id = oi.order_id
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
          WHERE o.created_at BETWEEN $1 AND $2 AND o.status <> 'CANCELLED'
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
          GROUP BY oi.product_id, oi.product_name
          ORDER BY revenue DESC
          LIMIT $3`,
@@ -420,9 +456,11 @@ export const products = async (req, res) => {
                 COALESCE(SUM(oi.amount), 0) AS revenue
          FROM order_items oi
          JOIN orders o ON o.order_id = oi.order_id
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
          LEFT JOIN products p ON p.product_id = oi.product_id
          LEFT JOIN product_categories pc ON pc.category_id = p.category_id
          WHERE o.created_at BETWEEN $1 AND $2 AND o.status <> 'CANCELLED'
+           AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
          GROUP BY 1
          ORDER BY revenue DESC`,
         [window.from, window.to]
@@ -483,8 +521,11 @@ export const finance = async (req, res) => {
          ) AS at
        ),
        billed AS (
-         SELECT date_trunc($4, created_at) AS at, SUM(total) AS revenue
-           FROM bills WHERE cafe_id = $1 AND created_at BETWEEN $2 AND $3
+         SELECT date_trunc($4, b.created_at) AS at, SUM(b.total) AS revenue
+           FROM bills b
+           LEFT JOIN customers c ON c.customer_id = b.customer_id
+          WHERE b.cafe_id = $1 AND b.created_at BETWEEN $2 AND $3
+            AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
           GROUP BY 1
        ),
        spent AS (
@@ -570,6 +611,7 @@ export const games = async (req, res) => {
          LEFT JOIN customers c   ON c.customer_id = s.customer_id
         WHERE s.cafe_id = $1 AND s.status = 'ended'
           AND s.started_at BETWEEN $2 AND $3
+          AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
         GROUP BY sm.software_id, sm.software_name, sm.category,
                  s.customer_id, c.customer_name, s.guest_name
         ORDER BY sm.software_name, revenue DESC

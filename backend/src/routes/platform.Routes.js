@@ -15,7 +15,7 @@ import {
 import {
   listReleases, createRelease, updateRelease, getRollout
 } from '../controllers/updates.Controller.js';
-import { requirePlatformAdmin } from '../middleware/authGuards.js';
+import { requirePlatformAdmin, requireReleaseAgent } from '../middleware/authGuards.js';
 
 const router = express.Router();
 
@@ -32,6 +32,12 @@ const router = express.Router();
 router.get('/pay/:token', getPayLink);
 router.post('/pay/:token/order', startLinkPayment);
 router.post('/pay/:token/complete', completeLinkPayment);
+
+/* The GitHub release workflow publishing a build it just made. Ahead of
+   requirePlatformAdmin on purpose — see requireReleaseAgent. A request
+   without its token falls straight through to the ordinary admin-gated
+   /releases route below, unaffected. */
+router.post('/releases', requireReleaseAgent, createRelease);
 
 /* ==========================================================================
    PLATFORM ADMIN — everything below crosses tenant boundaries

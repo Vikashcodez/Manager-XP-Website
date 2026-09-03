@@ -147,10 +147,57 @@ const openaiProvider = {
   }
 };
 
+/** Google Gemini — generateContent API. */
+const geminiProvider = {
+  name: 'gemini',
+  get configured() { return !!process.env.GEMINI_API_KEY; },
+  async narrate({ analysis, question }) {
+    const model = process.env.AI_MODEL || 'gemini-2.0-flash';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{
+              role: 'user',
+              parts: [{ text: `Question asked: ${question}\n\nComputed analysis:\n${analysis}` }]
+            }],
+            generationConfig: { maxOutputTokens: MAX_TOKENS }
+          })
+        }
+      );
+
+      if (!res.ok) throw new Error(`provider returned ${res.status}`);
+      const body = await res.json();
+      const text = ((body.candidates || [])[0]?.content?.parts || [])
+        .map((p) => p.text).filter(Boolean).join('\n').trim();
+      if (!text) throw new Error('provider returned no text');
+
+      return {
+        text,
+        model,
+        tokens: body.usageMetadata
+          ? { input: body.usageMetadata.promptTokenCount, output: body.usageMetadata.candidatesTokenCount }
+          : null
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+};
+
 const PROVIDERS = {
   deterministic: deterministicProvider,
   anthropic: anthropicProvider,
-  openai: openaiProvider
+  openai: openaiProvider,
+  gemini: geminiProvider
 };
 
 /** The provider named by AI_PROVIDER, or deterministic when unset/unusable. */

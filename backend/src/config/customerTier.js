@@ -86,14 +86,26 @@ export const outstandingFor = async (client, customerId, cafeId = null, excludeB
 };
 
 /**
- * May this customer leave this much unpaid?
+ * How far below zero this customer's wallet may go. Zero for everyone
+ * except a regular with a credit limit — the one number every debit site
+ * checks against instead of a flat "balance >= 0".
+ */
+export const floorFor = (standing) => (standing.type === 'REGULAR' ? -standing.creditLimit : 0);
+
+/**
+ * May this customer's wallet go this far into the negative?
  *
  * Answers with a reason rather than a boolean, because the till has to tell
  * somebody why — "not a regular" and "would exceed their limit" lead to
  * different conversations at the counter.
+ *
+ * Reads wallets.balance directly rather than summing unpaid bills: a
+ * regular's credit is now the same number as their wallet balance, not a
+ * second figure tracked alongside it that could drift from it.
  */
-export const checkCredit = async (client, customerId, amount, cafeId = null, excludeBillId = null) => {
-  const standing = await customerStanding(client, customerId);
+export const checkCredit = async (client, customerId, amount, cafeId = null) => {
+  const db = client || pool;
+  const standing = await customerStanding(db, customerId);
 
   if (!customerId) {
     return { ok: false, reason: 'guest', message: 'A guest cannot run a tab — take payment now.' };
@@ -111,17 +123,23 @@ export const checkCredit = async (client, customerId, amount, cafeId = null, exc
     };
   }
 
-  const owed = await outstandingFor(client, customerId, cafeId, excludeBillId);
-  const after = round2(owed + Number(amount || 0));
-  if (after > standing.creditLimit) {
+  const row = (await db.query(
+    `SELECT balance FROM wallets WHERE customer_id = $1`, [customerId]
+  )).rows[0];
+  const balance = row ? Number(row.balance) : 0;
+  const floor = floorFor(standing);
+  const after = round2(balance - Number(amount || 0));
+
+  if (after < floor) {
+    const owed = balance < 0 ? round2(-balance) : 0;
     return {
-      ok: false, reason: 'over_limit', owed, limit: standing.creditLimit, after,
-      message: `That would put them at ${after} against a ${standing.creditLimit} limit` +
+      ok: false, reason: 'over_limit', balance, limit: standing.creditLimit, after,
+      message: `That would put their balance at ${after}, past the ${standing.creditLimit} credit limit` +
         (owed > 0 ? ` — they already owe ${owed}.` : '.')
     };
   }
 
-  return { ok: true, owed, limit: standing.creditLimit, after, remaining: round2(standing.creditLimit - after) };
+  return { ok: true, balance, limit: standing.creditLimit, after, remaining: round2(after - floor) };
 };
 
-export default { customerStanding, outstandingFor, checkCredit };
+export default { customerStanding, outstandingFor, checkCredit, floorFor };

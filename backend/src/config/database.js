@@ -269,13 +269,27 @@ export const initializeDatabase = async () => {
       CREATE TABLE IF NOT EXISTS wallets (
         wallet_id SERIAL PRIMARY KEY,
         customer_id INTEGER UNIQUE NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
-        balance NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (balance >= 0),
+        balance NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (balance >= -999999),
         currency VARCHAR(8) NOT NULL DEFAULT 'XP',
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    /*
+     * Widened to let a REGULAR customer's balance go negative up to their
+     * own credit_limit — see customerTier.js's checkCredit. A CHECK here
+     * can't reference customers.credit_limit (no cross-table checks in
+     * Postgres), so the real per-customer limit is enforced in application
+     * code exactly like credit_limit already was; this constraint is only a
+     * sanity backstop against a runaway bug, not the actual limit. Dropped
+     * and recreated every boot, same as customers_type_check, since it has
+     * already changed once and a database created before this change would
+     * otherwise keep the old CHECK (balance >= 0) forever.
+     */
+    await client.query(`ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_balance_check`);
+    await client.query(`ALTER TABLE wallets ADD CONSTRAINT wallets_balance_check CHECK (balance >= -999999)`);
 
     // wallet ledger — append-only. balance_after is recorded so history can be
     // read back without replaying every row.
@@ -1655,7 +1669,9 @@ export const initializeDatabase = async () => {
         ('topup.coin_rate',    '1',    'number',  'wallet',
          'Coins credited per unit of currency paid'),
         ('topup.presets',      '100,250,500,1000', 'string', 'wallet',
-         'Quick-pick top-up amounts shown on the station')
+         'Quick-pick top-up amounts shown on the station'),
+        ('topup.bonus_tiers',  '[]',   'json',    'wallet',
+         'Bonus top-up amounts — e.g. pay 1000, get 1100 XP. Array of {pay_amount, credit_amount}; a top-up matching pay_amount exactly credits credit_amount instead of the flat coin rate.')
       ON CONFLICT (setting_key) WHERE cafe_id IS NULL DO NOTHING
     `);
 

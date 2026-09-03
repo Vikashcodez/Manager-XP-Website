@@ -21,17 +21,27 @@ import {
 } from '../modules/payments/payments.crypto.js';
 import { getProvider, listProviders, PROVIDER_IDS } from '../modules/payments/payments.providers.js';
 import { renderCheckout, renderMessage } from '../modules/payments/payments.checkout.js';
+import { getSettings } from '../config/settings.js';
 
 /* ==========================================================================
    HELPERS
    ========================================================================== */
 
-/** Settings that govern self-service top-ups, with safe fallbacks. */
-const loadTopupSettings = async (client) => {
-  const { rows } = await client.query(
-    `SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'topup.%'`
-  );
-  const map = Object.fromEntries(rows.map((r) => [r.setting_key, r.setting_value]));
+/*
+ * Settings that govern self-service top-ups, with safe fallbacks.
+ *
+ * Café-scoped through getSettings, the same accessor every other per-café
+ * setting in the codebase goes through (session grace, warn minutes, and so
+ * on) — this used to read every `topup.%` row across every café with a plain
+ * LIKE query and no cafe_id filter, which meant whichever café's row the
+ * database happened to return last silently won for everyone. Never
+ * surfaced because most installs only have one café to begin with.
+ */
+const loadTopupSettings = async (cafeId) => {
+  const map = await getSettings([
+    'topup.enabled', 'topup.cash_enabled', 'topup.min_amount', 'topup.max_amount',
+    'topup.coin_rate', 'topup.presets', 'topup.bonus_tiers'
+  ], cafeId);
 
   const num = (key, fallback) => {
     const v = Number(map[key]);
@@ -39,16 +49,37 @@ const loadTopupSettings = async (client) => {
   };
 
   return {
-    enabled: map['topup.enabled'] !== 'false',
+    enabled: map['topup.enabled'] !== false,
     // Cash needs no gateway, so it defaults on: a café that has configured
     // nothing can still take money for coins.
-    cashEnabled: map['topup.cash_enabled'] !== 'false',
+    cashEnabled: map['topup.cash_enabled'] !== false,
     min: num('topup.min_amount', 50),
     max: num('topup.max_amount', 10000),
     rate: num('topup.coin_rate', 1),
     presets: String(map['topup.presets'] || '100,250,500,1000')
-      .split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0)
+      .split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0),
+    // e.g. [{ pay_amount: 1000, credit_amount: 1100 }] — "pay 1000, get 1100
+    // XP" instead of the flat rate, for whatever amounts the café picks.
+    bonusTiers: (Array.isArray(map['topup.bonus_tiers']) ? map['topup.bonus_tiers'] : [])
+      .map((t) => ({ pay_amount: Number(t?.pay_amount), credit_amount: Number(t?.credit_amount) }))
+      .filter((t) => Number.isFinite(t.pay_amount) && t.pay_amount > 0 &&
+        Number.isFinite(t.credit_amount) && t.credit_amount > 0)
   };
+};
+
+/*
+ * What a top-up of this exact amount actually credits.
+ *
+ * An amount matching a configured bonus tier gets that tier's fixed payout —
+ * "pay 1000, get 1100" — rather than the flat rate; everything else still
+ * uses the standard coin_rate exactly as before. Tiers apply to the whole
+ * amount, not as a top-up-then-bonus split, so there is one number to reason
+ * about rather than a rate plus an add-on.
+ */
+const resolveTopupCoins = (charge, settings) => {
+  const tier = (settings.bonusTiers || []).find((t) => t.pay_amount === charge);
+  if (tier) return tier.credit_amount;
+  return Number((charge * settings.rate).toFixed(2));
 };
 
 /**
@@ -591,7 +622,7 @@ export const getTopupOptions = async (req, res) => {
   const client = await pool.connect();
   try {
     const cafeId = await resolveCafeId(client, req.actor);
-    const settings = await loadTopupSettings(client);
+    const settings = await loadTopupSettings(cafeId);
 
     const { rows } = await client.query(
       `SELECT * FROM payment_gateways
@@ -665,6 +696,9 @@ export const getTopupOptions = async (req, res) => {
         max_amount: settings.max,
         coin_rate: settings.rate,
         presets: settings.presets,
+        // "Pay 1000, get 1100 XP" — shown ahead of the flat rate wherever a
+        // tier exists, since it is strictly the better deal by design.
+        bonus_tiers: settings.bonusTiers,
         currency: 'INR',
         methods,
         pending_cash_request: pending
@@ -699,7 +733,8 @@ export const createTopupOrder = async (req, res) => {
     const provider = getProvider(providerId);
     if (!provider) return res.status(400).json({ success: false, message: 'Choose a payment method' });
 
-    const settings = await loadTopupSettings(client);
+    const cafeId = await resolveCafeId(client, req.actor);
+    const settings = await loadTopupSettings(cafeId);
     if (!settings.enabled) {
       return res.status(403).json({ success: false, message: 'Self-service top-up is switched off' });
     }
@@ -716,7 +751,7 @@ export const createTopupOrder = async (req, res) => {
     }
     // Two decimal places; a fractional paisa is not a real amount.
     const charge = Number(amount.toFixed(2));
-    const coins = Number((charge * settings.rate).toFixed(2));
+    const coins = resolveTopupCoins(charge, settings);
 
     const customer = await client.query(
       `SELECT ${CUSTOMER_COLUMNS} FROM customers WHERE customer_id = $1`,
@@ -725,7 +760,6 @@ export const createTopupOrder = async (req, res) => {
     if (customer.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
-    const cafeId = await resolveCafeId(client, req.actor);
 
     const gateway = await loadGatewaySecrets(client, cafeId, providerId);
     if (!gateway || !gateway.row.is_enabled || !gateway.keyId || !gateway.keySecret) {
@@ -955,7 +989,38 @@ export const requestCashTopup = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Sign in as a customer to request coins' });
     }
 
-    const settings = await loadTopupSettings(client);
+    /*
+     * Which café approves this request, resolved before settings so the
+     * right café's coin rate and bonus tiers apply — not whichever café the
+     * database happened to answer with.
+     *
+     * resolveCafeId's session-history guess is a proxy for "where is this
+     * customer physically sitting" — useful when the request carries nothing
+     * better, wrong the moment something better is available. A brand-new
+     * customer who registers at a station and asks to top up cash before
+     * staff has ever started a session for them has no session history at
+     * all: on an install with more than one café, resolveCafeId then returns
+     * null, and the request lands nowhere any café's console can see it —
+     * exactly the gap this closes. The station they are physically standing
+     * at is the actual ground truth and takes priority over the guess.
+     */
+    let cafeId = null;
+    const pcName = req.body?.pc_name ? String(req.body.pc_name).trim() : '';
+    if (pcName) {
+      const pc = await client.query(
+        `SELECT cafe_id FROM pcs WHERE name = $1 AND cafe_id IS NOT NULL LIMIT 1`, [pcName]);
+      cafeId = pc.rows[0]?.cafe_id ?? null;
+    }
+    if (cafeId == null) cafeId = await resolveCafeId(client, req.actor);
+
+    if (cafeId == null) {
+      return res.status(409).json({
+        success: false,
+        message: "Couldn't tell which café to send this to. Ask a staff member to add the coins directly."
+      });
+    }
+
+    const settings = await loadTopupSettings(cafeId);
     if (!settings.enabled || !settings.cashEnabled) {
       return res.status(403).json({ success: false, message: 'Cash top-ups are not available here' });
     }
@@ -987,36 +1052,7 @@ export const requestCashTopup = async (req, res) => {
     }
 
     const charge = Number(amount.toFixed(2));
-    const coins = Number((charge * settings.rate).toFixed(2));
-
-    /*
-     * Which café approves this request.
-     *
-     * resolveCafeId's session-history guess is a proxy for "where is this
-     * customer physically sitting" — useful when the request carries nothing
-     * better, wrong the moment something better is available. A brand-new
-     * customer who registers at a station and asks to top up cash before
-     * staff has ever started a session for them has no session history at
-     * all: on an install with more than one café, resolveCafeId then returns
-     * null, and the request lands nowhere any café's console can see it —
-     * exactly the gap this closes. The station they are physically standing
-     * at is the actual ground truth and takes priority over the guess.
-     */
-    let cafeId = null;
-    const pcName = req.body?.pc_name ? String(req.body.pc_name).trim() : '';
-    if (pcName) {
-      const pc = await client.query(
-        `SELECT cafe_id FROM pcs WHERE name = $1 AND cafe_id IS NOT NULL LIMIT 1`, [pcName]);
-      cafeId = pc.rows[0]?.cafe_id ?? null;
-    }
-    if (cafeId == null) cafeId = await resolveCafeId(client, req.actor);
-
-    if (cafeId == null) {
-      return res.status(409).json({
-        success: false,
-        message: "Couldn't tell which café to send this to. Ask a staff member to add the coins directly."
-      });
-    }
+    const coins = resolveTopupCoins(charge, settings);
 
     const created = await client.query(
       `INSERT INTO topup_orders

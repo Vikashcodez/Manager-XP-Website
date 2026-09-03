@@ -426,9 +426,11 @@ export const dashboard = async (req, res) => {
 
     const today = (await pool.query(`
       SELECT
-        COALESCE(SUM(total) FILTER (WHERE created_at >= CURRENT_DATE), 0) AS revenue_today,
-        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)::int           AS bills_today
-      FROM bills WHERE cafe_id = ANY($1::int[])
+        COALESCE(SUM(b.total) FILTER (WHERE b.created_at >= CURRENT_DATE), 0) AS revenue_today,
+        COUNT(*) FILTER (WHERE b.created_at >= CURRENT_DATE)::int             AS bills_today
+      FROM bills b
+      LEFT JOIN customers c ON c.customer_id = b.customer_id
+      WHERE b.cafe_id = ANY($1::int[]) AND COALESCE(c.customer_type, 'NORMAL') <> 'STAFF'
     `, [cafeIds.length ? cafeIds : [0]])).rows[0];
 
     const sessions = (await pool.query(`

@@ -4,6 +4,7 @@ import { getSetting } from '../config/settings.js';
 import { createBillForSession, recalculate } from './billing.Controller.js';
 import { resolveGamingPrice, amountForSeconds } from '../config/sessionPricing.js';
 import { activeMembershipDiscount } from '../config/membershipPricing.js';
+import { checkCredit, customerStanding, floorFor } from '../config/customerTier.js';
 
 /*
  * Play sessions.
@@ -129,6 +130,11 @@ const shape = async (row) => {
     ended_at: row.ended_at,
     elapsed_seconds: elapsed,
     remaining_seconds: plannedSeconds === null ? null : Math.max(0, plannedSeconds - elapsed),
+    /* How much of the start-of-session load buffer is left, so a station that
+       launches the game mid-buffer can hold its own local countdown at the
+       full amount for the same remaining stretch rather than ticking through
+       what the server is still treating as free. */
+    grace_seconds: graceSeconds,
     /* What the session would cost if it ended right now — produced by the same
        function that bills it, so the running figure and the final charge can
        never disagree about the arithmetic. */
@@ -300,9 +306,19 @@ export const startSession = async (req, res) => {
      * can see. `require_prepaid` is the flag only that self-service path
      * sends: it must be able to name a fully-known price up front (a BLOCK or
      * a FLAT — never the open-ended, metered HOUR path, which has no total to
-     * check a wallet against) and the wallet must already cover it. Getting
-     * this wrong is how a café ends up with an unattended session nobody can
-     * collect for.
+     * check a wallet against) and the customer must be able to cover it.
+     * Getting this wrong is how a café ends up with an unattended session
+     * nobody can collect for.
+     *
+     * "Cover it" is wallet balance first, and — for a regular customer the
+     * café has explicitly given a credit limit — whatever's left of that
+     * limit on top. That is the exact same allowance checkCredit already
+     * grants at the till for "let them leave without paying now"; a café
+     * that set a limit so a regular customer never gets turned away at
+     * checkout meant the same thing here, at the start of a session they are
+     * about to sit down and pay for the same way. A limit of zero (the
+     * default) or a non-regular customer falls straight through to the
+     * wallet-only rule, unchanged from before.
      */
     if (req.body?.require_prepaid) {
       if (!customerId) {
@@ -325,10 +341,14 @@ export const startSession = async (req, res) => {
       const wallet = await client.query('SELECT balance FROM wallets WHERE customer_id = $1', [customerId]);
       const balance = wallet.rows[0] ? Number(wallet.rows[0].balance) : 0;
       if (balance < due) {
-        return res.status(402).json({
-          success: false,
-          message: `Your wallet holds ₹${balance.toFixed(0)}, and this needs ₹${due.toFixed(0)}. Top up to start.`
-        });
+        const shortfall = Number((due - balance).toFixed(2));
+        const credit = await checkCredit(client, customerId, shortfall, station.cafe_id);
+        if (!credit.ok) {
+          return res.status(402).json({
+            success: false,
+            message: `Your wallet holds ₹${balance.toFixed(0)}, and this needs ₹${due.toFixed(0)}. Top up to start.`
+          });
+        }
       }
     }
 
@@ -694,18 +714,23 @@ export const resumeSession = (req, res) => mutate(req, res, async (client, row) 
 /*
  * POST /api/sessions/:id/extend
  *
- * Two shapes, one endpoint:
+ * One shape from the outside — `{ minutes }` — for every session, and it
+ * always adds exactly that many minutes. Nothing here rounds the time: a
+ * request for 15 must land at 15, not at the nearest block multiple — an
+ * earlier version of this rounded up to a whole block (e.g. 15 min on a
+ * 10-min-block session became 20), which reads as the timer being wrong,
+ * not as a pricing detail.
  *
- *   A BLOCK session extends by whole blocks — `{ blocks: 1 }`. Each block adds
- *   its own length to the clock and its own price to the bill, at the rate the
- *   session was originally sold at. Nothing is charged now: the extra rides on
- *   the same bill and is settled when the session ends, so a short wallet never
- *   blocks the extension — it just means more to settle later. This is what
- *   lets a player at the station add time themselves without staff, and what
- *   keeps the game running when the balance is low.
+ * A BLOCK session's price is still fixed per whole block, so a partial-block
+ * request is billed proportionally — the block's own per-minute rate times
+ * the minutes actually added — rather than snapping the time to match a
+ * whole-block price. `blocks` is still accepted directly for the station's
+ * own single-tap "+1 block" button, which already knows the exact block
+ * price up front and has no reason to go through minutes at all.
  *
- *   Any other session (open-ended counter play, or a pre-block HOUR session)
- *   extends by bare `{ minutes }`, with no charge, exactly as it always did.
+ * Either way nothing is charged now: the extra rides on the same bill and is
+ * settled when the session ends, so a short wallet never blocks the
+ * extension — it just means more to settle later.
  */
 export const extendSession = (req, res) => mutate(req, res, async (client, row, request) => {
   if (row.status === 'ended') {
@@ -718,15 +743,23 @@ export const extendSession = (req, res) => mutate(req, res, async (client, row, 
     if (!Number.isInteger(unitMinutes) || unitMinutes < 1 || !Number.isFinite(unitAmount)) {
       return { error: 'This session has no block to extend by', status: 409 };
     }
-    /* Default to one block. A count keeps the door open for "+2 hours" without
-       a second round trip, but the station only ever sends one at a time. */
-    const blocks = request.body?.blocks === undefined ? 1 : parseInt(request.body.blocks, 10);
-    if (!Number.isInteger(blocks) || blocks < 1 || blocks > 24) {
-      return { error: 'Extend by between 1 and 24 blocks' };
-    }
 
-    const addMinutes = unitMinutes * blocks;
-    const addAmount = Number((unitAmount * blocks).toFixed(2));
+    let addMinutes;
+    let addAmount;
+    if (request.body?.blocks !== undefined) {
+      const blocks = parseInt(request.body.blocks, 10);
+      if (!Number.isInteger(blocks) || blocks < 1 || blocks > 24) {
+        return { error: 'Extend by between 1 and 24 blocks' };
+      }
+      addMinutes = unitMinutes * blocks;
+      addAmount = Number((unitAmount * blocks).toFixed(2));
+    } else {
+      addMinutes = parseInt(request.body?.minutes, 10);
+      if (!Number.isInteger(addMinutes) || addMinutes < 1 || addMinutes > 1440) {
+        return { error: 'Extend by between 1 and 1440 minutes' };
+      }
+      addAmount = Number(((unitAmount / unitMinutes) * addMinutes).toFixed(2));
+    }
 
     await client.query(
       `UPDATE sessions
@@ -736,9 +769,7 @@ export const extendSession = (req, res) => mutate(req, res, async (client, row, 
         WHERE session_id = $3`,
       [addMinutes, addAmount, row.session_id]
     );
-    return {
-      message: `Added ${blocks} block${blocks === 1 ? '' : 's'} — ${addMinutes} min, ${addAmount} on the bill`
-    };
+    return { message: `Extended by ${addMinutes} min — ${addAmount} on the bill` };
   }
 
   const minutes = parseInt(request.body?.minutes, 10);
@@ -845,8 +876,13 @@ export const endSession = async (req, res) => {
         paymentStatus = 'unpaid';
       } else {
         const balance = Number(wallet.rows[0].balance);
-        if (balance >= amount) {
-          const next = Number((balance - amount).toFixed(2));
+        // A regular customer's wallet may cover this by going negative, up
+        // to their own credit_limit — see customerTier.js. Everyone else's
+        // floor is zero, same behaviour as before.
+        const standing = await customerStanding(client, row.customer_id);
+        const floor = floorFor(standing);
+        const next = Number((balance - amount).toFixed(2));
+        if (next >= floor) {
           await client.query(
             'UPDATE wallets SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE wallet_id = $2',
             [next, wallet.rows[0].wallet_id]
@@ -854,13 +890,14 @@ export const endSession = async (req, res) => {
           const ledger = await client.query(
             `INSERT INTO wallet_transactions
                (wallet_id, customer_id, direction, amount, balance_after, category, note, performed_by)
-             VALUES ($1,$2,'debit',$3,$4,'gaming',$5,$6)
+             VALUES ($1,$2,'debit',$3,$4,$5,$6,$7)
              RETURNING transaction_id`,
             [
               wallet.rows[0].wallet_id,
               row.customer_id,
               amount,
               next,
+              next < 0 ? 'credit_used' : 'gaming',
               `Session #${row.session_id}`,
               req.actor?.label || null
             ]
@@ -868,7 +905,8 @@ export const endSession = async (req, res) => {
           walletTransactionId = ledger.rows[0].transaction_id;
           paymentStatus = 'paid';
         } else {
-          // Ending is never blocked by a short balance — staff settle it.
+          // Even their full credit limit doesn't cover it — ending is still
+          // never blocked; staff settle the remainder like any other tab.
           paymentStatus = 'unpaid';
         }
       }

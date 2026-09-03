@@ -236,9 +236,9 @@ has found nothing.
 ## Providers
 
 ```
-AI_PROVIDER = deterministic | anthropic | openai
-AI_MODEL    = claude-sonnet-5 | gpt-4o-mini | …
-ANTHROPIC_API_KEY / OPENAI_API_KEY
+AI_PROVIDER = deterministic | anthropic | openai | gemini
+AI_MODEL    = claude-sonnet-5 | gpt-4o-mini | gemini-2.0-flash | …
+ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
 AI_TIMEOUT_MS  (default 20000)
 AI_MAX_TOKENS  (default 400)
 AI_RATE_LIMIT_PER_MINUTE (default 20)

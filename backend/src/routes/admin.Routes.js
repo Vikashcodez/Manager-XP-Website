@@ -21,7 +21,7 @@ import {
   listPackages, getPackage, createPackage, updatePackage,
   setPackageFeatures, setPackagePrices,
   listFeatureMaster, createFeature, updateFeature,
-  listAddons, createAddon, updateAddon,
+  listAddons, createAddon, updateAddon, deleteAddon,
   listAudit
 } from '../controllers/admin.Controller.js';
 import {
@@ -172,6 +172,7 @@ router.patch('/features/:key', requirePermission('features.edit'), updateFeature
 router.get('/addons', requirePermission('addons.view'), listAddons);
 router.post('/addons', requirePermission('addons.edit'), createAddon);
 router.patch('/addons/:id', requirePermission('addons.edit'), updateAddon);
+router.delete('/addons/:id', requirePermission('addons.edit'), deleteAddon);
 
 /* Administrators and roles. Reading is dmins.view; anything that changes
    who can do what is dmins.manage. The controller adds the refusals that

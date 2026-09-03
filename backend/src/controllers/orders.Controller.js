@@ -1,6 +1,7 @@
 import pool from '../config/database.js';
 import { getSetting } from '../config/settings.js';
 import { applyMovement } from './products.Controller.js';
+import { customerStanding, floorFor } from '../config/customerTier.js';
 
 /*
  * Orders placed from a station.
@@ -198,9 +199,14 @@ export const placeOrder = async (req, res) => {
         'SELECT * FROM wallets WHERE customer_id = $1 FOR UPDATE', [customerId]
       );
       const balance = wallet.rows.length ? Number(wallet.rows[0].balance) : 0;
+      // A regular customer's wallet may cover this by going negative, up to
+      // their own credit_limit — see customerTier.js. Everyone else's floor
+      // is zero, same behaviour as before.
+      const standing = wallet.rows.length ? await customerStanding(client, customerId) : null;
+      const floor = standing ? floorFor(standing) : 0;
+      const next = money(balance - total);
 
-      if (wallet.rows.length && balance >= total) {
-        const next = money(balance - total);
+      if (wallet.rows.length && next >= floor) {
         await client.query(
           'UPDATE wallets SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE wallet_id = $2',
           [next, wallet.rows[0].wallet_id]
@@ -208,8 +214,8 @@ export const placeOrder = async (req, res) => {
         const ledger = await client.query(
           `INSERT INTO wallet_transactions
              (wallet_id, customer_id, direction, amount, balance_after, category, note, performed_by)
-           VALUES ($1,$2,'debit',$3,$4,'food',$5,$6) RETURNING transaction_id`,
-          [wallet.rows[0].wallet_id, customerId, total, next, orderNumber, req.actor?.label || null]
+           VALUES ($1,$2,'debit',$3,$4,$5,$6,$7) RETURNING transaction_id`,
+          [wallet.rows[0].wallet_id, customerId, total, next, next < 0 ? 'credit_used' : 'food', orderNumber, req.actor?.label || null]
         );
         await client.query(
           `INSERT INTO payments (bill_id, customer_id, method, amount, reference, wallet_transaction_id, received_by)
