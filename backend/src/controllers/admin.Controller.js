@@ -499,15 +499,27 @@ export const setOrganizationStatus = async (req, res) => {
  */
 export const listStationTypes = async (_req, res) => {
   try {
+    /* DISTINCT ON (LOWER(category)), not DISTINCT category: this list has no
+       fixed enum behind it at all — it is exactly the raw values already
+       typed into pcs.category and software_master.category, platform-wide.
+       A café that once free-typed "pc" or "ps" (the "Other…" escape hatch on
+       Add Station, before this list existed to offer it as a choice) put
+       that casing into every other café's dropdown forever, right beside
+       the canonical "PC"/"PS". Grouping case-insensitively and taking the
+       first result, tie-broken with `COLLATE "C"` (plain byte order, not the
+       database's locale collation — which sorts case-insensitively-ish on
+       many installs and would pick either one unpredictably) so 'P' (0x50)
+       reliably sorts before 'p' (0x70) and the upper/title-cased spelling
+       wins over an all-lowercase one whenever both exist. */
     const { rows } = await pool.query(`
-      SELECT DISTINCT category FROM (
+      SELECT DISTINCT ON (LOWER(category)) category FROM (
         SELECT category FROM pcs            WHERE category IS NOT NULL AND category <> ''
         UNION ALL
         SELECT category FROM software_master WHERE category IS NOT NULL AND category <> ''
       ) t
-      ORDER BY category
+      ORDER BY LOWER(category), category COLLATE "C"
     `);
-    res.json({ success: true, data: rows.map((r) => r.category) });
+    res.json({ success: true, data: rows.map((r) => r.category).sort((a, b) => a.localeCompare(b)) });
   } catch (error) {
     console.error('Station type list failed:', error);
     res.status(500).json({ success: false, message: 'Could not load station types' });

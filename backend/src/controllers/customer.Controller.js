@@ -671,6 +671,16 @@ export const getCustomerCredit = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const cafeId = req.actor?.cafe_id ?? null;
+    // customerStanding takes a bare id with no café of its own to check —
+    // every other call site already reaches it through an already-scoped
+    // customer row, so the check belongs here, the one place that didn't.
+    const owned = await pool.query(
+      'SELECT customer_id FROM customers WHERE customer_id = $1 AND cafe_id IS NOT DISTINCT FROM $2',
+      [id, cafeId]
+    );
+    if (owned.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
     const standing = await customerStanding(pool, id);
     const owed = await outstandingFor(pool, id, cafeId);
     res.status(200).json({

@@ -466,7 +466,13 @@ export const checkStationLimit = async (organizationId, category, excludePcId = 
   const subscription = await getSubscription(organizationId);
   if (!subscription) return { ok: false, message: 'This account has no active subscription' };
 
-  const max = subscription.station_limits[name];
+  /* Matched case-insensitively: the plan editor's keys and a station's own
+     category both come from the same free-typed history (see
+     admin.Controller.js's listStationTypes), so "Pool" on the plan and
+     "pool" on a station are the same cap, not an uncapped mismatch. */
+  const limitsKey = Object.keys(subscription.station_limits || {})
+    .find((k) => k.toLowerCase() === name.toLowerCase());
+  const max = limitsKey ? subscription.station_limits[limitsKey] : null;
   if (max == null) return { ok: true };     // this type is not capped
 
   /* Active gaming PCs of this type, this organization. Counted at the moment
@@ -474,7 +480,7 @@ export const checkStationLimit = async (organizationId, category, excludePcId = 
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS used FROM pcs
       WHERE organization_id = $1 AND is_active AND device_type = 'GAMING_PC'
-        AND category = $2 AND ($3::int IS NULL OR pc_id <> $3::int)`,
+        AND LOWER(category) = LOWER($2) AND ($3::int IS NULL OR pc_id <> $3::int)`,
     [organizationId, name, excludePcId]
   );
   const used = rows[0].used;

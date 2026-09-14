@@ -48,12 +48,22 @@ const provisionOrganization = async (client, {
   const state = location?.state || null;
   const city = location?.city || null;
 
+  /*
+   * currency already fell back to 'INR' when no country was resolved —
+   * timezone did not, and organizations.timezone is NOT NULL. A signup with
+   * no location (createOrganization's "just the business name" flow, used
+   * by CreateBusiness.jsx for anyone who registered without going through
+   * the public signup form's location step, e.g. after Google OAuth) hit
+   * that constraint and failed with a raw 500 — the account and every part
+   * of the trial silently never got created. Same default market as the
+   * currency fallback, and as the phone form's own default country.
+   */
   const org = (await client.query(`
     INSERT INTO organizations
       (name, slug, email, phone, address, address_line_1, address_line_2,
        city, state, country, postal_code, currency, timezone,
        country_id, state_id, city_id, status)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'INR'),$13,$14,$15,$16,'ACTIVE')
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'INR'),COALESCE($13,'Asia/Kolkata'),$14,$15,$16,'ACTIVE')
     RETURNING *
   `, [
     orgName,
